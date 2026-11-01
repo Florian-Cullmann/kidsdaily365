@@ -1,0 +1,54 @@
+name: kidsdaily365
+
+x-app-environment: &app-environment
+  APP_MODE: live
+  APP_ORIGIN: ${APP_ORIGIN:?APP_ORIGIN muss auf die Browser-Adresse zeigen}
+  DATABASE_URL: postgres://kidsdaily:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD setzen}@db:5432/kidsdaily
+  FAMILY_ID: ${FAMILY_ID:?FAMILY_ID setzen}
+  DEVICE_PAIRING_CODE: ${DEVICE_PAIRING_CODE:?DEVICE_PAIRING_CODE setzen}
+  SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET setzen}
+  FAMILY_TIMEZONE: ${FAMILY_TIMEZONE:-Europe/Berlin}
+  FAMILY_NAME: ${FAMILY_NAME:-Unsere Familie}
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kidsdaily
+      POSTGRES_DB: kidsdaily
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD setzen}
+    volumes:
+      - ${APPDATA_PATH:-/mnt/user/appdata/kidsdaily365}/postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kidsdaily -d kidsdaily"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    # PostgreSQL has no host port; only the app network can reach it.
+
+  migrate:
+    build:
+      context: .
+      target: tools
+    environment: *app-environment
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      target: runner
+    restart: unless-stopped
+    environment: *app-environment
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
