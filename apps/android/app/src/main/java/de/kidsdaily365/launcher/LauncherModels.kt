@@ -1,10 +1,5 @@
 package de.kidsdaily365.launcher
 
-/** Read-only port. Pairing/Keystore/transport and managed enforcement are tracked in issue #2. */
-interface LauncherRepository {
-    suspend fun snapshot(): LauncherSnapshot
-}
-
 data class AllowedApp(val packageName: String, val label: String)
 data class Buddy(val kind: String, val name: String, val cosmeticIds: List<String>)
 data class Child(val id: String, val name: String, val avatar: String, val reducedMotion: Boolean)

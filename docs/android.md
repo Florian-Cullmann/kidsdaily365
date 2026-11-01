@@ -2,7 +2,7 @@
 
 ## Aktueller Stand
 
-Die Elternverwaltung und die getrennte Launcher-API sind umgesetzt. Eltern können ein Handy genau einem Kinderprofil zuweisen, die App-Freigaben je Kind pflegen und einen Gerätezugang widerrufen. Der Server liefert Sterne, Buddy und Freigaben ausschließlich lesend. Das kompilierbare native Projekt liegt unter `apps/android/`; es zeigt eine klar als ungeschützt gekennzeichnete Vorschau und verbindet sich noch nicht mit dem Server.
+Die Elternverwaltung und die getrennte Launcher-API sind umgesetzt. Eltern können ein Handy genau einem Kinderprofil zuweisen, die App-Freigaben je Kind pflegen und einen Gerätezugang widerrufen. Der Server liefert Sterne, Buddy und Freigaben ausschließlich lesend. Das kompilierbare native Projekt liegt unter `apps/android/`; es koppelt das Handy per Gerätecode, speichert Zugang und Cache Keystore-verschlüsselt und zeigt Buddy, Live-Sterne und freigegebene Apps. Die native Ansicht bleibt klar als ungeschützte Vorschau gekennzeichnet.
 
 **Die echte Gerätesperre ist noch nicht implementiert.** Sie wird in [Issue #2](https://github.com/Florian-Cullmann/kidsdaily365/issues/2) umgesetzt und auf dem tatsächlichen Telefon geprüft. [Buddy-Kosmetik und Käufe](https://github.com/Florian-Cullmann/kidsdaily365/issues/3) sind ein späterer, getrennter Funktionsblock.
 
@@ -32,12 +32,14 @@ Als Projektbasis gilt **Android 13/API 33 und neuer**, mit `compileSdk/targetSdk
 
 Die DPC-Policy muss außerdem Änderungen an Apps, Nutzerwechseln und unkontrollierten Installationswegen berücksichtigen. Eine Paketliste im Startbildschirm allein ist kein Nachweis einer Systemsperre. [UserManager restrictions](https://developer.android.com/reference/android/os/UserManager#DISALLOW_APPS_CONTROL).
 
-## Bereits implementierter Backend-Vertrag
+## Verbindung und Backend-Vertrag
+
+Die Einrichtungs- und Build-Schritte stehen in [apps/android/README.md](../apps/android/README.md). Release-Verbindungen verwenden HTTPS mit gültigem Zertifikat. Ausschließlich Debug erlaubt für LAN-Tests auch HTTP mit privater IP-Adresse; kein HTTP-Hostname, kein Redirect und keine TLS-Ausnahme.
 
 ### Freigabe
 
 1. Ein angemeldeter Elternteil erstellt unter Geräte einen Android-Code für genau ein aktives Kind.
-2. Die spätere App übermittelt `POST /api/device/pair` mit `{ "code": "…", "kind": "android" }`. Native Requests dürfen ohne `Origin` kommen; Browser-Origins müssen der konfigurierten Adresse entsprechen.
+2. Die App übermittelt `POST /api/device/pair` mit `{ "code": "…", "kind": "android" }`. Native Requests dürfen ohne `Origin` kommen; Browser-Origins müssen der konfigurierten Adresse entsprechen.
 3. Der zehn Minuten gültige Code wird atomar einmalig verbraucht. Das Ergebnis enthält einen zufälligen Bearer-Token, Geräte-ID und Ablaufdauer (90 Tage), aber kein Browsercookie.
 4. Der Server speichert ausschließlich den HMAC-Hash des Tokens. Widerruf, Ablauf oder Archivierung des Kinderprofils beenden den Zugriff. Ein erneutes Verbinden benötigt wieder einen Eltern-Code.
 
@@ -68,17 +70,17 @@ Die DPC-Policy muss außerdem Änderungen an Apps, Nutzerwechseln und unkontroll
 }
 ```
 
-Der versionierte Zod-Vertrag liegt in `src/domain/launcher.ts`, passende native DTOs in `LauncherRepository.kt`. Der Snapshot enthält keine Aufgaben, Termine, Elternkonten, Geschwisterdaten oder Passworthashes. `policy` beschreibt den gewünschten Zustand, **nicht den Nachweis**, dass ein Telefon ihn bereits durchsetzt. `revision` ändert sich bei einer Änderung der aktiven App-Liste; andere Snapshot-Felder werden trotzdem bei jedem Abruf neu gelesen.
+Der versionierte Zod-Vertrag liegt in `src/domain/launcher.ts`, passende native DTOs in `LauncherModels.kt`, die strikte Validierung in `LauncherProtocol.kt`. Eine gemeinsame fiktive Vertragsdatei unter `contracts/launcher-v1.example.json` wird durch Kotlin und Zod geprüft. Der Snapshot enthält keine Aufgaben, Termine, Elternkonten, Geschwisterdaten oder Passworthashes. `policy` beschreibt den gewünschten Zustand, **nicht den Nachweis**, dass ein Telefon ihn bereits durchsetzt. `revision` ändert sich bei einer Änderung der aktiven App-Liste; andere Snapshot-Felder werden trotzdem bei jedem Abruf neu gelesen.
 
-Die spätere App fragt im Vordergrund alle fünf Sekunden ab. Das ist ein begrenztes Polling-Intervall und noch kein Push/SSE. Der Sternestand kommt ausschließlich vom Server. Gerätestatus und Alter der letzten erfolgreichen Synchronisierung müssen sichtbar sein. Im lokalen LAN ist der Server direkt erreichbar; außerhalb braucht das Telefon einen eingerichteten, HTTPS-geschützten Zugang/VPN. Es gibt keinen automatischen Cloud-Relay.
+Die App fragt im Vordergrund alle fünf Sekunden ab. Das ist ein begrenztes Polling-Intervall und noch kein Push/SSE. Der Sternestand kommt ausschließlich vom Server. Gerätestatus und Alter der letzten erfolgreichen Synchronisierung müssen sichtbar sein. Im lokalen LAN ist der Server direkt erreichbar; außerhalb braucht das Telefon einen eingerichteten, HTTPS-geschützten Zugang/VPN. Es gibt keinen automatischen Cloud-Relay.
 
 Neue Kinderprofile erhalten [Audible (`com.audible.application`)](https://play.google.com/store/apps/details?id=com.audible.application) als erste App-Freigabe. Eltern können sie archivieren und weitere exakte Paketnamen freigeben. Platzhalter, URLs und besonders kritische Standard-Systempakete werden im Backend abgewiesen. Installation, Audible-Anmeldung und Downloads sind damit nicht automatisch erledigt; fehlende Apps müssen als fehlend angezeigt werden.
 
 ## Offline, Widerruf und Recovery
 
-- Den Token in der späteren App verschlüsselt mit einem durch Android Keystore geschützten Schlüssel speichern; kein SharedPreferences-Klartext und keine Backups von Zugangsdaten.
-- Letzten validierten Snapshot samt Empfangszeit lokal speichern. Eine ungültige Antwort, unbekannte Version oder Netzwerkfehler darf nie alle Apps freigeben.
-- Eine maximale Offline-Frist von 24 Stunden ist im Vertrag vorgesehen. Nach Ablauf bleibt nur die sichere Launcher-/Wartungsansicht; keine automatische Lockerung der Schutzregeln. Nach Prozess-/Geräteneustart ist dieselbe letzte Policy wiederherzustellen.
+- Implementiert: Token und letzter validierter Snapshot liegen gemeinsam AES-256-GCM-verschlüsselt im privaten No-Backup-Speicher; der Schlüssel bleibt im Android Keystore. Kein SharedPreferences-Klartext, keine Zugangsdaten-Backups. Der Gerätecode wird nicht gespeichert. Bei Widerruf/Token-Ablauf wird die Verbindung gelöscht.
+- Implementiert: Snapshot samt Empfangszeit, monotoner Gerätezeit und Boot-Zählung speichern. Ungültige Antwort/unbekannte Version verwirft die bisherige Startliste auch über Prozessneustarts hinweg; Netzwerkfehler erhält ausschließlich den letzten gültigen Stand. Geräte- und Kinderbindung werden geprüft. Keine Fehlerbehandlung gibt zusätzliche Apps frei.
+- Implementiert in der Vorschau: maximal 24 Stunden App-Starts mit gültigem Cache, monoton gemessen; danach bleibt die Buddy-Ansicht ohne App-Starts. Ein Prozessneustart im selben Geräte-Boot erhält diese Frist. Nach Geräte-Neustart oder unbekanntem Boot-Zähler sind App-Starts bis zur Online-Bestätigung gesperrt. Die spätere DPC-Umsetzung muss die System-Policy schon beim Start wiederherstellen; die heutige Ansicht allein bietet keine Systemsperre.
 - Ein offline befindliches Telefon kann einen serverseitigen Widerruf erst beim nächsten Kontakt erkennen. Die API kann keine sofortige Offline-Fernsperre garantieren.
 - Vor Aktivierung echter Sperren muss es eine getrennte elterliche Wartungsfreigabe geben, die auch bei ausgefallenem Server funktioniert: eigener lokal geprüfter, stark gehashter Eltern-Recovery-Code, Rate Limit, kurze Wartungsfrist und nachvollziehbarer Rückweg in den Kindermodus. Niemals den Kinder-/Gerätetoken als Wartungsrecht verwenden.
 - Notruf- und notwendige System-Sicherheitswege bleiben erhalten. Physisches Abschalten, Hardware-Recovery, Factory Reset über Recovery, entsperrte Bootloader und OS-Sicherheitslücken können nicht mit einer Launcher-Oberfläche vollständig verhindert werden. „Nicht schließbar“ bedeutet den geprüften verwalteten Alltagsbetrieb, keine absolute physische Manipulationssicherheit.
