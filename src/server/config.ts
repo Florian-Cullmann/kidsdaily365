@@ -6,8 +6,12 @@ const liveSchema = z.object({
   APP_ORIGIN: z.url().refine((value) => ["http:", "https:"].includes(new URL(value).protocol)),
   DATABASE_URL: z.string().startsWith("postgres"),
   FAMILY_ID: z.uuid(),
-  DEVICE_PAIRING_CODE: z.string().min(24),
+  SETUP_CODE: z.string().min(24),
   SESSION_SECRET: z.string().min(32),
+  FAMILY_NAME: z.string().min(1).default("Unsere Familie"),
+  FAMILY_TIMEZONE: z.string().default("Europe/Berlin").refine((value) => {
+    try { new Intl.DateTimeFormat("de", { timeZone: value }); return true; } catch { return false; }
+  }),
 });
 
 export function appMode(): "demo" | "live" {

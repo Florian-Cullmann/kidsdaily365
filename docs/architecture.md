@@ -1,62 +1,77 @@
-# Architekturentscheidungen
+# Architektur
 
-## Ziel und erster Zuschnitt
+## Drei Oberflächen, getrennte Rechte
 
-Ein Haushalt, ein Unraid-Server, ein gemeinsam genutzter Windows-Touchscreen. Die App startet immer in einer Profilauswahl. Das ausgewählte Kind bekommt eigene Aufgaben, Termine, Sterne und einen benannten Buddy. Die bereitgestellte Bildreferenz bestimmt die Richtung: eine illustrierte Waldwelt, große Karten, deutliche Erledigt-Zustände und ein Begleiter neben dem Plan. Fuchs, Hase und Bär sind lokale transparente WebP-Assets; Aufgabensymbole nutzen farbige System-Emojis. Es gibt keine automatische Bewegung oder Geräusche.
+| Client | Aufgabe | Berechtigung |
+| --- | --- | --- |
+| Eltern-Webbereich `/eltern` | Familie, Profile, Pläne, App-Freigaben und Geräte verwalten | Persönliches Elternkonto; serverseitige Sitzung |
+| Wandbildschirm `/` | Profilauswahl, persönlicher Tagesplan, Aufgaben abhaken | Individuell freigegebenes Wandgerät; Gerätecookie |
+| Native Android-App | Eigener Buddy, eigene Sterne, erlaubte Apps | Ein Kind je Gerät; ausschließlich lesender Bearer-Token |
 
-Die Kinderansicht verzichtet auf Seitenleiste, Metrik-Karten und Tagesabschnitt-Tabs. Eine „Heute“-Liste zeigt alle Aufgaben mit Namen, Uhrzeit, Sternen und großem Haken. Eine feste Navigation unten öffnet Tagesplan, Termine und Wünsche oder die Profilauswahl. Der Buddy und eine kleine Vorschau auf den nächsten Termin und das nächste Wunschziel bleiben daneben sichtbar. Im Querformat hat die Aufgabenliste einen eigenen Scrollbereich; im Hochformat fließt der Inhalt untereinander. Navigationsflächen sind mindestens 62 Pixel, Aufgabenkarten mindestens 80 Pixel hoch. Die Tagesabschnitte bleiben als fachliche Information im Datenmodell erhalten.
+Ein Haushalt pro Installation, konfiguriert durch die stabile `FAMILY_ID`. Das Datenmodell bewahrt Familiengrenzen; Registrierung bietet keine öffentliche Auswahl oder frei übermittelbare Familien-ID. Familien- und Kinderzuordnung kommen aus der serverseitig geprüften Identität, nicht aus frei gewählten Clientparametern.
 
-Next.js mit TypeScript verbindet die Website und eine kleine HTTP-API. PostgreSQL speichert den fachlichen Zustand; Drizzle hält Schema und Migrationen im Repository. Wir starten ohne Microservices, externen Identity-Anbieter oder separaten Worker. [Next.js unterstützt Self-Hosting](https://nextjs.org/docs/app/guides/self-hosting); die Docker-Auslieferung nutzt den Standalone-Build. [Drizzle-Transaktionen](https://orm.drizzle.team/docs/transactions) und Datenbankconstraints sichern die Punktevergabe ab.
+Next.js/TypeScript verbindet UI und HTTP-API, PostgreSQL speichert den Zustand und Drizzle versioniert das Schema. Fachliche Dienste und Datenbankzugriff liegen unter `src/server/`; validierte Eingabeverträge unter `src/domain/`. Android ist ein eigenständiges natives Projekt. Es gibt keine Microservices, externen Identity-Anbieter oder Cloud-Abhängigkeit. Die Auslieferung nutzt den [Next.js-Standalone-Build](https://nextjs.org/docs/app/guides/self-hosting).
+
+## Eltern und erste Einrichtung
+
+Der erste Elternzugang benötigt den bei der Installation gesetzten `SETUP_CODE`. Die erste Registrierung legt den konfigurierten Haushalt bei Bedarf automatisch an. Eine PostgreSQL-Transaktionssperre serialisiert die erste Besitzübernahme; danach ist derselbe Einrichtungscode keine weitere Registrierungsberechtigung. Weitere Eltern brauchen eine vom bestehenden Elternteil erzeugte, einmalige Einladung mit 48 Stunden Gültigkeit. Alle Eltern dieser Installation sind gleichberechtigte Haushaltsadministratoren.
+
+Passwörter werden mit Nodes eingebautem scrypt, individuellem Salt und `N=2^17, r=8, p=1` gespeichert. Die Implementierung begrenzt gleichzeitige Hashvorgänge, Eingabelängen und Anmeldeversuche. Ein unbekanntes Konto verursacht ebenfalls den Hashaufwand; die Login-Fehlermeldung verrät nicht, ob eine E-Mail registriert ist. Diese Parameter folgen der [OWASP-Empfehlung für scrypt](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html).
+
+Zufällige Sitzungstokens werden nur gehasht in der Datenbank gespeichert (HMAC-SHA256 mit `SESSION_SECRET`). Das Elterncookie ist HttpOnly, SameSite=Strict, bei HTTPS Secure und zwölf Stunden gültig. Logout löscht die Sitzung. Passwortwechsel beendet alle alten Sitzungen dieses Kontos und gibt auf dem aktuellen Gerät eine neue aus. Operator-Recovery über `npm run auth:reset` widerruft sämtliche Sitzungen des betroffenen Kontos. Rotation von `SESSION_SECRET` widerruft zusätzlich sämtliche Geräte-, Einladungs- und Pairing-Tokens; Passwörter bleiben gültig.
+
+Beim Betreten des gemeinsamen Kinderbildschirms mit einer noch aktiven Elternsitzung erscheint zunächst die Abmeldeansicht. Erst nach erfolgreichem Logout und Neuladen wird die Kinderansicht zugänglich. Das separate Gerätecookie bleibt erhalten. Eltern sollten ihren eigenen Zugang auf dem persönlichen Gerät nutzen; Profilauswahl unter Geschwistern ist bewusst keine zusätzliche Anmeldung.
+
+## Geräte und Schreibgrenzen
+
+Eltern erzeugen einen zehn Minuten gültigen, zufälligen Gerätecode für `wall` oder `android`. Android-Codes müssen genau einem aktiven Kind zugeordnet sein; Wandgeräte haben keine einzelne Kinderzuordnung. Der Gerätetyp wird aus dem gespeicherten Code abgeleitet. Ein Client kann durch einen anderen angefragten Typ keine zusätzlichen Rechte erlangen. Ein Code wird unter einer Zeilensperre genau einmal verbraucht.
+
+Wandgeräte bekommen ausschließlich ein HttpOnly-Cookie, Android-Geräte ausschließlich einen Bearer-Token. Beide werden serverseitig als einzelne Geräte mit 90 Tagen Laufzeit geführt und können widerrufen werden. Archivierung eines Kindes widerruft seine Android-Geräte. Jede Geräteprüfung kontrolliert Ablauf, Widerruf, konfigurierten Haushalt und gegebenenfalls das aktive Kinderprofil. Eine Erweiterung von Leserechten zu Verwaltungs- oder Abhakrechten findet niemals statt.
+
+Browser-Schreibzugriffe brauchen den exakt zu `APP_ORIGIN` passenden Origin-Header. Native Pairing-Requests dürfen den Header weglassen, erhalten dadurch aber nur die Rechte ihres Android-Codes. Native Tokens werden am Aufgabenabschluss ausdrücklich abgewiesen. Elternrouten verwenden ausschließlich die Elternsitzung; Gerätecookies und Bearer-Tokens sind dort wirkungslos. Der Launcher-Snapshot enthält keine Aufgaben oder Geschwisterdaten. Es gibt keinen Kauf- oder Punkteänderungs-Endpunkt für Handys.
 
 ## Datenmodell
 
-| Tabelle | Verantwortung |
+| Tabellen | Verantwortung |
 | --- | --- |
-| `families` | Haushaltsgrenze, Name und IANA-Zeitzone |
-| `children` | Eigenes Profil, Avatar, Buddy-Typ/-Name, Einstellung für reduzierte Bewegung |
-| `task_templates` | Aktive tägliche Routinen pro Kind, Beschreibung, Tagesabschnitt, Uhrzeit, Punkte, Reihenfolge |
-| `daily_tasks` | Einmalige Tageskopie einer Routine oder eigenständige Aufgabe mit Datum |
-| `point_entries` | Verdiente Punkte; genau ein unveränderter Buchungseintrag pro erledigter Aufgabe |
-| `appointments` | Eigene Termine pro Kind mit UTC-Zeitpunkten und optionalem Ende |
-| `rewards` | Vom Haushalt vorgegebene positive Wunschziele; Fortschritt ergibt sich aus dem persönlichen Kontostand |
+| `families`, `parents` | Haushalt, Zeitzone, persönliche Elternkonten |
+| `parent_sessions`, `parent_invitations` | Ablaufende, widerrufbare Sitzungen und einmalige Einladungen |
+| `children` | Name, Avatar, Buddy-Typ/-Name, Bewegungspräferenz, aktiv/archiviert |
+| `task_templates` | Routinen je Kind, Wochentage, Uhrzeit, Abschnitt, Reihenfolge, Punkte |
+| `daily_tasks` | Datierte Aufgabenkopien und Einzelaufgaben, gegebenenfalls storniert |
+| `point_entries` | Einmalige positive Punktebuchung pro abgeschlossener Aufgabe |
+| `appointments`, `rewards` | Eigene Termine je Kind; gemeinsame Wunschziele mit individuellem Fortschritt |
+| `allowed_apps` | Exakte aktive Android-Paketnamen und Anzeigenamen je Kind |
+| `devices`, `device_pairing_codes` | Gerätekind, Kindzuordnung, Hashes, Ablauf, Widerruf bzw. Verbrauch |
 
-Zusammengesetzte Fremdschlüssel verhindern, dass Aufgaben, Vorlagen, Termine oder Punkte versehentlich einem Kind eines anderen Haushalts zugeordnet werden. Alle Dienste erhalten die serverseitig konfigurierte `FAMILY_ID`. Die Installation bedient genau diese Familie; es gibt keine öffentliche Registrierung.
+Zusammengesetzte Fremdschlüssel sichern Kind-/Familienzuordnungen in Aufgaben, Vorlagen, Terminen, Punkten, Freigaben und Geräten. API-Schemas sind strikt und nehmen keine frei gelieferten Familien- oder Berechtigungsfelder an. Archivierung statt Löschung erhält Kinder- und Aufgabenhistorie. Eltern-DTOs enthalten keine Passwort- oder Tokenhashes.
 
-Tageskopien entstehen idempotent beim ersten Laden an einem Tag. `(template_id, date)` ist eindeutig. Änderungen an einer Vorlage ändern keine bestehende Tageskopie und keine bereits verdienten Punkte. Vorlagen gelten momentan **jeden Tag**; Wochentage, Schulferien und flexible Wiederholungen sind noch nicht implementiert. Beim Überspringen eines Tages entstehen keine nachträglichen Aufgaben und keine Minuspunkte.
+## Tagesplan und Punkte
 
-## Punkte und Abschluss
+Das Tagesdatum stammt aus der IANA-Zeitzone der Familie. Termine werden als UTC-Zeitpunkte (`timestamptz`) gespeichert. Die Elternformulare lesen lokale Datum-/Uhrzeiteingaben in der Zeitzone des Eingabegeräts und erklären diese Wahl; die Kinderansicht zeigt sie in der Familienzeitzone.
 
-Der Client übermittelt ausschließlich die Aufgaben-ID. Der Server prüft Familienzugehörigkeit und aktuelles Familiendatum, liest den Punktewert aus der Tageskopie und schreibt in einer Transaktion einen Journaleintrag. Ein eindeutiger Schlüssel auf `task_id` verhindert doppelte Punkte auch bei parallelen Requests oder einem erneuten Versuch nach einem Verbindungsabbruch. `ON CONFLICT DO NOTHING` macht Wiederholungen erfolgreich und wirkungslos. Erledigt-Zustand und Kontostand werden aus demselben Journal abgeleitet.
+Beim ersten Laden entstehen Aufgabenkopien aktiver Routinen für den jeweiligen Wochentag und aktive Kinder. `(template_id, date)` ist eindeutig. Vorlagenänderungen verändern keine bereits erzeugte Tageskopie; dafür können Eltern eine offene Einzelaufgabe bearbeiten. Ausgelassene Tage erzeugen keine nachträglichen Aufgaben oder Minuspunkte. Ferien- und komplexe Wiederholungsregeln sind noch nicht vorhanden.
 
-Das Journal ist auf Anwendungsebene append-only; die Laufzeit-DB-Rolle hat aktuell keine gesonderten SQL-Rechte zur Verhinderung manueller Änderungen. Elternkorrekturen und Einlösungen brauchen später explizite Gegenbuchungen und eine Audit-Spur. Heute gibt es weder Lösch- noch Änderungs-Endpunkte für Punkte.
+Beim Abhaken prüft der Server Wandgerät, Familienzugehörigkeit, aktives Kinderprofil und aktuelles Familiendatum. Der Punktewert kommt aus der gespeicherten Aufgabenkopie. Ein eindeutiger Journalschlüssel auf `task_id` verhindert doppelte Punkte. Abschluss und elterliche Aufgabenänderung sperren dieselbe Aufgabenzeile; nach einer Punktebuchung kann die Aufgabe nicht mehr geändert oder storniert werden. Wiederholte Abschlüsse sind wirkungslos. [Drizzle-Transaktionen](https://orm.drizzle.team/docs/transactions) und Datenbankconstraints sichern diese Abläufe gemeinsam.
 
-## Gerätefreigabe und API
+Der Kontostand ist momentan die Summe verdienter Sterne. Einlösung, Korrektur und Kosmetikkäufe brauchen später ein erweitertes Journal mit Gegenbuchungen und eigener Berechtigung; sie sind noch nicht vorhanden. Das Journal ist auf Anwendungsebene append-only, nicht durch getrennte SQL-Rollen gegen einen Datenbankadministrator geschützt.
 
-| Endpunkt | Verhalten |
+## API-Übersicht
+
+| Bereich | Schnittstellen |
 | --- | --- |
-| `GET /` | Demo oder Gerätefreigabe; erst nach Freigabe Daten der konfigurierten Familie |
-| `POST /api/device/pair` | Gerätecode gegen Serverkonfiguration prüfen; signiertes HttpOnly-Cookie für 30 Tage |
-| `POST /api/tasks/:taskId/complete` | Gerät und Origin prüfen; Aufgabe abschließen; aktuellen persönlichen Plan zurückgeben |
-| `GET /api/health` | Konfiguration, DB-Verbindung und Existenz der Familientabelle prüfen; keine Familiendaten ausgeben |
+| Elternauthentifizierung | `POST /api/auth/register`, `/login`, `/logout`, `/password` |
+| Elternverwaltung | `GET /api/parent/data`; `POST /api/parent/records/:resource`; `PUT/DELETE /api/parent/records/:resource/:id` |
+| Einladungen/Geräte | `POST /api/parent/invitations`, `/pairing-codes`; `DELETE /api/parent/devices/:id` |
+| Gerätefreigabe | `POST /api/device/pair` |
+| Wandbildschirm | `POST /api/tasks/:taskId/complete` |
+| Android, nur lesen | `GET /api/launcher/snapshot` |
+| Betrieb | `GET /api/health`, Konfiguration/DB-Schema erreichbar, keine Familiendaten |
 
-Das Cookie ist an die Familie gebunden, `SameSite=Strict` und bei HTTPS `Secure`. Schreibzugriffe verlangen ein exakt zu `APP_ORIGIN` passendes Origin-Headerfeld. Der Pairing-Code hat mindestens 24, das Signatursecret mindestens 32 Zeichen. Der Pairing-Endpunkt begrenzt den Request-Body und erlaubt pro App-Prozess maximal zehn Versuche pro Minute. Das ist eine Basis für eine einzelne LAN-Instanz, kein verteilter Schutz für einen Internetdienst. Rotation von `SESSION_SECRET` widerruft alle Geräte. Die Profilauswahl ist keine zusätzliche Sicherheitsgrenze innerhalb eines freigegebenen Familienbildschirms.
+Ressourcen der Elternverwaltung: `children`, `routines`, `tasks`, `appointments`, `rewards`, `apps`. PUT ersetzt die bearbeitbaren Felder eines Eintrags, DELETE archiviert/storniert. Abgeschlossene Aufgaben bleiben unveränderlich. Derzeit werden maximal 1000 aktuelle/zukünftige Aufgaben bzw. Termine je Verwaltungsabruf geliefert; eine umfangreiche Historien-/Suchansicht ist ein späterer Ausbau.
 
-Es gibt noch keinen Elternzugang. Elternfunktionen müssen später eine getrennte Berechtigung bekommen; das Gerätecookie allein darf dafür nicht reichen. Aktuell besitzt der Bildschirm ausschließlich Anzeige- und Abschlussfunktionen.
+## Kinder-UX und Betrieb
 
-## Datum, Touch und Rückmeldungen
+Die Waldwelt, persönliche Tier-Buddys, große Symbole und untere Navigation orientieren sich an der bereitgestellten Referenz. Aufgabenkarten sind mindestens 80 Pixel hoch, Navigationsflächen mindestens 62 Pixel. Lange Pläne scrollen im Querformat im eigenen Bereich; im Hochformat fließt die Ansicht untereinander. Rückmeldungen kommen im Live-Modus erst nach erfolgreicher Speicherung. Bei Fehlern bleibt ein erneuter Versuch möglich. Es gibt keine automatische Bewegung, Sounds, Ranglisten oder Streak-Strafen.
 
-- Tagesdatum aus der IANA-Zeitzone der Familie, nicht aus Browser- oder Server-Lokalzeit. Termine sind `timestamptz`, angezeigt in der Familienzeitzone.
-- Ein Tageswechsel wird spätestens bei der Minutenprüfung bzw. beim Aufwachen des Tabs erkannt. Veraltete Aufgaben weist der Server zurück; bereits abgeschlossene Tage bleiben bestehen.
-- Große Profilkacheln und Aufgabenkarten, mindestens 48 Pixel hohe primäre Bedienelemente, keine Hover-Abhängigkeiten, Tastaturfokus und Statusmeldungen für Screenreader.
-- Kein sofortiges optimistisches Abhaken im Live-Modus: Die Rückmeldung kommt nach Speicherung. Bei Fehler bleibt die Aufgabe offen und erneut anklickbar.
-- Bewegungsarme Grundeinstellung pro Kind, zusätzlich `prefers-reduced-motion`. Keine automatisch gestarteten Geräusche, Zeitdruck oder Verlust von bereits verdienten Sternen.
-- Noch keine therapeutische Aussage oder allgemeingültige UX für alle neurodivergenten Kinder. Als nächstes gemeinsam mit den konkreten Kindern testen und Dichte, Text, Symbole und Reize individuell anpassen.
-
-## Ausbau in kleinen Schritten
-
-1. Elternbereich mit eigener Anmeldung: Kinder, Buddy und sensorische Einstellungen bearbeiten; Routinen, Einzelaufgaben und Termine verwalten.
-2. Wochentags-/Ferienregeln und kleinschrittige Checklisten; freie Reihenfolge, freiwillige Fokussicht und Pausen.
-3. Belohnungswünsche je Kind, elterlich bestätigte Einlösung mit transaktionssicherer Abbuchung und Verlauf.
-4. Weitere Buddy-Illustrationen und optionales positives Feedback. Jede zukünftige Animation und jeder Ton individuell abschaltbar.
-5. Sanfter Abgleich mehrerer Bildschirme (zunächst Polling). Offline-Lesen und spätere Sync-Strategie ausdrücklich planen, bevor Offline-Schreiben eingeführt wird.
-6. Erst nach echtem Kiosk-Test über einen Windows-Rahmen (z. B. Tauri) entscheiden. Die Website bleibt die fachliche Basis.
+Die Demo ist ausdrücklich ungespeichert und kann keine Konten anlegen oder Verwaltungs-/Gerätezugriffe ausführen. Der Server betreibt eine einzelne Haushaltsinstanz; die prozessweiten Rate Limits sind keine verteilte Internet-Abwehr. Für Fernzugriff braucht es HTTPS/VPN. Es gibt noch keinen E-Mail-Versand, keine E-Mail-Verifikation, keine MFA, keine Offline-Schreibsynchronisation und keinen Push. Beim Android-Client ist Fünf-Sekunden-Polling vorgesehen; die echte Durchsetzung von Gerätesperren folgt getrennt gemäß [Android-Konzept](android.md).

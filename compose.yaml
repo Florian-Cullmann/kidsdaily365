@@ -5,7 +5,7 @@ x-app-environment: &app-environment
   APP_ORIGIN: ${APP_ORIGIN:?APP_ORIGIN muss auf die Browser-Adresse zeigen}
   DATABASE_URL: postgres://kidsdaily:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD setzen}@db:5432/kidsdaily
   FAMILY_ID: ${FAMILY_ID:?FAMILY_ID setzen}
-  DEVICE_PAIRING_CODE: ${DEVICE_PAIRING_CODE:?DEVICE_PAIRING_CODE setzen}
+  SETUP_CODE: ${SETUP_CODE:?SETUP_CODE setzen}
   SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET setzen}
   FAMILY_TIMEZONE: ${FAMILY_TIMEZONE:-Europe/Berlin}
   FAMILY_NAME: ${FAMILY_NAME:-Unsere Familie}

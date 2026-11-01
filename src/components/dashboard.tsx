@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { CalendarDays, Check, ChevronRight, Heart, House, Maximize, Star, Users } from "lucide-react";
 import { completeDemoTask, localDate, type DayPlan, type TaskIcon } from "@/domain/plan";
 import { Buddy } from "./buddy";
+import Link from "next/link";
 
 type View = "day" | "appointments" | "rewards";
 const taskPictures: Record<TaskIcon, string> = {
@@ -90,7 +91,7 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
       <span className="profile-art"><Buddy kind={item.child.buddyKind} priority /><span className="profile-initial">{item.child.avatar}</span></span>
       <strong>{item.child.name}</strong><span>mit {item.child.buddyName}</span>
     </button>)}</div>
-    <p className="profile-footer">{demo ? "Zum Ausprobieren · Dein Fortschritt wird nicht gespeichert" : "Jeder hat seinen eigenen Tag. Und seinen eigenen Buddy."}</p>
+    <div className="profile-footer"><p>{demo ? "Zum Ausprobieren · Dein Fortschritt wird nicht gespeichert" : "Jeder hat seinen eigenen Tag. Und seinen eigenen Buddy."}</p><Link className="parent-entry-link" href="/eltern">Elternbereich</Link></div>
   </main>;
 
   const done = plan.tasks.filter((task) => task.completed).length;

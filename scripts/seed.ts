@@ -4,7 +4,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { z } from "zod";
 import { demoPlans } from "../src/domain/demo";
-import { appointments, children, families, rewards, taskTemplates } from "../src/server/db/schema";
+import { allowedApps, appointments, children, families, rewards, taskTemplates } from "../src/server/db/schema";
 
 const familyId = z.uuid().parse(process.env.FAMILY_ID);
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL fehlt.");
@@ -24,6 +24,7 @@ try {
     for (const plan of demoPlans()) {
       const childId = stableId(plan.child.id);
       await tx.insert(children).values({ ...plan.child, id: childId, familyId }).onConflictDoNothing();
+      await tx.insert(allowedApps).values({ familyId, childId, packageName: "com.audible.application", label: "Audible" }).onConflictDoNothing();
       await tx.insert(taskTemplates).values(plan.tasks.map((task, index) => ({
         id: stableId(task.id), familyId, childId, title: task.title, description: task.description,
         icon: task.icon, section: task.section, scheduledTime: task.time, points: task.points, sortOrder: index,

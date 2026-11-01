@@ -10,3 +10,9 @@ next-env.d.ts
 backups/
 playwright-report/
 test-results/
+apps/android/.gradle/
+apps/android/.kotlin/
+apps/android/**/build/
+apps/android/local.properties
+*.jks
+*.keystore
