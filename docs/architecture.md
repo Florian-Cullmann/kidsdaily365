@@ -2,7 +2,9 @@
 
 ## Ziel und erster Zuschnitt
 
-Ein Haushalt, ein Unraid-Server, ein gemeinsam genutzter Windows-Touchscreen. Die App startet immer in einer Profilauswahl. Das ausgewählte Kind bekommt eigene Aufgaben, Termine, Sterne und einen benannten Buddy. Gleichbleibende Bereiche und kurze Handlungsschritte geben Orientierung. Die bereitgestellte Bildreferenz bestimmt die Richtung: große Karten, freundliche Pastellfarben, deutliche Erledigt-Zustände und ein Begleiter neben dem Plan. Illustrationen und Animationen sind spätere, austauschbare Assets.
+Ein Haushalt, ein Unraid-Server, ein gemeinsam genutzter Windows-Touchscreen. Die App startet immer in einer Profilauswahl. Das ausgewählte Kind bekommt eigene Aufgaben, Termine, Sterne und einen benannten Buddy. Die bereitgestellte Bildreferenz bestimmt die Richtung: eine illustrierte Waldwelt, große Karten, deutliche Erledigt-Zustände und ein Begleiter neben dem Plan. Fuchs, Hase und Bär sind lokale transparente WebP-Assets; Aufgabensymbole nutzen farbige System-Emojis. Es gibt keine automatische Bewegung oder Geräusche.
+
+Die Kinderansicht verzichtet auf Seitenleiste, Metrik-Karten und Tagesabschnitt-Tabs. Eine „Heute“-Liste zeigt alle Aufgaben mit Namen, Uhrzeit, Sternen und großem Haken. Eine feste Navigation unten öffnet Tagesplan, Termine und Wünsche oder die Profilauswahl. Der Buddy und eine kleine Vorschau auf den nächsten Termin und das nächste Wunschziel bleiben daneben sichtbar. Im Querformat hat die Aufgabenliste einen eigenen Scrollbereich; im Hochformat fließt der Inhalt untereinander. Navigationsflächen sind mindestens 62 Pixel, Aufgabenkarten mindestens 80 Pixel hoch. Die Tagesabschnitte bleiben als fachliche Information im Datenmodell erhalten.
 
 Next.js mit TypeScript verbindet die Website und eine kleine HTTP-API. PostgreSQL speichert den fachlichen Zustand; Drizzle hält Schema und Migrationen im Repository. Wir starten ohne Microservices, externen Identity-Anbieter oder separaten Worker. [Next.js unterstützt Self-Hosting](https://nextjs.org/docs/app/guides/self-hosting); die Docker-Auslieferung nutzt den Standalone-Build. [Drizzle-Transaktionen](https://orm.drizzle.team/docs/transactions) und Datenbankconstraints sichern die Punktevergabe ab.
 
@@ -55,6 +57,6 @@ Es gibt noch keinen Elternzugang. Elternfunktionen müssen später eine getrennt
 1. Elternbereich mit eigener Anmeldung: Kinder, Buddy und sensorische Einstellungen bearbeiten; Routinen, Einzelaufgaben und Termine verwalten.
 2. Wochentags-/Ferienregeln und kleinschrittige Checklisten; freie Reihenfolge, freiwillige Fokussicht und Pausen.
 3. Belohnungswünsche je Kind, elterlich bestätigte Einlösung mit transaktionssicherer Abbuchung und Verlauf.
-4. Buddy-Illustrationen und optionales positives Feedback. Jede Animation und jeder Ton individuell abschaltbar.
+4. Weitere Buddy-Illustrationen und optionales positives Feedback. Jede zukünftige Animation und jeder Ton individuell abschaltbar.
 5. Sanfter Abgleich mehrerer Bildschirme (zunächst Polling). Offline-Lesen und spätere Sync-Strategie ausdrücklich planen, bevor Offline-Schreiben eingeführt wird.
 6. Erst nach echtem Kiosk-Test über einen Windows-Rahmen (z. B. Tauri) entscheiden. Die Website bleibt die fachliche Basis.

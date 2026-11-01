@@ -1,8 +1,10 @@
 # KidsDaily365
 
-Eine selbst gehostete Familien-App für einen 14-Zoll-Wand-Touchscreen. Kinder wählen ihr Profil, sehen einen übersichtlichen Tagesplan und sammeln mit jedem erledigten Schritt eigene Sterne. Die Oberfläche orientiert sich an einer freundlichen, ruhigen Spielwelt; Buddy-Grafiken sind zunächst Emoji-Platzhalter.
+Eine selbst gehostete Familien-App für einen 14-Zoll-Wand-Touchscreen. Kinder wählen ihr Profil, sehen einen übersichtlichen Tagesplan und sammeln mit jedem erledigten Schritt eigene Sterne. Eine illustrierte Waldwelt, persönliche Tier-Buddys und große Bildsymbole geben der Oberfläche einen kindlichen Charakter.
 
-**Stand: Architektur und lauffähiges Grundgerüst**, keine fertige Familienverwaltung. Die Profilauswahl, getrennte Tagespläne, Aufgabenabschluss, Punktejournal, persönliche Buddys und Terminanzeige funktionieren. Elternverwaltung, frei konfigurierbare Routinen, Wiederholungsregeln, Belohnungseinlösung und individuelle Buddy-Grafiken folgen in weiteren Schritten.
+**Stand: Architektur und lauffähiges Grundgerüst**, keine fertige Familienverwaltung. Die Profilauswahl, getrennte Tagespläne, Aufgabenabschluss, Punktejournal, persönliche Buddys und Terminanzeige funktionieren. Elternverwaltung, frei konfigurierbare Routinen, Wiederholungsregeln, Belohnungseinlösung und eigene Buddy-Uploads folgen in weiteren Schritten.
+
+Die Kinderansicht zeigt eine große „Heute“-Liste. Ganze Aufgabenkarten lassen sich mit einem Tipp abhaken. Die Navigation für Tagesplan, Termine, Sterne und Profilwechsel bleibt am unteren Bildschirmrand erreichbar. Im Querformat scrollt bei längeren Plänen nur die Aufgabenliste; im Hochformat fließt die Ansicht untereinander. Rückmeldungen erscheinen ohne Blinken, automatische Geräusche oder Animationen. [Illustrationen und verwendete Prompts](docs/illustrations.md) liegen mit den Assets im Repository.
 
 ## Lokal starten
 
