@@ -8,6 +8,22 @@ permissions:
   contents: read
 
 jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Compile native foundation and run Android lint
+        working-directory: apps/android
+        run: ./gradlew assembleDebug lintDebug --console=plain
+
   verify:
     runs-on: ubuntu-latest
     services:
@@ -26,7 +42,7 @@ jobs:
       APP_ORIGIN: http://localhost:3000
       DATABASE_URL: postgres://kidsdaily:integration-only@localhost:5432/kidsdaily_test
       FAMILY_ID: 11111111-1111-4111-8111-111111111111
-      DEVICE_PAIRING_CODE: integration-only-pairing-code-32-chars
+      SETUP_CODE: integration-only-setup-code-32-chars
       SESSION_SECRET: integration-only-session-secret-32-chars
       NEXT_TELEMETRY_DISABLED: 1
     steps:
@@ -50,10 +66,12 @@ jobs:
           docker run --rm --network host -e DATABASE_URL -e FAMILY_ID kidsdaily365-tools:ci npm run db:seed -- --example
       - name: Check runtime container
         run: |
-          docker run -d --name kidsdaily365-ci --network host -e APP_MODE -e APP_ORIGIN -e DATABASE_URL -e FAMILY_ID -e DEVICE_PAIRING_CODE -e SESSION_SECRET kidsdaily365:ci
+          docker run -d --name kidsdaily365-ci --network host -e APP_MODE -e APP_ORIGIN -e DATABASE_URL -e FAMILY_ID -e SETUP_CODE -e SESSION_SECRET kidsdaily365:ci
           for attempt in $(seq 1 30); do
             if curl --fail --silent http://localhost:3000/api/health; then exit 0; fi
             sleep 2
           done
           docker logs --tail 30 kidsdaily365-ci
           exit 1
+      - name: Exercise parent, wall and Android HTTP boundaries
+        run: npm run test:http

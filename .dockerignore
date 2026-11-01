@@ -5,3 +5,4 @@ node_modules
 backups
 coverage
 test-results
+apps/android

@@ -19,7 +19,7 @@ beforeAll(() => {
   process.env.APP_MODE = "live";
   process.env.APP_ORIGIN ??= "http://localhost:3000";
   process.env.FAMILY_ID ??= randomUUID();
-  process.env.DEVICE_PAIRING_CODE ??= "integration-only-pairing-code-32-chars";
+  process.env.SETUP_CODE ??= "integration-only-setup-code-32-chars";
   process.env.SESSION_SECRET ??= "integration-only-session-secret-32-chars";
 });
 

@@ -8,6 +8,13 @@
       "when": 1793561383357,
       "tag": "0000_vengeful_red_ghost",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793566257408,
+      "tag": "0001_parent-accounts-and-device-scopes",
+      "breakpoints": true
     }
   ]
 }

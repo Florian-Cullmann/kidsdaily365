@@ -1,0 +1,20 @@
+name: Bug
+description: Einen reproduzierbaren Fehler melden (Sicherheitslücken bitte privat)
+body:
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Schritte, erwartetes und tatsächliches Verhalten
+      description: Nur fiktive Profile verwenden. Keine Passwörter, Gerätecodes oder Kinderdaten posten.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Version, Browser oder Android-Modell/-Version
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Bereinigte Screenshots oder Fehlermeldungen

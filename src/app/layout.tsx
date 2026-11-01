@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./parents.css";
 
 export const metadata: Metadata = {
   title: "KidsDaily365 · Ein Schritt nach dem anderen",

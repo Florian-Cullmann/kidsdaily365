@@ -12,6 +12,8 @@ FROM dependencies AS tools
 COPY scripts ./scripts
 COPY src/domain ./src/domain
 COPY src/server/db/schema.ts ./src/server/db/schema.ts
+COPY src/server/auth/password.ts ./src/server/auth/password.ts
+COPY src/server/errors.ts ./src/server/errors.ts
 COPY drizzle ./drizzle
 COPY tsconfig.json ./
 USER node

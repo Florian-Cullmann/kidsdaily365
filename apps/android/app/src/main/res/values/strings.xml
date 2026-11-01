@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">KidsDaily Launcher · Vorschau</string>
+    <string name="greeting">Dein Buddy kommt aufs Handy.</string>
+    <string name="explanation">Hier werden dein Buddy, deine Sterne und deine freigegebenen Apps zu Hause sein.</string>
+    <string name="unmanaged">Entwicklungsvorschau · Dieses Gerät ist nicht durch KidsDaily geschützt.</string>
+    <string name="connection">Noch nicht mit einem Kinderprofil verbunden.</string>
+    <string name="parent_setup">Die Geräteverwaltung und die sichere Einrichtung folgen im nächsten Entwicklungsschritt. Aufgaben können auf dem Handy nicht abgehakt werden.</string>
+</resources>

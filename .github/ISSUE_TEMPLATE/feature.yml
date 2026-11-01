@@ -1,0 +1,21 @@
+name: Feature
+description: Eine konkrete Erweiterung vorschlagen
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem und gewünschtes Verhalten
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Umfang und Grenzen
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Abnahmekriterien
+    validations:
+      required: true

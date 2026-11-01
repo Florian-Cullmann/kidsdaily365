@@ -21,7 +21,7 @@ FAMILY_ID=11111111-1111-4111-8111-111111111111
 FAMILY_NAME=Unsere Familie
 FAMILY_TIMEZONE=Europe/Berlin
 POSTGRES_PASSWORD=<eigenes-zufaelliges-hex-secret>
-DEVICE_PAIRING_CODE=<anderes-zufaelliges-hex-secret>
+SETUP_CODE=<anderes-zufaelliges-hex-secret>
 SESSION_SECRET=<drittes-zufaelliges-hex-secret>
 ```
 
@@ -34,21 +34,40 @@ Die IP-Adresse ersetzen. Jedes der drei Secrets separat mit `openssl rand -hex 3
 ```sh
 docker compose config --quiet
 docker compose up -d --build
-docker compose run --rm migrate npm run db:seed
 docker compose ps
 ```
 
 PostgreSQL startet zuerst. Der einmalige `migrate`-Container führt versionierte Migrationen aus; erst bei Erfolg startet die App. Ein Container mit Status `Exited (0)` für `migrate` ist normal. Die App läuft ohne Root und überwacht ihre Datenbank über `/api/health`. Die DB hat keinen nach außen veröffentlichten Port. Das Webfrontend ist auf dem konfigurierten Port im LAN erreichbar.
 
-Der Seed legt nur den Haushalt an. Weil die Elternverwaltung noch fehlt, kann zum Ausprobieren zusätzlich dieser Befehl verwendet werden:
+Öffne die App-Adresse und wähle **Familie einrichten** bzw. `/register`. Mit `SETUP_CODE`, Name, E-Mail und einer Passphrase von mindestens zwölf Zeichen wird der erste Elternzugang eingerichtet; der Haushalt entsteht automatisch. Der Einrichtungscode allein kann danach keine weiteren Eltern registrieren. Unter **Elternkonto** lassen sich einmalige Einladungen für weitere Eltern erstellen (48 Stunden gültig). Eine E-Mail wird nicht versandt; den Code über einen geeigneten privaten Weg weitergeben.
+
+Unter `/eltern` kannst du Kinderprofile, Buddys, Wochentagsroutinen, Einzelaufgaben, Termine, Wünsche und App-Freigaben verwalten. Neue Kinderprofile erhalten Audible als erste Android-App-Freigabe. Die native Android-App ist noch eine ungeschützte Entwicklungsvorschau; [Android-Konzept](android.md) und Issue #2 beschreiben die noch ausstehende Durchsetzung.
+
+Nur zum Ausprobieren mit **fiktiven Daten** ist weiterhin ein optionaler Seed verfügbar:
 
 ```sh
 docker compose run --rm migrate npm run db:seed -- --example
 ```
 
-Dadurch entstehen zwei fiktive Kinder, tägliche Beispielroutinen, Termine und Belohnungsziele. Erneute Aufrufe überschreiben nichts. Die Beispieltermine wandern bei erneutem Seed nicht mit. Ohne Beispiele müssen Profile und Routinen vorerst direkt in der Datenbank gepflegt werden; es gibt bewusst keinen ungeschützten CRUD-Endpunkt.
+Dadurch entstehen zwei fiktive Kinder, tägliche Beispielroutinen, Termine, Audible-Freigaben und Belohnungsziele. Erneute Aufrufe überschreiben nichts. Die Beispieltermine wandern bei erneutem Seed nicht mit. Produktive Profile und Pläne werden im Elternbereich gepflegt; direkte Datenbankbearbeitung ist nicht nötig.
 
-Beim ersten Besuch auf dem Windows-Gerät den langen `DEVICE_PAIRING_CODE` einmal eingeben/einfügen. Danach beginnt jeder Seitenaufruf mit der Profilauswahl. Der Browser behält die Gerätefreigabe bis zu 30 Tage. Profilwahl und Punkte werden getrennt behandelt; ein Neuladen öffnet wieder die Profilauswahl, bereits gespeicherte Punkte bleiben bestehen.
+Unter **Geräte** einen Code vom Typ **Wandbildschirm** erstellen. Er ist zehn Minuten gültig und wird auf dem Windows-Gerät unter `/` einmal eingegeben. Danach beginnt jeder Seitenaufruf mit der Profilauswahl. Die Gerätefreigabe gilt bis zu 90 Tage und lässt sich im Elternbereich sofort widerrufen. Profilwahl und Punkte werden getrennt behandelt; ein Neuladen öffnet wieder die Profilauswahl, bereits gespeicherte Punkte bleiben bestehen.
+
+Android-Codes werden getrennt für ein bestimmtes Kind erstellt und ergeben ausschließlich lesende Bearer-Tokens. Sie können keinen Wandbildschirm freigeben. Beim Wechsel vom Elternbereich zur Kinderansicht wird die Elternsitzung auf diesem Browser beendet; das Gerätecookie bleibt bestehen.
+
+### Migration von der ersten Grundversion
+
+Vorher Backup erstellen. In `.env` ein neues `SETUP_CODE` setzen; `DEVICE_PAIRING_CODE` wird nicht mehr verwendet. Die zusätzliche Migration erhält vorhandene Familien, Kinder, Aufgaben und Punkte. Mit dem neuen Einrichtungscode den ersten Elternzugang für dieselbe `FAMILY_ID` registrieren. Anschließend bisherige Wandgeräte einmal neu freigeben: alte signierte Gerätecookies werden bewusst nicht mehr als Berechtigung akzeptiert. Die Konfiguration `SESSION_SECRET` bleibt erforderlich und dient jetzt als Pepper für Tokenhashes.
+
+### Passwort vergessen / Operator-Recovery
+
+Es gibt noch keinen E-Mail-Versand oder öffentlichen Passwort-Reset. Als Betreiber auf dem Server:
+
+```sh
+docker compose run --rm --interactive migrate npm run auth:reset -- eltern@example.test
+```
+
+Das neue Passwort wird verborgen interaktiv eingelesen. Niemals ein echtes Passwort als Befehlsargument oder in die Shell-History schreiben. Der Reset betrifft nur das Elternkonto der konfigurierten Familie und beendet alle seine Sitzungen. Für lokale Entwicklung funktioniert derselbe Befehl als `npm run auth:reset -- eltern@example.test` mit passender `.env`.
 
 ## 3. Windows als Kiosk
 
@@ -77,7 +96,7 @@ docker compose exec -T db pg_restore -U kidsdaily -d kidsdaily --no-owner --exit
 docker compose up -d app
 ```
 
-Die `.env` separat sichern. Für die Wiederherstellung dieselbe `FAMILY_ID` verwenden. `SESSION_SECRET` kann bewusst neu gesetzt werden, um alle Geräte erneut freigeben zu müssen. Das Datenbankpasswort eines bestehenden PostgreSQL-Volumes ändert sich nicht durch Bearbeiten der Umgebungsvariable; ein Passwortwechsel benötigt zusätzlich `ALTER ROLE` auf der DB.
+Die `.env` separat sichern. Für die Wiederherstellung dieselbe `FAMILY_ID` verwenden. Eine Rotation von `SESSION_SECRET` widerruft Elternsitzungen, Geräte, Einladungen und noch offene Gerätecodes; danach können Eltern sich mit ihrem Passwort neu anmelden und Geräte neu freigeben. Das Datenbankpasswort eines bestehenden PostgreSQL-Volumes ändert sich nicht durch Bearbeiten der Umgebungsvariable; ein Passwortwechsel benötigt zusätzlich `ALTER ROLE` auf der DB.
 
 ## 5. Updates
 

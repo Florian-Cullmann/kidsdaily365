@@ -21,6 +21,7 @@ export const children = pgTable("children", {
   reducedMotion: boolean().notNull().default(true),
   buddyKind: buddyKind().notNull().default("fox"),
   buddyName: text().notNull().default("Fino"),
+  active: boolean().notNull().default(true),
 }, (table) => [unique("children_family_identity").on(table.id, table.familyId)]);
 
 // Templates describe routines; occurrences are immutable daily snapshots.
@@ -36,10 +37,12 @@ export const taskTemplates = pgTable("task_templates", {
   points: integer().notNull().default(5),
   sortOrder: integer().notNull().default(0),
   active: boolean().notNull().default(true),
+  weekdays: integer().array().notNull().default(sql`ARRAY[1,2,3,4,5,6,7]::integer[]`),
 }, (table) => [
   foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
   unique("templates_child_family_identity").on(table.id, table.childId, table.familyId),
   check("template_points_range", sql`${table.points} between 0 and 1000`),
+  check("template_valid_weekdays", sql`cardinality(${table.weekdays}) between 1 and 7 and ${table.weekdays} <@ ARRAY[1,2,3,4,5,6,7]::integer[]`),
 ]);
 
 export const dailyTasks = pgTable("daily_tasks", {
@@ -55,6 +58,7 @@ export const dailyTasks = pgTable("daily_tasks", {
   scheduledTime: time(),
   points: integer().notNull(),
   sortOrder: integer().notNull().default(0),
+  cancelledAt: timestamp({ withTimezone: true }),
 }, (table) => [
   foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
   foreignKey({ columns: [table.templateId, table.childId, table.familyId], foreignColumns: [taskTemplates.id, taskTemplates.childId, taskTemplates.familyId] }),
@@ -95,8 +99,75 @@ export const appointments = pgTable("appointments", {
   icon: appointmentIcon().notNull().default("calendar"),
   startsAt: timestamp({ withTimezone: true }).notNull(),
   endsAt: timestamp({ withTimezone: true }),
+  active: boolean().notNull().default(true),
 }, (table) => [
   foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
   index("appointments_child_time").on(table.familyId, table.childId, table.startsAt),
   check("appointment_end_after_start", sql`${table.endsAt} is null or ${table.endsAt} > ${table.startsAt}`),
+]);
+
+export const parents = pgTable("parents", {
+  id: uuid().primaryKey().defaultRandom(),
+  familyId: uuid().notNull().references(() => families.id),
+  name: text().notNull(),
+  email: text().notNull().unique(),
+  passwordHash: text().notNull(),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+}, (table) => [unique("parent_family_identity").on(table.id, table.familyId)]);
+
+export const parentSessions = pgTable("parent_sessions", {
+  tokenHash: text().primaryKey(),
+  parentId: uuid().notNull().references(() => parents.id, { onDelete: "cascade" }),
+  expiresAt: timestamp({ withTimezone: true }).notNull(),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("session_parent_lookup").on(table.parentId)]);
+
+export const parentInvitations = pgTable("parent_invitations", {
+  id: uuid().primaryKey().defaultRandom(),
+  familyId: uuid().notNull().references(() => families.id),
+  tokenHash: text().notNull().unique(),
+  expiresAt: timestamp({ withTimezone: true }).notNull(),
+  usedAt: timestamp({ withTimezone: true }),
+});
+
+export const deviceKind = pgEnum("device_kind", ["wall", "android"]);
+export const devices = pgTable("devices", {
+  id: uuid().primaryKey().defaultRandom(),
+  familyId: uuid().notNull().references(() => families.id),
+  childId: uuid(),
+  kind: deviceKind().notNull(),
+  label: text().notNull(),
+  tokenHash: text().notNull().unique(),
+  expiresAt: timestamp({ withTimezone: true }).notNull(),
+  revokedAt: timestamp({ withTimezone: true }),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
+  check("device_child_scope", sql`(${table.kind} = 'android' and ${table.childId} is not null) or (${table.kind} = 'wall' and ${table.childId} is null)`),
+]);
+
+export const devicePairingCodes = pgTable("device_pairing_codes", {
+  id: uuid().primaryKey().defaultRandom(),
+  familyId: uuid().notNull().references(() => families.id),
+  childId: uuid(),
+  kind: deviceKind().notNull(),
+  label: text().notNull(),
+  codeHash: text().notNull().unique(),
+  expiresAt: timestamp({ withTimezone: true }).notNull(),
+  usedAt: timestamp({ withTimezone: true }),
+}, (table) => [
+  foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
+  check("pair_code_child_scope", sql`(${table.kind} = 'android' and ${table.childId} is not null) or (${table.kind} = 'wall' and ${table.childId} is null)`),
+]);
+
+export const allowedApps = pgTable("allowed_apps", {
+  id: uuid().primaryKey().defaultRandom(),
+  familyId: uuid().notNull().references(() => families.id),
+  childId: uuid().notNull(),
+  packageName: text().notNull(),
+  label: text().notNull(),
+  active: boolean().notNull().default(true),
+}, (table) => [
+  foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
+  unique("one_app_per_child").on(table.childId, table.packageName),
 ]);
