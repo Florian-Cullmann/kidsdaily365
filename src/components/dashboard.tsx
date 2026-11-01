@@ -127,7 +127,7 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
       </section>
 
       <aside className="buddy-space" aria-label={`Dein Buddy ${plan.child.buddyName}`}>
-        <div className="buddy-scene"><div className="buddy-speech"><strong>{done === plan.tasks.length && done > 0 ? "Alles geschafft!" : done > 0 ? "Weiter so!" : "Ich bin dabei!"}</strong><span>{done > 0 ? "Du kannst stolz auf dich sein." : "Wir machen das in deinem Tempo."}</span><Heart size={22} fill="currentColor" /></div><Buddy kind={plan.child.buddyKind} className="main-buddy" priority /><span className="buddy-name">Dein {plan.child.buddyName}</span>
+        <div className="buddy-scene"><Buddy kind={plan.child.buddyKind} className="main-buddy" priority /><span className="buddy-name">Dein {plan.child.buddyName}</span>
           <button className="star-treasure" onClick={() => openView("rewards")} aria-label={`${plan.balance} Sterne gesammelt. Deine Wünsche ansehen.`}><span aria-hidden="true">⭐</span><div><strong>{plan.balance}</strong><span>deine Sterne</span></div><ChevronRight size={27} /></button>
         </div>
         <button className="peek-card appointment-peek" onClick={() => openView("appointments")}><span className="peek-picture" aria-hidden="true">📅</span><span className="peek-copy"><span>Dein nächster Termin</span><strong>{nextAppointment?.title ?? "Gerade nichts geplant"}</strong>{nextAppointment && <span>{appointmentDay(nextAppointment.startsAt, plan)} · {appointmentTime(nextAppointment.startsAt, plan.timezone)} Uhr</span>}</span><ChevronRight size={25} /></button>
