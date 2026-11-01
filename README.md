@@ -56,6 +56,8 @@ Next.js/TypeScript und PostgreSQL/Drizzle bilden einen modularen Monolithen. Der
 
 ## Prüfen
 
+Der [manuelle Testleitfaden](docs/testing.md) führt durch Registrierung, Profile, Wandbildschirm, Rechte und den aktuellen Android-Stand. Automatische Tests immer von euren manuellen Live-Daten trennen.
+
 ```sh
 npm run check
 npm run build

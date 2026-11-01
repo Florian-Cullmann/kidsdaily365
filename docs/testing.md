@@ -1,0 +1,88 @@
+# Gemeinsam durchtesten
+
+## Welche Umgebung?
+
+- **Demo:** `APP_MODE=demo` zeigt fiktive Kinder; Fortschritt verschwindet beim Neuladen. Konten und Elternverwaltung sind absichtlich deaktiviert.
+- **Manueller Live-Test:** `APP_MODE=live` mit eigener PostgreSQL-Datenbank. Profile und Fortschritt bleiben bestehen. Zuerst fiktive Namen verwenden, bis Einrichtung und Backups geprüft sind.
+- **Automatische Tests:** ausschließlich eine separate, wegwerfbare Datenbank mit Namen `*_test`. Der HTTP-Smoke-Test entfernt den gesamten zugehörigen Testhaushalt. Niemals die Datenbank für euren manuellen Test oder eure Familie dafür verwenden.
+
+Die Web-/Backend-Tests und das native Grundgerüst können jetzt geprüft werden. Die tatsächliche Android-Gerätesperre ist noch nicht implementiert und kann deshalb noch nicht als Schutz auf einem Kinderhandy abgenommen werden.
+
+## 1. Elternzugang und Profile
+
+1. Im Live-Modus `/register` öffnen. Als erster Elternteil mit dem `SETUP_CODE` aus der privaten Serverkonfiguration registrieren. Erwartung: Anmeldung und Weiterleitung zu `/eltern`.
+2. Abmelden, mit falschem Passwort versuchen, anschließend korrekt anmelden. Erwartung: Das falsche Passwort gibt keinen Zugriff; das richtige funktioniert.
+3. Zwei fiktive Kinder mit unterschiedlichen Buddys anlegen. Seite neu laden. Erwartung: Beide Profile und Buddy-Namen bleiben erhalten.
+4. Ein Profil bearbeiten. Erwartung: Die Änderung betrifft ausschließlich dieses Kind.
+5. Unter Elternkonto einen weiteren Elternteil einladen; den Code in einem getrennten Browser unter `/register` verwenden. Erwartung: einmal verwendbar, Zugang zur gleichen Familie; der ursprüngliche Einrichtungscode registriert jetzt keinen weiteren Elternteil.
+6. Passwort ändern und die vorherige Sitzung in einem anderen Browser prüfen. Erwartung: Dort wird erneut eine Anmeldung verlangt. Bei vergessenem Passwort den dokumentierten Operator-Reset verwenden, nicht direkt Datenbankwerte bearbeiten.
+
+## 2. Plan und Wandbildschirm
+
+Für den Test auf einem Rechner den Elternbereich im normalen Browser und den Wandbildschirm in einem **getrennten Browser oder privaten Fenster** öffnen. Beide benötigen getrennte Cookies. Im gleichen Browser beendet der Wechsel zur Kinderansicht bewusst die Elternsitzung. Ein privates Fenster verliert seine Gerätefreigabe beim Schließen; das ist kein Persistenzfehler der Aufgaben.
+
+1. Pro Kind eine Routine mit fünf Sternen, eine Einzelaufgabe für heute, einen zukünftigen Termin und einen Wunsch anlegen. Für die Routine den heutigen Wochentag auswählen.
+2. Unter Geräte einen Code für einen **Wandbildschirm** erzeugen. Im getrennten Browser `/` öffnen und den Code eingeben. Erwartung: Profilauswahl; die Kinder sehen ihre eigenen Daten.
+3. Bei Kind A eine Fünf-Sterne-Aufgabe abhaken. Erwartung: Haken, positive Rückmeldung und genau fünf zusätzliche Sterne.
+4. Mehrfach schnell tippen und anschließend neu laden. Erwartung: weiterhin nur eine Buchung, der Erledigt-Zustand bleibt gespeichert.
+5. Zu Kind B wechseln. Erwartung: dessen Aufgaben und Sterne sind unverändert; anderer Buddy und nur eigene Termine.
+6. Im Elternbereich Aufgaben oder Termine ändern, danach die Kinderansicht neu laden. Bereits erzeugte Tageskopien ändern sich durch eine Routineänderung nicht; dafür offene Einzelaufgaben bearbeiten. Abgeschlossene Aufgaben bleiben geschützt.
+7. Das Test-Wandgerät im Elternbereich sperren. In dessen Browser neu laden oder einen Abschluss versuchen. Erwartung: erneute Gerätefreigabe nötig, kein weiterer unberechtigter Abschluss.
+8. Einen frischen Wandcode erstellen. Erwartung: nach der Freigabe wieder Zugriff; ein bereits verbrauchter Gerätecode funktioniert nicht erneut.
+
+Tageswechsel, Wochentage, parallele Requests und gleichzeitige Elternänderungen werden zusätzlich automatisch gegen echte PostgreSQL-Daten getestet. Die Systemzeit des Familienrechners dafür nicht verstellen.
+
+## 3. Touch und Betrieb
+
+Am eigentlichen 14-Zoll-Bildschirm im Querformat und mit der vorgesehenen Windows-Skalierung testen:
+
+- Texte aus typischem Abstand lesbar; ganze Aufgabenkarten und untere Navigation gut erreichbar; kein Hover nötig.
+- Lange Aufgabenliste lässt sich scrollen, ohne dass die Navigation verschwindet. Auch Hochformat bzw. kleineres Fenster prüfen.
+- Vollbild aktivieren, Profile wechseln, einen bereits erledigten Tag ansehen und mit Tastatur durch die Bedienelemente navigieren.
+- Während eines Tests den Server stoppen und danach wieder starten. Erwartung: keine nur lokal erfundenen Punkte; ein Wiederholungsversuch darf nicht doppelt zählen.
+- Browser bzw. Windows neu starten. Erwartung: gespeicherte Aufgaben und Sterne bleiben erhalten. Ob die Gerätefreigabe bleibt, hängt zusätzlich von der Kiosk-/Cookie-Konfiguration ab.
+- Datenbank sichern und zuerst in einer separaten Ersatzinstanz wiederherstellen. Anleitung in [unraid.md](unraid.md).
+
+Wenn der Browser auf einem anderen Rechner über die Server-IP zugreift, muss `APP_ORIGIN` exakt diese Adresse inklusive Schema/Port enthalten. `localhost` bezeichnet auf dem Wandgerät dessen eigenen Rechner. Für den späteren Unraid-Test nicht die Adresse des Entwicklungsrechners übernehmen.
+
+## 4. Android: Was jetzt prüfbar ist
+
+Die App unter `apps/android/` ist eine **ungeschützte native Vorschau**, noch nicht mit dem Backend verbunden. Sie zeigt weder schon echte Live-Sterne noch erzwingt sie App-/System-Sperren. Keine Eltern- oder Produktionszugänge in diese Vorschau eingeben.
+
+Mit JDK 17 und Android SDK 36:
+
+```sh
+cd apps/android
+./gradlew assembleDebug lintDebug
+```
+
+Die Test-APK liegt danach unter `app/build/outputs/apk/debug/app-debug.apk`. Sie kann zum Anschauen auf dem Xiaomi/LineageOS-Testgerät normal installiert und als normale App geöffnet werden. Dafür sind weder Device-Owner-Enrollment noch ein Werksreset nötig. Eine Installation der Vorschau sichert das Telefon nicht ab.
+
+Im Backend lassen sich bereits kindgebundene Android-Gerätecodes, App-Freigaben und Widerruf testen. Die automatische HTTP-Prüfung verbindet sich als Android-Gerät, vergleicht Sterne vor/nach einem Wand-Abschluss und prüft, dass mit dem Android-Token keine Aufgaben oder Eltern-Daten verändert werden können.
+
+Die echten Tests für Recents, Kamera, Quick Settings, Benachrichtigungen, Autostart, Offline-Policy, erlaubte Apps und elterliche Wiederherstellung folgen in [Issue #2](https://github.com/Florian-Cullmann/kidsdaily365/issues/2). Mindestplattform Android 13; LineageOS und HyperOS getrennt abnehmen. Siehe [Android-Konzept](android.md).
+
+## 5. Automatische Prüfungen
+
+Der [GitHub-Workflow](https://github.com/Florian-Cullmann/kidsdaily365/actions/workflows/ci.yml) führt pro PR bzw. `main` Folgendes aus:
+
+- Web-Lint, Typprüfung und Unit-/API-Grenztests.
+- Migrationen und Integrationstests gegen PostgreSQL 18.
+- Produktionsbuild, beide Docker-Targets und realen HTTP-Smoke-Test im Runtime-Container.
+- Native Android-Kompilierung und Android Lint.
+
+Lokal ohne echte Familiendaten:
+
+```sh
+npm run check
+npm run build
+# Nur mit einer eigens gestarteten, wegwerfbaren *_test-Datenbank:
+DATABASE_URL=postgres://…/kidsdaily_test npm run db:migrate
+DATABASE_URL=postgres://…/kidsdaily_test npm run test:integration
+# Nur gegen einen dazu gestarteten Testserver auf Loopback:
+SMOKE_ORIGIN=http://localhost:3000 npm run test:http
+```
+
+Der HTTP-Test braucht dazu die vollständige Testserver-Konfiguration (`DATABASE_URL`, `FAMILY_ID`, `SETUP_CODE`, `SESSION_SECRET`, `APP_ORIGIN`) und einen Testhaushalt ohne vorhandene Elternkonten. Er ist ein automatischer Abnahmetest, kein Befehl für eure laufende Familieninstanz.
+
+Fehler als GitHub-Issue mit Reproduktionsschritten, Browser-/Android-Version und bereinigtem Screenshot dokumentieren. Keine Passwörter, Codes, Tokens oder echten Kinderdaten ins Issue schreiben.
