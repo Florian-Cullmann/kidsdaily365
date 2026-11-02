@@ -1,5 +1,6 @@
+import type { RoutineStep } from "@/domain/management";
 import { sql } from "drizzle-orm";
-import { boolean, check, date, foreignKey, index, integer, pgEnum, pgTable, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, date, foreignKey, index, integer, jsonb, pgEnum, pgTable, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 
 export const daySection = pgEnum("day_section", ["morning", "afternoon", "evening"]);
 export const taskIcon = pgEnum("task_icon", ["sun", "toothbrush", "backpack", "book", "moon", "heart"]);
@@ -26,6 +27,7 @@ export const children = pgTable("children", {
 
 // Templates describe routines; occurrences are immutable daily snapshots.
 export const taskTemplates = pgTable("task_templates", {
+  steps: jsonb().$type<RoutineStep[]>(),
   id: uuid().primaryKey().defaultRandom(),
   familyId: uuid().notNull().references(() => families.id),
   childId: uuid().notNull(),
@@ -50,6 +52,8 @@ export const dailyTasks = pgTable("daily_tasks", {
   familyId: uuid().notNull().references(() => families.id),
   childId: uuid().notNull(),
   templateId: uuid(),
+  stepIndex: integer().notNull().default(0),
+  routineTitle: text(),
   date: date().notNull(),
   title: text().notNull(),
   description: text().notNull().default(""),
@@ -63,7 +67,7 @@ export const dailyTasks = pgTable("daily_tasks", {
   foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
   foreignKey({ columns: [table.templateId, table.childId, table.familyId], foreignColumns: [taskTemplates.id, taskTemplates.childId, taskTemplates.familyId] }),
   unique("tasks_child_family_identity").on(table.id, table.childId, table.familyId),
-  unique("one_template_per_day").on(table.templateId, table.date),
+  unique("one_template_per_day").on(table.templateId, table.date, table.stepIndex),
   index("tasks_day_lookup").on(table.familyId, table.childId, table.date),
   check("task_points_range", sql`${table.points} between 0 and 1000`),
 ]);

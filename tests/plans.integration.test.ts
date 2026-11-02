@@ -3,6 +3,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db/client";
 import { appointments, children, dailyTasks, families, pointEntries, rewards, taskTemplates } from "@/server/db/schema";
+import { saveRecord, archiveRecord } from "@/server/management";
 import { completeTask, getDayPlans } from "@/server/plans";
 
 const now = new Date("2026-11-01T12:00:00Z");
@@ -50,6 +51,33 @@ afterAll(async () => {
 });
 
 describe("persisted daily plans", () => {
+  it("snapshots ordered groups, preserves history through edits, and awards each step only once", async () => {
+    const parent = { id: randomUUID(), familyId, name: "Test", email: "test@example.test" };
+    const steps = ["Frühstücken", "Zähne putzen", "Rucksack packen"].map((title, i) => ({ title, description: "", icon: "heart" as const, points: i + 1 }));
+    const input = { childId: firstChild, title: "Morgenroutine", section: "morning", weekdays: [1, 7], steps };
+    const routine = await saveRecord(parent, "routines", input);
+    await expect(saveRecord({ ...parent, familyId: otherFamilyId }, "routines", { ...input, childId: foreignChild }, routine.id)).rejects.toMatchObject({ status: 404 });
+    await Promise.all(Array.from({ length: 5 }, () => getDayPlans(familyId, now)));
+    const [first] = await getDayPlans(familyId, now);
+    const group = first.tasks.filter((task) => task.routineId === routine.id);
+    expect(group.map((task) => task.title)).toEqual(steps.map((step) => step.title));
+    await Promise.all([completeTask(familyId, group[0].id, now), ...Array.from({ length: 6 }, () => completeTask(familyId, group[1].id, now))]);
+    await saveRecord(parent, "routines", { ...input, title: "Neue Routine", steps: [{ ...steps[2], points: 100 }, steps[0]] }, routine.id);
+    const [reloaded, sibling] = await getDayPlans(familyId, now);
+    const snapshot = reloaded.tasks.filter((task) => task.routineId === routine.id);
+    expect(snapshot).toHaveLength(3);
+    expect(snapshot.filter((task) => task.completed)).toHaveLength(2);
+    expect(snapshot.every((task) => task.routineTitle === "Morgenroutine")).toBe(true);
+    expect(reloaded.balance).toBe(3);
+    expect(sibling.balance).toBe(0);
+    expect(sibling.tasks.some((task) => task.routineId === routine.id)).toBe(false);
+    const [tomorrow] = await getDayPlans(familyId, new Date("2026-11-02T12:00:00Z"));
+    expect(tomorrow.tasks.filter((task) => task.routineId === routine.id).map((task) => [task.title, task.points, task.completed])).toEqual([[steps[2].title, 100, false], [steps[0].title, 1, false]]);
+    await archiveRecord(parent, "routines", routine.id);
+    expect((await getDayPlans(familyId, now))[0].tasks.filter((task) => task.routineId === routine.id)).toEqual(snapshot);
+    expect((await getDayPlans(familyId, new Date("2026-11-08T12:00:00Z")))[0].tasks.some((task) => task.routineId === routine.id)).toBe(false);
+  });
+
   it("materializes one snapshot per routine and day under concurrent reads", async () => {
     await Promise.all(Array.from({ length: 6 }, () => getDayPlans(familyId, now)));
     const tasks = await db().select().from(dailyTasks).where(eq(dailyTasks.familyId, familyId));

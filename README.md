@@ -7,7 +7,8 @@ Eine selbst gehostete Familien-App für neurodivergente Kinder: eigener Buddy, �
 - Registrierung des ersten Elternteils mit Einrichtungscode; weitere Eltern per einmaliger Einladung.
 - Login, Logout, Passwortwechsel und widerrufbare, serverseitige Sitzungen. Beim Wechsel zum Kinderbildschirm wird die Elternsitzung beendet.
 - Kinderprofile mit eigenem Buddy, Aufgaben, Terminen und Sternestand; Archivierung erhält den bisherigen Verlauf.
-- Routinen nach Wochentagen, einmalige Tagesaufgaben, Termine und gemeinsame Belohnungsziele verwalten.
+- Routinen mit sortierbaren, einzeln abhakbaren Schritten nach Wochentagen; einmalige Tagesaufgaben, Termine und gemeinsame Belohnungsziele verwalten. Die Kinderansicht zeigt den Gruppenfortschritt (z. B. 2 von 3).
+- Routinenänderungen gelten für noch nicht angelegte Tagespläne. Bestehende Tageskopien und verdiente Sterne bleiben erhalten; die Migration übernimmt bisherige Routinen als Gruppen mit einem Schritt.
 - Kindliche Waldwelt, große Aufgabenkarten zum Abhaken und untere Navigation für Wand-Tablets. Profile und Punkte bleiben getrennt; paralleles Abhaken vergibt keine doppelten Sterne.
 - Wandbildschirme und Android-Geräte einzeln freigeben und sperren. Android-Geräte gehören genau einem Kind und haben keine Schreibrechte.
 - Lokaler Android-Elternzugang mit Offline-Wartung, einmaliger Eltern-Bestätigung zur Einrichtung und begrenzten Fehlversuchen.

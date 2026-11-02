@@ -45,7 +45,7 @@ try {
   const html = await parentPage.text();
   assert.ok(html.includes("Kinderprofile") && !html.includes("passwordHash"));
   const kid = await write("/api/parent/records/children", { name: "Mika Beispiel", avatar: "M", buddyKind: "fox", buddyName: "Fino", reducedMotion: true, active: true });
-  await write("/api/parent/records/routines", { childId: kid.id, title: "Zähne putzen", description: "Zahnbürste und Zahnpasta bereitlegen.", icon: "toothbrush", section: "morning", scheduledTime: "07:20", points: 5, weekdays: [1, 2, 3, 4, 5, 6, 7] });
+  await write("/api/parent/records/routines", { childId: kid.id, title: "Morgenroutine", steps: [{ title: "Zähne putzen", description: "Zahnbürste und Zahnpasta bereitlegen.", icon: "toothbrush", points: 5 }], section: "morning", scheduledTime: "07:20", weekdays: [1, 2, 3, 4, 5, 6, 7] });
   const task = await write("/api/parent/records/tasks", { childId: kid.id, title: "Rucksack bereitmachen", icon: "backpack", section: "morning", points: 10, date: localDate(new Date(), "Europe/Berlin") });
   await write("/api/parent/records/appointments", { childId: kid.id, title: "Musikstunde", icon: "calendar", startsAt: new Date(Date.now() + 3_600_000).toISOString() });
   await write("/api/parent/records/rewards", { title: "Gemeinsame Spielzeit", cost: 50 });
