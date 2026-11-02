@@ -96,3 +96,13 @@ SMOKE_ORIGIN=http://localhost:3000 npm run test:http
 Der HTTP-Test braucht dazu die vollständige Testserver-Konfiguration (`DATABASE_URL`, `FAMILY_ID`, `SETUP_CODE`, `SESSION_SECRET`, `APP_ORIGIN`) und einen Testhaushalt ohne vorhandene Elternkonten. Er ist ein automatischer Abnahmetest, kein Befehl für eure laufende Familieninstanz.
 
 Fehler als GitHub-Issue mit Reproduktionsschritten, Browser-/Android-Version und bereinigtem Screenshot dokumentieren. Keine Passwörter, Codes, Tokens oder echten Kinderdaten ins Issue schreiben.
+
+## Gruppierte Routinen
+
+- Im Elternbereich eine Morgenroutine mit drei Schritten und unterschiedlichen Sternwerten anlegen; Schritte bearbeiten und mit „Nach oben“ / „Nach unten“ sortieren. Kind und Wochentage gelten für die ganze Routine.
+- Am gekoppelten Wandbildschirm zwei Schritte abhaken: Die Gruppe zeigt „2 von 3 geschafft“. Neuladen und Profilwechsel erhalten den Fortschritt; das andere Kind erhält keine Sterne.
+- Dieselbe Aufgabe auf zwei Wandbildschirmen gleichzeitig abhaken: Die Sterne werden nur einmal gutgeschrieben.
+- Die Vorlage umbenennen, Schritte ergänzen, entfernen oder umsortieren: Der bereits angelegte Tag bleibt unverändert; der nächste passende, noch nicht angelegte Tagesplan übernimmt die Änderungen.
+- Bestehende Routinen werden bei Migration zu Gruppen mit einem Schritt. Historische Aufgabentitel, IDs und Journalbuchungen bleiben erhalten.
+
+Screenshots mit ausschließlich fiktiven Daten: [Elterneditor](proof/routine-editor.png), [gespeicherter Gruppenfortschritt](proof/routine-progress.png).

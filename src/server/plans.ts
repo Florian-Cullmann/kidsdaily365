@@ -17,27 +17,38 @@ async function familyDay(familyId: string, now: Date) {
 export async function getDayPlans(familyId: string, now = new Date()): Promise<DayPlan[]> {
   const { date, timezone } = await familyDay(familyId, now);
   const weekday = new Date(`${date}T12:00:00Z`).getUTCDay() || 7;
-  const templateRows = await db().select({ template: taskTemplates }).from(taskTemplates)
-    .innerJoin(children, and(eq(children.id, taskTemplates.childId), eq(children.active, true))).where(and(
-    eq(taskTemplates.familyId, familyId), eq(taskTemplates.active, true),
-    sql`${taskTemplates.weekdays} @> ARRAY[${weekday}]::integer[]`,
-  ));
-  const templates = templateRows.map((row) => row.template);
-  if (templates.length) {
-    await db().insert(dailyTasks).values(templates.map((template) => ({
-      familyId, childId: template.childId, templateId: template.id, date,
-      title: template.title, description: template.description, icon: template.icon,
-      section: template.section, scheduledTime: template.scheduledTime,
-      points: template.points, sortOrder: template.sortOrder,
-    }))).onConflictDoNothing({ target: [dailyTasks.templateId, dailyTasks.date] });
-  }
+  // Lock templates while copying the entire group: edits and concurrent reads cannot
+  // produce partial snapshots or add new steps to an already materialized day.
+  await db().transaction(async (tx) => {
+    const templates = await tx.select().from(taskTemplates).where(and(
+      eq(taskTemplates.familyId, familyId), eq(taskTemplates.active, true),
+      sql`${taskTemplates.weekdays} @> ARRAY[${weekday}]::integer[]`,
+    )).orderBy(asc(taskTemplates.id)).for("update");
+    for (const template of templates) {
+      const [child] = await tx.select({ id: children.id }).from(children).where(and(
+        eq(children.id, template.childId), eq(children.familyId, familyId), eq(children.active, true),
+      ));
+      if (!child) continue;
+      const [existing] = await tx.select({ id: dailyTasks.id }).from(dailyTasks).where(and(
+        eq(dailyTasks.familyId, familyId), eq(dailyTasks.templateId, template.id), eq(dailyTasks.date, date),
+      )).limit(1);
+      if (existing) continue;
+      const steps = template.steps ?? [template];
+      await tx.insert(dailyTasks).values(steps.map((step, stepIndex) => ({
+        familyId, childId: template.childId, templateId: template.id, date, stepIndex,
+        routineTitle: template.title, title: step.title, description: step.description, icon: step.icon,
+        section: template.section, scheduledTime: template.scheduledTime,
+        points: step.points, sortOrder: template.sortOrder,
+      })));
+    }
+  });
 
   const [profiles, tasks, balances, upcoming, rewardOptions] = await Promise.all([
     db().select().from(children).where(and(eq(children.familyId, familyId), eq(children.active, true))).orderBy(asc(children.name)),
     db().select({ task: dailyTasks, completedAt: pointEntries.createdAt })
       .from(dailyTasks).leftJoin(pointEntries, eq(dailyTasks.id, pointEntries.taskId))
       .where(and(eq(dailyTasks.familyId, familyId), eq(dailyTasks.date, date), isNull(dailyTasks.cancelledAt)))
-      .orderBy(asc(dailyTasks.sortOrder), asc(dailyTasks.id)),
+      .orderBy(asc(dailyTasks.sortOrder), asc(dailyTasks.templateId), asc(dailyTasks.stepIndex), asc(dailyTasks.id)),
     db().select({ childId: pointEntries.childId, balance: sql`sum(${pointEntries.amount})`.mapWith(Number) })
       .from(pointEntries).where(eq(pointEntries.familyId, familyId)).groupBy(pointEntries.childId),
     db().select().from(appointments).where(and(eq(appointments.familyId, familyId), eq(appointments.active, true), gte(appointments.startsAt, now))).orderBy(asc(appointments.startsAt)),
@@ -52,7 +63,7 @@ export async function getDayPlans(familyId: string, now = new Date()): Promise<D
     appointments: upcoming.filter((item) => item.childId === child.id).slice(0, 3).map((item) => ({ id: item.id, title: item.title, startsAt: item.startsAt.toISOString(), icon: item.icon })),
     rewards: rewardOptions,
     tasks: tasks.filter(({ task }) => task.childId === child.id).map(({ task, completedAt }) => ({
-      id: task.id, title: task.title, description: task.description, icon: task.icon,
+      id: task.id, routineId: task.templateId, routineTitle: task.routineTitle, title: task.title, description: task.description, icon: task.icon,
       section: task.section, time: task.scheduledTime?.slice(0, 5) ?? null,
       points: task.points, completed: completedAt !== null,
     })),
