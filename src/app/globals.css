@@ -112,10 +112,6 @@ h1, h2, h3, strong { font-weight: 800; }
 .buddy-space { min-height: 0; display: grid; grid-template-rows: minmax(170px, 1fr) auto auto; gap: 14px; }
 .buddy-scene { position: relative; min-height: 0; }
 .main-buddy { position: absolute; width: 64%; height: 100%; right: -7px; bottom: 0; filter: drop-shadow(0 12px 7px #5b603124); }
-.buddy-speech { position: absolute; z-index: 1; left: 0; top: 7px; width: 46%; max-width: 235px; padding: 15px 17px; background: #fffef6; border: 2px solid #fff; border-radius: 27px 27px 6px 27px; box-shadow: 0 5px 10px #4d4b2a08; }
-.buddy-speech strong { display: block; font-size: 23px; }
-.buddy-speech > span { display: block; margin-top: 7px; color: #69647e; font-size: 17px; line-height: 1.4; }
-.buddy-speech svg { display: block; margin: 8px 0 -3px auto; color: #b784d4; }
 .buddy-name { position: absolute; right: 10%; bottom: 0; padding: 5px 13px; background: #fffdf0ed; border-radius: 16px; font-size: 14px; font-weight: 700; color: #6b644e; }
 .star-treasure { position: absolute; z-index: 2; left: 0; bottom: 5px; display: flex; align-items: center; gap: 8px; width: 46%; min-width: 190px; min-height: 91px; padding: 12px 14px; border: 3px solid #fff; border-radius: 25px; background: linear-gradient(130deg, #d9c5ff, #efe5ff); box-shadow: 0 6px 14px #8164a020; text-align: left; }
 .star-treasure > span { font-size: 43px; line-height: 1; }
@@ -202,9 +198,6 @@ progress::-moz-progress-bar { background: #efb832; border-radius: 20px; }
   .task-words > span { font-size: 18px; }
   .peek-card { min-height: 126px; }
   .peek-copy strong { font-size: 26px; }
-  .buddy-speech { top: 20px; max-width: 290px; padding: 24px; }
-  .buddy-speech strong { font-size: 29px; }
-  .buddy-speech > span { font-size: 21px; }
   .star-treasure { min-height: 115px; }
   .star-treasure strong { font-size: 48px; }
   .touch-dock button { min-height: 72px; min-width: 175px; font-size: 22px; }
@@ -225,9 +218,6 @@ progress::-moz-progress-bar { background: #efb832; border-radius: 20px; }
   .peek-picture { font-size: 35px; width: 43px; }
   .peek-copy strong { font-size: 20px; }
   .peek-copy > span { font-size: 14px; }
-  .buddy-speech { width: 49%; padding: 13px; }
-  .buddy-speech strong { font-size: 20px; }
-  .buddy-speech > span { font-size: 15px; }
   .star-treasure { min-width: 172px; padding: 10px; gap: 5px; }
   .star-treasure > span { font-size: 35px; }
   .star-treasure strong { font-size: 32px; }
@@ -253,9 +243,6 @@ progress::-moz-progress-bar { background: #efb832; border-radius: 20px; }
   .paper-footer { padding-top: 20px; }
   .buddy-space { grid-template-rows: 300px auto auto; gap: 16px; }
   .main-buddy { width: 62%; right: 2%; }
-  .buddy-speech { width: 44%; top: 15px; padding: 18px; }
-  .buddy-speech strong { font-size: 23px; }
-  .buddy-speech > span { font-size: 18px; }
   .star-treasure { left: 10px; width: 42%; }
   .peek-card { min-height: 111px; }
   .peek-copy strong { font-size: 23px; }
@@ -284,9 +271,6 @@ progress::-moz-progress-bar { background: #efb832; border-radius: 20px; }
   .check-circle { width: 38px; height: 38px; border-width: 3px; }
   .done-badge { font-size: 12px; padding: 8px; }
   .paper-heading h2 { font-size: 27px; }
-  .buddy-speech { padding: 14px; }
-  .buddy-speech > span { font-size: 16px; }
-  .buddy-speech strong { font-size: 21px; }
   .appointment-row, .wish-card { padding: 16px; gap: 13px; }
   .appointment-row h3, .wish-card h3 { font-size: 21px; }
   .appointment-row time { font-size: 20px; padding: 10px; }
