@@ -15,6 +15,13 @@
       "when": 1793566257408,
       "tag": "0001_parent-accounts-and-device-scopes",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793576620568,
+      "tag": "0002_uneven_marvel_apes",
+      "breakpoints": true
     }
   ]
 }

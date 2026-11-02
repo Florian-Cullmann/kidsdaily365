@@ -13,7 +13,16 @@ interface LauncherApi {
 class HttpFailure(val status: Int) : IOException("Serveranfrage fehlgeschlagen ($status).")
 
 /** Fixed native endpoints, no cookie manager, no redirects or TLS exceptions. Call off the UI thread. */
-class HttpLauncherApi : LauncherApi {
+class HttpLauncherApi : LauncherApi, MaintenanceAuthorizer {
+    override fun authorize(target: MaintenanceTarget, code: String) {
+        require(Regex("[a-f0-9]{32}").matches(code.trim())) { "Eltern-Bestätigung aus der Geräteverwaltung eingeben." }
+        val body = JSONObject().put("deviceId", target.deviceId).put("code", code.trim()).toString()
+        val raw = request(target.server, "/api/device/maintenance", null, body)
+        try {
+            val o = JSONObject(raw)
+            check(o.get("schemaVersion") == 1 && o.get("authorized") == true && o.get("deviceId") == target.deviceId)
+        } catch (_: Exception) { throw ProtocolFailure() }
+    }
     override fun pair(server: ServerAddress, code: String): Pairing {
         require(code.trim().length in 1..256) { "Gerätecode eingeben." }
         val body = JSONObject().put("code", code.trim()).put("kind", "android").toString()

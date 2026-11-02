@@ -16,9 +16,6 @@
     <string name="last_sync">Letzte Aktualisierung: %1$s</string>
     <string name="refresh_required">Bitte die App-Freigaben mit dem Server aktualisieren.</string>
     <string name="retry">Jetzt aktualisieren</string>
-    <string name="disconnect">Verbindung trennen</string>
-    <string name="disconnect_explanation">Dieses Handy braucht danach einen neuen Android-Gerätecode aus der Elternverwaltung. In dieser ungeschützten Vorschau gibt es noch keinen Eltern-Recovery-Zugang.</string>
-    <string name="cancel">Abbrechen</string>
     <string name="setup_title">Dein Buddy zieht ein.</string>
     <string name="setup_explanation">Ein Elternteil erstellt unter Geräte einen Android-Code für dein Profil. Auf diesem Handy siehst du deine Sterne und deinen Buddy. Aufgaben erledigst du am Wandbildschirm.</string>
     <string name="server_address">Serveradresse</string>
@@ -27,4 +24,11 @@
     <string name="debug_http">Nur zum Entwickeln: Diese Debug-App erlaubt im LAN auch http:// mit privater IP-Adresse, im Emulator z. B. http://10.0.2.2:3000. Für echte Nutzung HTTPS einrichten.</string>
     <string name="connection_failed">Verbindung fehlgeschlagen. Serveradresse und Erreichbarkeit prüfen und erneut versuchen. Wurde der Code schon eingelöst, einen neuen Android-Code erstellen.</string>
     <string name="invalid_code">Gerätecode ungültig oder abgelaufen. Bitte einen neuen Android-Code erstellen.</string>
+    <plurals name="maintenance_wait">
+        <item quantity="one">\nBitte %1$d Sekunde warten.</item>
+        <item quantity="other">\nBitte %1$d Sekunden warten.</item>
+    </plurals>
+    <string name="maintenance_damaged">\nDer gespeicherte Elternzugang ist nicht lesbar. Eine neue Eltern-Bestätigung ist erforderlich.</string>
+    <string name="maintenance_disconnect_first">Vor einer neuen Kopplung zuerst die bestehende Verbindung trennen.</string>
+    <string name="maintenance_failed">Das hat nicht geklappt. Verbindung und Eltern-Bestätigung prüfen. Falls sie schon verwendet wurde, eine neue erstellen.</string>
 </resources>

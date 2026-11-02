@@ -34,12 +34,12 @@ class ConnectedLauncherTest {
 
     @Test fun `consumed code is retained if first snapshot fails then restart recovers`() = runBlocking {
         val store = Store(); val clock = Clock(); val api = Api()
-        var repo = ConnectedLauncher(api, store, clock, true)
+        var repo = ConnectedLauncher(api, store, clock, true, TestMaintenanceAccess())
         repo.pair("http://10.0.2.2:3000", "fictional")
         api.failure = IOException()
         assertTrue(repo.refresh().paired)
         assertFalse(repo.current().canLaunch)
-        repo = ConnectedLauncher(api, store, clock, true)
+        repo = ConnectedLauncher(api, store, clock, true, TestMaintenanceAccess())
         api.failure = null
         assertTrue(repo.refresh().canLaunch)
         assertEquals(35L, repo.current().snapshot?.stars)
@@ -47,7 +47,7 @@ class ConnectedLauncherTest {
 
     @Test fun `offline policy expires monotonically and is invalid after reboot`() = runBlocking {
         val store = Store(); val clock = Clock(); val api = Api()
-        val repo = ConnectedLauncher(api, store, clock, true)
+        val repo = ConnectedLauncher(api, store, clock, true, TestMaintenanceAccess())
         repo.pair("http://10.0.2.2:3000", "fictional"); repo.refresh()
         api.failure = IOException()
         clock.now -= 600_000 // Clock rollback cannot extend the policy lifetime.
@@ -58,11 +58,11 @@ class ConnectedLauncherTest {
         assertFalse(repo.current().canLaunch)
         api.failure = null; repo.refresh()
         clock.boot++
-        assertFalse(ConnectedLauncher(api, store, clock, true).current().canLaunch)
+        assertFalse(ConnectedLauncher(api, store, clock, true, TestMaintenanceAccess()).current().canLaunch)
     }
 
     @Test fun `revocation wipes token and cached child`() = runBlocking {
-        val store = Store(); val api = Api(); val repo = ConnectedLauncher(api, store, Clock(), true)
+        val store = Store(); val api = Api(); val repo = ConnectedLauncher(api, store, Clock(), true, TestMaintenanceAccess())
         repo.pair("http://10.0.2.2:3000", "fictional"); repo.refresh()
         api.failure = AccessRevoked()
         assertFalse(repo.refresh().paired)
@@ -72,17 +72,17 @@ class ConnectedLauncherTest {
 
     @Test fun `identity mismatch or invalid protocol discards old launch policy across restart`() = runBlocking {
         val store = Store(); val api = Api(); val clock = Clock()
-        val repo = ConnectedLauncher(api, store, clock, true)
+        val repo = ConnectedLauncher(api, store, clock, true, TestMaintenanceAccess())
         repo.pair("http://10.0.2.2:3000", "fictional"); repo.refresh()
         api.data = api.data.copy(child = api.data.child.copy(id = "33333333-3333-4333-8333-333333333333"))
         assertNull(repo.refresh().snapshot)
-        assertFalse(ConnectedLauncher(api, store, clock, true).mayLaunch("com.audible.application"))
+        assertFalse(ConnectedLauncher(api, store, clock, true, TestMaintenanceAccess()).mayLaunch("com.audible.application"))
         api.data = snapshotFixture().copy(device = snapshotFixture().device.copy(id = "33333333-3333-4333-8333-333333333333"))
         assertFalse(repo.refresh().canLaunch)
     }
 
     @Test fun `app removal empty list token expiry and storage failure never widen access`() = runBlocking {
-        val store = Store(); val api = Api(); val clock = Clock(); val repo = ConnectedLauncher(api, store, clock, true)
+        val store = Store(); val api = Api(); val clock = Clock(); val repo = ConnectedLauncher(api, store, clock, true, TestMaintenanceAccess())
         repo.pair("http://10.0.2.2:3000", "fictional"); repo.refresh()
         assertFalse(repo.mayLaunch("com.android.settings"))
         api.data = api.data.copy(policy = api.data.policy.copy(allowedApps = emptyList()))
@@ -98,7 +98,7 @@ class ConnectedLauncherTest {
     }
 
     @Test fun `reset waits out in-flight snapshot and cannot restore old child`() = runBlocking {
-        val store = Store(); val api = Api(); val clock = Clock(); val repo = ConnectedLauncher(api, store, clock, true)
+        val store = Store(); val api = Api(); val clock = Clock(); val repo = ConnectedLauncher(api, store, clock, true, TestMaintenanceAccess())
         repo.pair("http://10.0.2.2:3000", "fictional")
         val started = CountDownLatch(1); val release = CountDownLatch(1)
         api.block = { started.countDown(); check(release.await(5, TimeUnit.SECONDS)) }
@@ -115,7 +115,12 @@ class ConnectedLauncherTest {
 
     @Test fun `corrupt encrypted-store payload requires new pairing`() = runBlocking {
         val store = Store().apply { raw = "not-json" }
-        assertFalse(ConnectedLauncher(Api(), store, Clock(), true).current().paired)
+        assertFalse(ConnectedLauncher(Api(), store, Clock(), true, TestMaintenanceAccess()).current().paired)
         assertNull(store.raw)
     }
+}
+
+class TestMaintenanceAccess : MaintenanceAccess {
+ override fun requireOpen() {}
+ override fun requirePairingAllowed() {}
 }

@@ -37,8 +37,14 @@ class MainActivity : Activity() {
     private var polling: Job? = null
     private var operation: Job? = null
     private lateinit var content: LinearLayout
-    private var connectedLayout = false
+    private var layoutKind = -1
+    private val maintenance get() = (application as LauncherApplication).maintenance
+    private lateinit var parentPanel: ParentPanel
+    private var parentStatus: MaintenanceStatus? = null
+    private var showPairing = false
+    private var active = false
     private var lastSnapshot: LauncherSnapshot? = null
+    private var lastRendered: LauncherView? = null
     private lateinit var connectionStatus: TextView
     private lateinit var greeting: TextView
     private lateinit var stars: TextView
@@ -65,44 +71,62 @@ class MainActivity : Activity() {
                 insets
             }
         })
+        parentPanel = ParentPanel(this, scope, maintenance, repository,
+            reconnect = { showPairing = true; layoutKind = -1; startPolling() },
+            changed = { showPairing = false; layoutKind = -1; startPolling() })
     }
 
-    override fun onStart() {
-        super.onStart()
+    override fun onResume() {
+        super.onResume()
+        active = true
         lastSnapshot = null // Recheck app installation/availability after returning from another app.
+        lastRendered = null
         startPolling()
     }
 
-    override fun onStop() {
+    override fun onPause() {
+        active = false
+        maintenance.close()
+        parentPanel.dismiss()
         polling?.cancel()
         operation?.cancel()
-        super.onStop()
+        showPairing = false
+        super.onPause()
     }
 
     override fun onDestroy() { scope.cancel(); super.onDestroy() }
 
     private fun startPolling() {
+        if (!active) return
         polling?.cancel()
         polling = scope.launch {
             safely {
-                render(repository.current())
+                parentStatus = maintenance.status()
+                maintenance.rememberTarget(repository.maintenanceTarget())
+                var tick = 0
                 while (true) {
-                    val view = repository.refresh()
+                    var view = repository.current()
+                    if (view.paired && tick % 5 == 0) view = repository.refresh()
+                    parentStatus = maintenance.status()
                     render(view)
-                    if (!view.paired) break
-                    delay(5_000)
+                    tick++
+                    delay(1_000)
                 }
             }
         }
     }
 
     private fun render(state: LauncherView) {
-        if (content.childCount == 0 || connectedLayout != state.paired) {
+        val mayPair = parentStatus?.let { !it.configured && !it.damaged } == true || (showPairing && maintenance.isOpen())
+        val nextKind = if (state.paired) 1 else if (mayPair) 0 else 2
+        if (layoutKind == nextKind && lastRendered == state) return
+        lastRendered = state
+        if (content.childCount == 0 || layoutKind != nextKind) {
             content.removeAllViews()
-            connectedLayout = state.paired
+            layoutKind = nextKind
             lastSnapshot = null
             content.addView(text(getString(R.string.unmanaged), 14f, Color.rgb(126, 65, 77)))
-            if (state.paired) buildHome() else buildPairing()
+            when (nextKind) { 1 -> buildHome(); 0 -> buildPairing(); else -> buildDisconnected() }
         }
         val sync = state.receivedAt?.let { getString(R.string.last_sync, DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it))) }.orEmpty()
         connectionStatus.text = listOf(state.status, sync).filter { it.isNotEmpty() }.joinToString("\n")
@@ -164,15 +188,15 @@ class MainActivity : Activity() {
         apps = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; content.addView(apps, fullWidth())
         connectionStatus = text("", 14f); content.addView(connectionStatus)
         content.addView(button(getString(R.string.retry)) { startPolling() })
-        content.addView(button(getString(R.string.disconnect)) {
-            AlertDialog.Builder(this).setTitle(R.string.disconnect)
-                .setMessage(R.string.disconnect_explanation)
-                .setNegativeButton(R.string.cancel, null)
-                .setPositiveButton(R.string.disconnect) { _, _ ->
-                    polling?.cancel()
-                    operation = scope.launch { safely { render(repository.reset()) } }
-                }.show()
-        })
+        content.addView(button("Elternzugang") { parentPanel.open() })
+    }
+
+    private fun buildDisconnected() {
+        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        content.addView(text("Handy erneut verbinden", 30f))
+        content.addView(text("Ein Elternteil kann den Zugang öffnen und dieses Handy neu koppeln. Der Eltern-Code funktioniert auch ohne Server.", 18f))
+        connectionStatus = text("", 16f); content.addView(connectionStatus)
+        content.addView(button("Elternzugang") { parentPanel.open() })
     }
 
     private fun buildPairing() {
@@ -202,17 +226,24 @@ class MainActivity : Activity() {
             polling?.cancel()
             operation = scope.launch {
                 try {
-                    safely { render(repository.pair(endpoint, pairingCode)); startPolling() }
-                } finally { if (!connectedLayout) pairButton.isEnabled = true }
+                    safely {
+                        val paired = repository.pair(endpoint, pairingCode)
+                        maintenance.rememberTarget(repository.maintenanceTarget())
+                        maintenance.close(); showPairing = false
+                        render(paired); startPolling()
+                    }
+                } finally { if (layoutKind == 0) pairButton.isEnabled = true }
             }
         }; content.addView(pairButton)
         connectionStatus = text("", 16f); content.addView(connectionStatus)
+        if (parentStatus?.target != null) content.addView(button("Elternzugang") { parentPanel.open() })
         if (BuildConfig.DEBUG) content.addView(text(getString(R.string.debug_http), 14f))
     }
 
     private suspend fun safely(block: suspend () -> Unit) {
         try { block() }
         catch (e: CancellationException) { throw e }
+        catch (_: MaintenanceLocked) { parentStatus = maintenance.status(); layoutKind = -1; render(repository.current()) }
         catch (e: IllegalArgumentException) { connectionStatus.text = e.message ?: getString(R.string.connection_failed) }
         catch (e: HttpFailure) { connectionStatus.setText(if (e.status == 401) R.string.invalid_code else R.string.connection_failed) }
         catch (_: Exception) { connectionStatus.setText(R.string.connection_failed) }

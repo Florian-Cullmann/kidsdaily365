@@ -12,10 +12,11 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /** AES-GCM authenticated storage. The key is non-exportable; ciphertext is excluded from backups. */
-class KeystorePrivateStore(context: Context) : PrivateStore {
-    private val file = AtomicFile(File(context.noBackupFilesDir, "launcher-connection.v1"))
-    private val alias = "kidsdaily.launcher.connection.v1"
-    private val aad = "kidsdaily-launcher-storage-v1".toByteArray(Charsets.UTF_8)
+class KeystorePrivateStore(context: Context, name: String = "connection") : PrivateStore {
+    init { require(name in setOf("connection", "maintenance")) }
+    private val file = AtomicFile(File(context.noBackupFilesDir, "launcher-$name.v1"))
+    private val alias = "kidsdaily.launcher.$name.v1"
+    private val aad = (if (name == "connection") "kidsdaily-launcher-storage-v1" else "kidsdaily-maintenance-storage-v1").toByteArray(Charsets.UTF_8)
 
     private fun key(create: Boolean): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }

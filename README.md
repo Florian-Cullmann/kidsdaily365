@@ -10,6 +10,7 @@ Eine selbst gehostete Familien-App für neurodivergente Kinder: eigener Buddy, �
 - Routinen nach Wochentagen, einmalige Tagesaufgaben, Termine und gemeinsame Belohnungsziele verwalten.
 - Kindliche Waldwelt, große Aufgabenkarten zum Abhaken und untere Navigation für Wand-Tablets. Profile und Punkte bleiben getrennt; paralleles Abhaken vergibt keine doppelten Sterne.
 - Wandbildschirme und Android-Geräte einzeln freigeben und sperren. Android-Geräte gehören genau einem Kind und haben keine Schreibrechte.
+- Lokaler Android-Elternzugang mit Offline-Wartung, einmaliger Eltern-Bestätigung zur Einrichtung und begrenzten Fehlversuchen.
 - App-Freigaben je Kind im Elternbereich; Audible als erste Freigabe bei neuen Profilen.
 - Launcher-API für Buddy, Sternestand und App-Liste. Das native Projekt unter `apps/android/` ist eine **ungeschützte Vorschau** mit Gerätecode-Kopplung, Keystore-Speicher und Live-Sternen. Echte Gerätesperren folgen in [Issue #2](https://github.com/Florian-Cullmann/kidsdaily365/issues/2).
 

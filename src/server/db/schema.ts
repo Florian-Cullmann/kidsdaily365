@@ -142,8 +142,20 @@ export const devices = pgTable("devices", {
   revokedAt: timestamp({ withTimezone: true }),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
+  unique("device_family_identity").on(table.id, table.familyId),
   foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
   check("device_child_scope", sql`(${table.kind} = 'android' and ${table.childId} is not null) or (${table.kind} = 'wall' and ${table.childId} is null)`),
+]);
+
+export const deviceMaintenanceCodes = pgTable("device_maintenance_codes", {
+  id: uuid().primaryKey().defaultRandom(),
+  familyId: uuid().notNull().references(() => families.id),
+  deviceId: uuid().notNull(),
+  codeHash: text().notNull().unique(),
+  expiresAt: timestamp({ withTimezone: true }).notNull(),
+  usedAt: timestamp({ withTimezone: true }),
+}, (table) => [
+  foreignKey({ columns: [table.deviceId, table.familyId], foreignColumns: [devices.id, devices.familyId] }).onDelete("cascade"),
 ]);
 
 export const devicePairingCodes = pgTable("device_pairing_codes", {
