@@ -1,6 +1,6 @@
 # KidsDaily365
 
-Eine selbst gehostete Familien-App für neurodivergente Kinder: eigener Buddy, übersichtlicher Tagesplan und Sterne für kleine Schritte. Die Kinderansicht ist für einen 14-Zoll-Wand-Touchscreen gestaltet. Eltern verwalten die Familie im geschützten Webbereich. Ein nativer Android-Launcher wird als weiterer, ausschließlich lesender Client vorbereitet.
+Eine selbst gehostete Familien-App für neurodivergente Kinder: eigener Buddy, übersichtlicher Tagesplan und Sterne für kleine Schritte. Die Kinderansicht ist für einen 14-Zoll-Wand-Touchscreen gestaltet. Eltern verwalten die Familie im geschützten Webbereich. Ein nativer Android-Launcher zeigt als ausschließlich lesender Client Buddy und Sterne.
 
 ## Was bereits funktioniert
 
@@ -11,7 +11,7 @@ Eine selbst gehostete Familien-App für neurodivergente Kinder: eigener Buddy, �
 - Kindliche Waldwelt, große Aufgabenkarten zum Abhaken und untere Navigation für Wand-Tablets. Profile und Punkte bleiben getrennt; paralleles Abhaken vergibt keine doppelten Sterne.
 - Wandbildschirme und Android-Geräte einzeln freigeben und sperren. Android-Geräte gehören genau einem Kind und haben keine Schreibrechte.
 - App-Freigaben je Kind im Elternbereich; Audible als erste Freigabe bei neuen Profilen.
-- Launcher-API für Buddy, Sternestand und App-Liste. Das native Projekt unter `apps/android/` kompiliert als **ungeschützte Vorschau**; Verbindung und echte Gerätesperren folgen in [Issue #2](https://github.com/Florian-Cullmann/kidsdaily365/issues/2).
+- Launcher-API für Buddy, Sternestand und App-Liste. Das native Projekt unter `apps/android/` ist eine **ungeschützte Vorschau** mit Gerätecode-Kopplung, Keystore-Speicher und Live-Sternen. Echte Gerätesperren folgen in [Issue #2](https://github.com/Florian-Cullmann/kidsdaily365/issues/2).
 
 Belohnungseinlösung und [Buddy-Kosmetik](https://github.com/Florian-Cullmann/kidsdaily365/issues/3) sind noch nicht umgesetzt. Es gibt keine Werbung, zufälligen Belohnungen, Streak-Strafen, externen Fonts oder automatisch gestarteten Sounds. [Illustrationen und Prompts](docs/illustrations.md) liegen im Projekt.
 
@@ -68,7 +68,7 @@ DATABASE_URL=postgres://…/kidsdaily_test npm run test:integration
 SMOKE_ORIGIN=http://localhost:3000 npm run test:http
 # Eigenständiges natives Projekt mit JDK 17 und Android SDK 36:
 cd apps/android
-./gradlew assembleDebug lintDebug
+./gradlew testDebugUnitTest assembleDebug lintDebug
 ```
 
 Der HTTP-Smoke-Test braucht zusätzlich die Live-Konfiguration und dieselbe `DATABASE_URL`/`FAMILY_ID` wie der Testserver. Er verweigert andere Datenbanknamen, externe Hosts und Haushalte mit bestehenden Elternkonten. Er legt fiktive Daten an und entfernt anschließend **den Testhaushalt samt Beispieldaten**. Nicht gegen produktive Daten verwenden. GitHub Actions prüft PostgreSQL 18, Produktionsbuild, Container, HTTP-Wege und den Android-Build.

@@ -47,18 +47,26 @@ Wenn der Browser auf einem anderen Rechner über die Server-IP zugreift, muss `A
 
 ## 4. Android: Was jetzt prüfbar ist
 
-Die App unter `apps/android/` ist eine **ungeschützte native Vorschau**, noch nicht mit dem Backend verbunden. Sie zeigt weder schon echte Live-Sterne noch erzwingt sie App-/System-Sperren. Keine Eltern- oder Produktionszugänge in diese Vorschau eingeben.
+Die native App unter `apps/android/` verbindet sich mit dem Backend, zeigt Buddy und Live-Sterne und öffnet konfigurierte installierte Apps. Sie bleibt eine **ungeschützte Vorschau**. Eine Installation aktiviert keine Device-Owner- oder Systemsperren.
 
 Mit JDK 17 und Android SDK 36:
 
 ```sh
 cd apps/android
-./gradlew assembleDebug lintDebug
+./gradlew testDebugUnitTest assembleDebug lintDebug assembleRelease lintRelease
 ```
 
-Die Test-APK liegt danach unter `app/build/outputs/apk/debug/app-debug.apk`. Sie kann zum Anschauen auf dem Xiaomi/LineageOS-Testgerät normal installiert und als normale App geöffnet werden. Dafür sind weder Device-Owner-Enrollment noch ein Werksreset nötig. Eine Installation der Vorschau sichert das Telefon nicht ab.
+Für einen getrennten Entwicklungs-Emulator oder ein bewusst vorgesehenes Testgerät:
 
-Im Backend lassen sich bereits kindgebundene Android-Gerätecodes, App-Freigaben und Widerruf testen. Die automatische HTTP-Prüfung verbindet sich als Android-Gerät, vergleicht Sterne vor/nach einem Wand-Abschluss und prüft, dass mit dem Android-Token keine Aufgaben oder Eltern-Daten verändert werden können.
+1. Debug-APK aus `app/build/outputs/apk/debug/` installieren und öffnen.
+2. Im Eltern-Webbereich unter Geräte einen **Android**-Code für ein fiktives Kind anlegen. In der App Serveradresse und Gerätecode eingeben. Kein Elternpasswort/Registrierungscode. HTTPS verwenden; nur Debug erlaubt HTTP mit privater IP. Im Standard-Emulator: `http://10.0.2.2:3000`. Details und Grenzen: [Android-README](../apps/android/README.md).
+3. Buddy/Name und Sterne mit dem Web vergleichen. Am Wandbildschirm eine Aufgabe erledigen: Der Handy-Sternestand soll im Vordergrund nach dem nächsten Fünf-Sekunden-Abruf steigen. Keine Abhakfunktion auf dem Handy.
+4. Eine installierte, harmlose Test-App im Eltern-Backend freigeben. Sie erscheint und lässt sich öffnen. Entfernte Freigaben verschwinden nach dem nächsten Abruf. Fehlendes Audible erscheint als „nicht installiert“ und startet nicht.
+5. Verbindung unterbrechen: letzter Sternestand und letzte Aktualisierung bleiben sichtbar, der Offline-Hinweis erscheint nach dem Abruf-Timeout. Die letzte Liste wird nicht erweitert. App-Prozess im selben Geräte-Boot neu starten: Cache bleibt. Nach Geräte-Neustart ist vor App-Starts eine Online-Bestätigung nötig.
+6. Verbindung wiederherstellen: Buddy/Sterne/Freigaben aktualisieren sich. Gerätezugang im Backend widerrufen: Beim nächsten Kontakt zurück zur Code-Eingabe, kein alter Kinder-Cache. Erneute Kopplung braucht einen neuen Code.
+7. Optional auf dem Emulator den verschlüsselten Speicher beschädigen: Die App verlangt eine neue Kopplung und zeigt keinen alten Kinderstand. Keine Zugangsdaten oder Codes in Logs/Screenshots aufnehmen.
+
+JVM-Tests prüfen zusätzlich 24-Stunden-Grenze und Uhrenrückstellung, Neustart/Boot-Wechsel, falsches Kind/Gerät, unbekannte Versionen, unzulässige Berechtigungen/Pakete, Token-Widerruf, Speicherfehler, gleichzeitige Trennung/Synchronisierung sowie reale Loopback-HTTP-Requests ohne Browsercookies oder Redirect-Folgen. Diese Tests ersetzen keine echte Geräte-Sicherheitsabnahme. Die automatischen Backend-HTTP-Tests prüfen weiterhin Live-Sterne und die getrennten Schreibrechte.
 
 Die echten Tests für Recents, Kamera, Quick Settings, Benachrichtigungen, Autostart, Offline-Policy, erlaubte Apps und elterliche Wiederherstellung folgen in [Issue #2](https://github.com/Florian-Cullmann/kidsdaily365/issues/2). Mindestplattform Android 13; LineageOS und HyperOS getrennt abnehmen. Siehe [Android-Konzept](android.md).
 
@@ -69,7 +77,7 @@ Der [GitHub-Workflow](https://github.com/Florian-Cullmann/kidsdaily365/actions/w
 - Web-Lint, Typprüfung und Unit-/API-Grenztests.
 - Migrationen und Integrationstests gegen PostgreSQL 18.
 - Produktionsbuild, beide Docker-Targets und realen HTTP-Smoke-Test im Runtime-Container.
-- Native Android-Kompilierung und Android Lint.
+- Native Android-JVM-Tests, Debug-/Release-Kompilierung und Android Lint; Debug-APK als Test-Artefakt.
 
 Lokal ohne echte Familiendaten:
 

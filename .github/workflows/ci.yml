@@ -22,9 +22,15 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Install Android SDK
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
-      - name: Compile native foundation and run Android lint
+      - name: Test, compile and lint native launcher
         working-directory: apps/android
-        run: ./gradlew assembleDebug lintDebug --console=plain
+        run: ./gradlew testDebugUnitTest assembleDebug lintDebug assembleRelease lintRelease --console=plain
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kidsdaily-android-debug
+          path: apps/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
 
   verify:
     runs-on: ubuntu-latest
