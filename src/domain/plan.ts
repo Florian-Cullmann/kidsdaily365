@@ -8,6 +8,8 @@ export type ChildProfile = {
 export type Appointment = { id: string; title: string; startsAt: string; icon: "calendar" | "tooth" | "ball" | "heart" };
 export type Reward = { id: string; title: string; cost: number };
 export type Task = {
+  routineId?: string | null;
+  routineTitle?: string | null;
   id: string;
   title: string;
   description: string;

@@ -28,7 +28,7 @@ export async function getManagementData(parent: ParentActor) {
   ]);
   return {
     family: { name: family.name, timezone: family.timezone }, today,
-    children: kids, routines, tasks: tasks.map(({ task, completed }) => ({ ...task, completed })),
+    children: kids, routines: routines.map((routine) => ({ ...routine, steps: routine.steps ?? [{ title: routine.title, description: routine.description, icon: routine.icon, points: routine.points }] })), tasks: tasks.map(({ task, completed }) => ({ ...task, completed })),
     appointments: dates.map((item) => ({ ...item, startsAt: item.startsAt.toISOString(), endsAt: item.endsAt?.toISOString() ?? null })),
     rewards: goals, apps,
     devices: deviceRows.map((item) => ({ ...item, expiresAt: item.expiresAt.toISOString(), revokedAt: item.revokedAt?.toISOString() ?? null })),

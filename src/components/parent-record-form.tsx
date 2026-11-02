@@ -1,7 +1,7 @@
 "use client";
 
-import type { FormEvent } from "react";
-import type { Resource } from "@/domain/management";
+import { useState, type FormEvent } from "react";
+import type { Resource, RoutineStep } from "@/domain/management";
 import type { ManagementData } from "@/server/management";
 
 export type EditableRecord = Record<string, unknown> & { id: string };
@@ -19,6 +19,15 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onCance
   resource: Resource; data: ManagementData; record: EditableRecord | null; busy: boolean;
   onSave: (input: unknown) => Promise<void>; onCancel: () => void;
 }) {
+  const [steps, setSteps] = useState<RoutineStep[]>(() => (record?.steps as RoutineStep[] | undefined) ?? [{ title: "", description: "", icon: "heart", points: 5 }]);
+  const [openStep, setOpenStep] = useState<number | null>(record ? null : 0);
+  function updateStep(index: number, patch: Partial<RoutineStep>) {
+    setSteps((items) => items.map((item, i) => i === index ? { ...item, ...patch } : item));
+  }
+  function moveStep(index: number, direction: number) {
+    setOpenStep((current) => current === index ? index + direction : current === index + direction ? index : current);
+    setSteps((items) => { const next = [...items]; [next[index], next[index + direction]] = [next[index + direction], next[index]]; return next; });
+  }
   const text = (key: string, fallback = "") => String(record?.[key] ?? fallback);
   const value = (key: string, fallback: number) => Number(record?.[key] ?? fallback);
   const withChild = ["routines", "tasks", "appointments", "apps"].includes(resource);
@@ -32,8 +41,8 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onCance
     let input: unknown;
     if (resource === "children") input = { name: field("name"), avatar: field("avatar") || Array.from(field("name"))[0], buddyName: field("buddyName"), buddyKind: field("buddyKind"), reducedMotion: form.get("reducedMotion") === "on", active };
     else if (isTask) {
-      const fields = { childId: field("childId"), title: field("title"), description: field("description"), icon: field("icon"), section: field("section"), scheduledTime: field("scheduledTime") || null, points: Number(field("points")), sortOrder: Number(field("sortOrder")) };
-      input = resource === "routines" ? { ...fields, active, weekdays: form.getAll("weekdays").map(Number) } : { ...fields, date: field("date") };
+      const fields = { childId: field("childId"), title: field("title"), description: field("description"), icon: field("icon") || "heart", section: field("section"), scheduledTime: field("scheduledTime") || null, points: Number(field("points")), sortOrder: Number(field("sortOrder")) };
+      input = resource === "routines" ? { childId: fields.childId, title: fields.title, section: fields.section, scheduledTime: fields.scheduledTime, sortOrder: fields.sortOrder, steps, active, weekdays: form.getAll("weekdays").map(Number) } : { ...fields, date: field("date") };
     } else if (resource === "appointments") input = { childId: field("childId"), title: field("title"), icon: field("icon"), startsAt: new Date(field("startsAt")).toISOString(), endsAt: field("endsAt") ? new Date(field("endsAt")).toISOString() : null, active };
     else if (resource === "rewards") input = { title: field("title"), cost: Number(field("cost")), active };
     else input = { childId: field("childId"), label: field("label"), packageName: field("packageName"), active };
@@ -53,15 +62,44 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onCance
       </>}
       {(isTask || resource === "appointments" || resource === "rewards") && <label className="wide-field">{resource === "rewards" ? "Wunsch oder Belohnung" : "Bezeichnung"}<input name="title" defaultValue={text("title")} required maxLength={80} /></label>}
       {isTask && <>
+        {resource === "tasks" && <>
         <label className="wide-field">Kurze Erklärung<textarea name="description" defaultValue={text("description")} maxLength={500} rows={2} /></label>
         <label>Bildsymbol<select name="icon" defaultValue={text("icon", "heart")}>{taskIcons.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
+        </>}
         <label>Tagesabschnitt<select name="section" defaultValue={text("section", "morning")}><option value="morning">Morgen</option><option value="afternoon">Nachmittag</option><option value="evening">Abend</option></select></label>
         <label>Uhrzeit (optional)<input name="scheduledTime" type="time" defaultValue={text("scheduledTime").slice(0, 5)} /></label>
-        <label>Sterne<input name="points" type="number" defaultValue={value("points", 5)} min={0} max={1000} required /></label>
+        {resource === "tasks" && <label>Sterne<input name="points" type="number" defaultValue={value("points", 5)} min={0} max={1000} required /></label>}
         <label>Reihenfolge<input name="sortOrder" type="number" defaultValue={value("sortOrder", 0)} min={0} max={1000} required /></label>
         {resource === "tasks" && <label>Datum<input name="date" type="date" defaultValue={text("date", data.today)} required /></label>}
         {resource === "routines" && <fieldset className="weekday-fields wide-field"><legend>Wiederholt sich an</legend>{weekLabels.map((label, index) => <label key={label}><input name="weekdays" type="checkbox" value={index + 1} defaultChecked={!record || (record.weekdays as number[]).includes(index + 1)} /><span>{label}</span></label>)}</fieldset>}
       </>}
+      {resource === "routines" && <div className="wide-field routine-editor">
+        <h4>Aufgaben in dieser Routine</h4>
+        <p className="field-help">Jeder Schritt wird einzeln abgehakt und erhält seine eigenen Sterne. Änderungen gelten ab dem nächsten noch nicht angelegten Tagesplan.</p>
+        {steps.map((step, index) => <details key={index} className="routine-step-editor" open={openStep === index} onInvalidCapture={(event) => {
+          const firstInvalid = event.currentTarget.closest("form")?.querySelector("input:invalid, select:invalid, textarea:invalid");
+          if (event.target !== firstInvalid) return;
+          event.currentTarget.open = true;
+          setOpenStep(index);
+        }}>
+          <summary onClick={(event) => { event.preventDefault(); if (!busy) setOpenStep(openStep === index ? null : index); }} aria-expanded={openStep === index}>
+            <span className="routine-step-title">{index + 1}. {taskIcons.find(([id]) => id === step.icon)?.[1].split(" ")[0]} {step.title.trim() || "Neue Aufgabe"}</span>
+            <span className="routine-step-meta">{step.points} Sterne · {openStep === index ? "Zuklappen" : "Bearbeiten"}</span>
+          </summary>
+          <div className="routine-step-fields">
+          <label>Aufgabe<input value={step.title} onChange={(event) => updateStep(index, { title: event.target.value })} required maxLength={80} /></label>
+          <label>Kurze Erklärung<textarea value={step.description} onChange={(event) => updateStep(index, { description: event.target.value })} maxLength={500} rows={2} /></label>
+          <label>Bildsymbol<select value={step.icon} onChange={(event) => updateStep(index, { icon: event.target.value as RoutineStep["icon"] })}>{taskIcons.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
+          <label>Sterne<input type="number" min={0} max={1000} required value={step.points} onChange={(event) => updateStep(index, { points: Number(event.target.value) })} /></label>
+          <div className="record-form-actions">
+            <button type="button" className="parent-secondary" disabled={index === 0} onClick={() => moveStep(index, -1)} aria-label={`Schritt ${index + 1} nach oben`}>Nach oben</button>
+            <button type="button" className="parent-secondary" disabled={index === steps.length - 1} onClick={() => moveStep(index, 1)} aria-label={`Schritt ${index + 1} nach unten`}>Nach unten</button>
+            <button type="button" className="parent-secondary" disabled={steps.length === 1} onClick={() => { setSteps((items) => items.filter((_, i) => i !== index)); setOpenStep((current) => current === index ? null : current !== null && current > index ? current - 1 : current); }}>Entfernen</button>
+          </div>
+          </div>
+        </details>)}
+        <button type="button" className="parent-secondary" disabled={steps.length >= 50} onClick={() => { setOpenStep(steps.length); setSteps((items) => [...items, { title: "", description: "", icon: "heart", points: 5 }]); }}>Aufgabe hinzufügen</button>
+      </div>}
       {resource === "appointments" && <>
         <label>Beginn<input name="startsAt" type="datetime-local" defaultValue={localInput(record?.startsAt)} required /></label>
         <label>Ende (optional)<input name="endsAt" type="datetime-local" defaultValue={localInput(record?.endsAt)} /></label>

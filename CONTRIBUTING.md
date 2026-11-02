@@ -26,4 +26,23 @@ Every PR, including maintainer and agent PRs, must include **Proof of Done**. Ca
 
 If a screenshot is not meaningful or cannot be captured, explain why in the PR and provide relevant alternative evidence such as focused test results, a validated migration or compiler output. Never silently omit Proof of Done. Screenshots supplement the required checks.
 
+### Screenshot attachments in private repositories
+
+Use GitHub CLI 2.99.0 or newer (`gh pr edit --help` must list `--attach`). Raw or blob image URLs from this private repository do not reliably render in issue and PR bodies. Upload actual GitHub attachments instead, following the [Flexpane attachment workflow](https://github.com/Florian-Cullmann/flexpane/pull/33).
+
+1. Inspect the screenshot locally and use only safe, fictional data.
+2. Place the body draft and screenshot in the same temporary directory. Reference the local image in the draft, for example `![Completed task](screenshot.png)`.
+3. Upload the referenced file with the body:
+
+   ```sh
+   gh pr edit 123 --body-file /tmp/pr-proof/body.md --attach /tmp/pr-proof/screenshot.png
+   ```
+
+   `gh pr create` supports the same flags. Repeat `--attach` for multiple images. The CLI replaces local references with canonical `https://github.com/user-attachments/assets/<id>` URLs.
+
+4. Read the saved body back with `gh pr view 123 --json body --jq .body`. Confirm that captions remain and all inline images use canonical attachment URLs, with no local paths, private raw/blob URLs or temporary signed download URLs. Verify the attachment through authenticated `gh api` and compare its bytes with the local capture; do not claim browser rendering was checked unless it actually was.
+5. Reuse those canonical URLs for later text edits. If an upload fails, inspect the saved PR before retrying because some attachments may already have succeeded.
+
+Do not publish private screenshots on public image hosts. Ordinary proof screenshots need not be committed unless they also serve maintained documentation or fixtures. For issue bodies, use the corresponding `gh issue create/edit --attach` workflow.
+
 Report platform assumptions, new dependencies and verification limits. Android app compilation, emulator checks and physical managed-device tests are different levels of evidence; distinguish them.

@@ -27,10 +27,17 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
   const [childId, setChildId] = useState<string | null>(null);
   const [view, setView] = useState<View>("day");
   const [busy, setBusy] = useState<string | null>(null);
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<{ text: string } | null>(null);
+  const noticeContext = useRef(0);
   const [error, setError] = useState("");
   const pending = useRef(false);
   const plan = plans.find((item) => item.child.id === childId);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 5_000);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   useEffect(() => {
     if (!plan) return;
@@ -43,23 +50,26 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
   }, [plan]);
 
   function chooseProfile(id: string) {
-    setChildId(id); setView("day"); setNotice(""); setError("");
+    noticeContext.current += 1;
+    setChildId(id); setView("day"); setNotice(null); setError("");
   }
 
   function openView(nextView: View) {
+    noticeContext.current += 1;
     setView(nextView);
-    setNotice("");
+    setNotice(null);
   }
 
   async function complete(taskId: string) {
     if (pending.current || !plan) return;
-    pending.current = true; setBusy(taskId); setError(""); setNotice("");
+    const context = noticeContext.current;
+    pending.current = true; setBusy(taskId); setError(""); setNotice(null);
     try {
       if (demo) {
         const updated = completeDemoTask(plan, taskId);
         setPlans((previous) => previous.map((item) => item.child.id === plan.child.id ? updated : item));
         const points = updated.balance - plan.balance;
-        setNotice(points ? `Geschafft! ${points} neue Sterne für dich.` : "Das hast du geschafft!");
+        setNotice({ text: points ? `Geschafft! ${points} neue Sterne für dich.` : "Das hast du geschafft!" });
       } else {
         const response = await fetch(`/api/tasks/${taskId}/complete`, { method: "POST" });
         const data = await response.json();
@@ -68,7 +78,7 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
           return;
         }
         setPlans((previous) => previous.map((item) => item.child.id === data.childId ? data.plan : item));
-        setNotice(data.awarded ? `Geschafft! ${data.awarded} neue Sterne für dich.` : "Das hast du geschafft!");
+        if (context === noticeContext.current) setNotice({ text: data.awarded ? `Geschafft! ${data.awarded} neue Sterne für dich.` : "Das hast du geschafft!" });
       }
     } catch {
       setError("Der Server ist gerade nicht erreichbar. Deine Aufgabe bleibt offen. Bitte erneut versuchen.");
@@ -95,6 +105,9 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
   </main>;
 
   const done = plan.tasks.filter((task) => task.completed).length;
+  const groups = Array.from(new Set(plan.tasks.map((task) => task.routineId ?? task.id))).map((id) => ({
+    id, tasks: plan.tasks.filter((task) => (task.routineId ?? task.id) === id),
+  }));
   const next = plan.tasks.find((task) => !task.completed);
   const nextAppointment = plan.appointments[0];
   const goal = plan.rewards.find((reward) => reward.cost > plan.balance) ?? plan.rewards[0];
@@ -111,11 +124,13 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
         <div className="paper-heading"><h2>{view === "day" ? "Heute" : view === "appointments" ? "Deine Termine" : "Deine Wünsche"}</h2>{view === "day" && <span className="done-badge"><Star size={24} fill="currentColor" /><span>{done} von {plan.tasks.length} geschafft</span></span>}</div>
 
         {view === "day" && <div className="tasks-scroll">
-          {plan.tasks.map((task) => <button key={task.id} className={`task-row ${task.completed ? "is-done" : ""} ${next?.id === task.id ? "is-next" : ""}`} disabled={task.completed || !!busy} aria-label={`${task.title}${task.time ? `, ${task.time} Uhr` : ""}, ${task.points} Sterne${task.completed ? ", erledigt" : ", abhaken"}`} onClick={() => complete(task.id)}>
+          {groups.map((group) => <section key={group.id} className="routine-group" aria-label={group.tasks[0].routineTitle ?? "Einzelaufgabe"}>
+          {group.tasks[0].routineTitle && <div className="routine-heading"><h3>{group.tasks[0].routineTitle}</h3><span>{group.tasks.filter((task) => task.completed).length} von {group.tasks.length} geschafft</span></div>}
+          {group.tasks.map((task) => <button key={task.id} className={`task-row ${task.completed ? "is-done" : ""} ${next?.id === task.id ? "is-next" : ""}`} disabled={task.completed || !!busy} aria-label={`${task.title}${task.time ? `, ${task.time} Uhr` : ""}, ${task.points} Sterne${task.completed ? ", erledigt" : ", abhaken"}`} onClick={() => complete(task.id)}>
             <span className="task-picture" aria-hidden="true">{taskPictures[task.icon]}</span>
             <span className="task-words"><strong>{task.title}</strong><span>{task.completed ? "Geschafft!" : task.time ? `${task.time} Uhr` : "In deinem Tempo"}<span className="row-stars"><Star size={15} fill="currentColor" />{task.completed ? "" : "+"}{task.points}</span></span></span>
             <span className="check-circle" aria-hidden="true">{busy === task.id ? <span className="saving-dots">•••</span> : task.completed ? <Check size={30} strokeWidth={3.5} /> : null}</span>
-          </button>)}
+          </button>)}</section>)}
           {!plan.tasks.length && <div className="empty-state"><span aria-hidden="true">🌈</span><h3>Heute ist Platz für dich.</h3><p>Gerade stehen keine Aufgaben an.</p></div>}
         </div>}
 
@@ -135,13 +150,13 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
       </aside>
     </main>
 
-    <div className="message-area"><div className={`success-message ${notice ? "has-message" : ""}`} aria-live="polite" role="status">{notice && <><Star size={23} fill="currentColor" />{notice}</>}</div>{error && <div className="error-message" role="alert"><p>{error}</p><button onClick={() => window.location.reload()}>Neu laden</button></div>}</div>
+    <div className="message-area"><div className={`success-message ${notice ? "has-message" : ""}`} aria-live="polite" role="status">{notice && <><Star size={23} fill="currentColor" />{notice.text}</>}</div>{error && <div className="error-message" role="alert"><p>{error}</p><button onClick={() => window.location.reload()}>Neu laden</button></div>}</div>
     <nav className="touch-dock" aria-label="Deine Bereiche">
       <button aria-pressed={view === "day"} className={view === "day" ? "active" : ""} onClick={() => openView("day")}><House size={29} /><span>Mein Tag</span></button>
       <button aria-pressed={view === "appointments"} className={view === "appointments" ? "active" : ""} onClick={() => openView("appointments")}><CalendarDays size={29} /><span>Termine</span></button>
       <button aria-pressed={view === "rewards"} className={view === "rewards" ? "active" : ""} onClick={() => openView("rewards")}><Star size={29} /><span>Sterne</span></button>
       <span className="dock-divider" />
-      <button className="switch-profile" disabled={!!busy} onClick={() => { setChildId(null); setNotice(""); setError(""); }}><Users size={28} /><span>Wer ist dran?</span></button>
+      <button className="switch-profile" disabled={!!busy} onClick={() => { noticeContext.current += 1; setChildId(null); setNotice(null); setError(""); }}><Users size={28} /><span>Wer ist dran?</span></button>
     </nav>
   </div>;
 }

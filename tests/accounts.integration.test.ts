@@ -168,7 +168,7 @@ describe("parent management and child isolation", () => {
 
   it("supports weekday routines and preserves completed tasks during parent edits", async () => {
     const parent = await actor(); const kid = await child(parent);
-    await saveRecord(parent, "routines", { childId: kid.id, title: "Monday task", icon: "book", section: "morning", points: 10, weekdays: [1] });
+    await saveRecord(parent, "routines", { childId: kid.id, title: "Monday routine", steps: [{ title: "Monday task", icon: "book", points: 10 }], section: "morning", weekdays: [1] });
     expect((await getDayPlans(familyId, new Date("2026-11-01T12:00:00Z")))[0].tasks).toHaveLength(0);
     expect((await getDayPlans(familyId, new Date("2026-11-02T12:00:00Z")))[0].tasks).toHaveLength(1);
     const taskInput = { childId: kid.id, title: "Today", icon: "sun", section: "morning", points: 5, date: localDate(new Date(), "Europe/Berlin") };
