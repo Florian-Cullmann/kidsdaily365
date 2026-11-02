@@ -1,9 +1,12 @@
+import sharp from "sharp";
+import { readProfileImage, saveProfileImage, removeProfileImage } from "@/server/profile-images";
+import { GET as getImage, PUT as putImage, DELETE as deleteImage } from "@/app/api/children/[id]/image/route";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "@/server/db/client";
-import { allowedApps, appointments, children, dailyTasks, devicePairingCodes, devices, families, parentInvitations, parents, parentSessions, pointEntries, rewards, taskTemplates } from "@/server/db/schema";
+import { allowedApps, appointments, childImages, children, dailyTasks, devicePairingCodes, devices, families, parentInvitations, parents, parentSessions, pointEntries, rewards, taskTemplates } from "@/server/db/schema";
 import { changePassword, createInvitation, loginParent, logoutParent, parentFromToken, registerParent, type ParentActor } from "@/server/auth/parent";
 import { hashPassword } from "@/server/auth/password";
 import * as passwordModule from "@/server/auth/password";
@@ -301,5 +304,73 @@ describe("device-specific parent maintenance confirmation", () => {
     process.env.FAMILY_ID = familyId;
     expect(await exchangeMaintenanceCode(phone.id, confirmation.code)).toMatchObject({ authorized: true });
     expect(await deviceFromToken(phone.token)).toBeNull();
+  });
+});
+
+
+describe("private profile images", () => {
+  it("atomically replaces/removes images and preserves profiles, points and siblings", async () => {
+    const parent = await actor(); const kid = await child(parent); const sibling = await child(parent, "Sibling");
+    const foreignParent = await actor(otherFamilyId); const foreignChild = await child(foreignParent);
+    const input = await sharp({ create: { width: 64, height: 64, channels: 3, background: "green" } }).png().toBuffer();
+    await expect(saveProfileImage(parent, foreignChild.id, input, {})).rejects.toMatchObject({ status: 404 });
+    const before = (await getManagementData(parent)).children;
+    const task = await saveRecord(parent, "tasks", { childId: kid.id, title: "Test", icon: "sun", section: "morning", points: 5, date: localDate(new Date(), "Europe/Berlin") });
+    await completeTask(familyId, task.id);
+    const first = await saveProfileImage(parent, kid.id, input, {});
+    await expect(saveProfileImage(parent, kid.id, Buffer.from("not an image"), {})).rejects.toMatchObject({ status: 400 });
+    expect((await getManagementData(parent)).children.find((row) => row.id === kid.id)?.imageUrl).toBe(first.imageUrl);
+    const replacement = await saveProfileImage(parent, kid.id, input, { zoom: 2 });
+    expect(replacement.imageUrl).not.toBe(first.imageUrl);
+    expect(await db().select({ childId: childImages.childId }).from(childImages).where(eq(childImages.familyId, familyId))).toHaveLength(1);
+    expect((await sharp(await readProfileImage(familyId, kid.id)).metadata()).format).toBe("webp");
+    await expect(readProfileImage(otherFamilyId, kid.id)).rejects.toMatchObject({ status: 404 });
+    await expect(removeProfileImage(foreignParent, kid.id)).rejects.toMatchObject({ status: 404 });
+    await Promise.all([saveProfileImage(parent, kid.id, input, {}), removeProfileImage(parent, kid.id)]);
+    await removeProfileImage(parent, kid.id);
+    expect(await db().select().from(childImages).where(eq(childImages.familyId, familyId))).toHaveLength(0);
+    expect((await getManagementData(parent)).children).toEqual(before);
+    const plans = await getDayPlans(familyId);
+    expect(plans.find((plan) => plan.child.id === kid.id)?.balance).toBe(5);
+    expect(plans.find((plan) => plan.child.id === sibling.id)?.balance).toBe(0);
+  });
+
+  it("enforces image HTTP permissions, no-store responses, origin, and revocation", async () => {
+    const parent = await actor(); const kid = await child(parent); const sibling = await child(parent, "Sibling");
+    const input = await sharp({ create: { width: 50, height: 50, channels: 3, background: "blue" } }).png().toBuffer();
+    const context = (id = kid.id) => ({ params: Promise.resolve({ id }) });
+    const request = (method = "GET", headers: Record<string, string> = {}, id = kid.id) => new Request(`${origin}/api/children/${id}/image`, { method, headers: { Origin: origin, ...headers }, ...(method === "PUT" ? { body: new Uint8Array(input) } : {}) });
+    expect((await getImage(request(), context())).status).toBe(401);
+    expect((await putImage(request("PUT"), context())).status).toBe(401);
+    cookieState.set("kidsdaily_parent", await loginParent({ email: parent.email, password }));
+    expect((await putImage(request("PUT", { Origin: "https://foreign.example" }), context())).status).toBe(403);
+    expect((await putImage(request("PUT"), context())).status).toBe(200);
+    await saveProfileImage(parent, sibling.id, input, {});
+    const response = await getImage(request(), context());
+    expect(response.status).toBe(200); expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(response.headers.get("Content-Type")).toBe("image/webp"); expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    const phoneCode = await createPairingCode(parent, { kind: "android", label: "Phone", childId: kid.id });
+    const phone = await exchangePairingCode(phoneCode.code, origin, "android");
+    const bearer = { Authorization: `Bearer ${phone.token}` };
+    // Even valid parent cookies cannot promote a launcher bearer to write access.
+    expect((await putImage(request("PUT", bearer), context())).status).toBe(403);
+    expect((await deleteImage(request("DELETE", bearer), context())).status).toBe(403);
+    cookieState.clear();
+    expect((await getImage(request("GET", bearer), context())).status).toBe(200);
+    expect((await getImage(request("GET", bearer, sibling.id), context(sibling.id))).status).toBe(403);
+    await revokeDevice(parent, phone.id);
+    expect((await getImage(request("GET", bearer), context())).status).toBe(401);
+    const wallCode = await createPairingCode(parent, { kind: "wall", label: "Wall" });
+    const wall = await exchangePairingCode(wallCode.code, origin, "wall");
+    cookieState.set("kidsdaily_device", wall.token);
+    expect((await getImage(request(), context())).status).toBe(200);
+    expect((await getImage(request("GET", {}, sibling.id), context(sibling.id))).status).toBe(200);
+    expect((await putImage(request("PUT"), context())).status).toBe(401);
+    expect((await deleteImage(request("DELETE"), context())).status).toBe(401);
+    await revokeDevice(parent, wall.id);
+    expect((await getImage(request(), context())).status).toBe(401);
+    cookieState.set("kidsdaily_parent", await loginParent({ email: parent.email, password }));
+    expect((await deleteImage(request("DELETE"), context())).status).toBe(200);
+    expect((await getImage(request(), context())).status).toBe(404);
   });
 });

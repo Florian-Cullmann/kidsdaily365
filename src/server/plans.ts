@@ -1,8 +1,9 @@
 import "server-only";
+import { profileImageUrl } from "@/domain/profile-image";
 import { and, asc, eq, gte, isNull, sql } from "drizzle-orm";
 import { localDate, type DayPlan } from "@/domain/plan";
 import { db } from "./db/client";
-import { appointments, children, dailyTasks, families, pointEntries, rewards, taskTemplates } from "./db/schema";
+import { appointments, childImages, children, dailyTasks, families, pointEntries, rewards, taskTemplates } from "./db/schema";
 
 export class PlanError extends Error {
   constructor(message: string, public status: number) { super(message); }
@@ -43,7 +44,7 @@ export async function getDayPlans(familyId: string, now = new Date()): Promise<D
     }
   });
 
-  const [profiles, tasks, balances, upcoming, rewardOptions] = await Promise.all([
+  const [profiles, tasks, balances, upcoming, rewardOptions, images] = await Promise.all([
     db().select().from(children).where(and(eq(children.familyId, familyId), eq(children.active, true))).orderBy(asc(children.name)),
     db().select({ task: dailyTasks, completedAt: pointEntries.createdAt })
       .from(dailyTasks).leftJoin(pointEntries, eq(dailyTasks.id, pointEntries.taskId))
@@ -54,11 +55,13 @@ export async function getDayPlans(familyId: string, now = new Date()): Promise<D
     db().select().from(appointments).where(and(eq(appointments.familyId, familyId), eq(appointments.active, true), gte(appointments.startsAt, now))).orderBy(asc(appointments.startsAt)),
     db().select({ id: rewards.id, title: rewards.title, cost: rewards.cost }).from(rewards)
       .where(and(eq(rewards.familyId, familyId), eq(rewards.active, true))).orderBy(asc(rewards.cost)),
+    db().select({ childId: childImages.childId, version: childImages.version }).from(childImages).where(eq(childImages.familyId, familyId)),
   ]);
 
+  const imageUrls = new Map(images.map((image) => [image.childId, profileImageUrl(image.childId, image.version)]));
   return profiles.map((child) => ({
     date, timezone,
-    child: { id: child.id, name: child.name, avatar: child.avatar, reducedMotion: child.reducedMotion, buddyKind: child.buddyKind, buddyName: child.buddyName },
+    child: { id: child.id, name: child.name, avatar: child.avatar, imageUrl: imageUrls.get(child.id) ?? null, reducedMotion: child.reducedMotion, buddyKind: child.buddyKind, buddyName: child.buddyName },
     balance: balances.find((row) => row.childId === child.id)?.balance ?? 0,
     appointments: upcoming.filter((item) => item.childId === child.id).slice(0, 3).map((item) => ({ id: item.id, title: item.title, startsAt: item.startsAt.toISOString(), icon: item.icon })),
     rewards: rewardOptions,

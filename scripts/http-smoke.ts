@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import postgres from "postgres";
+import sharp from "sharp";
 import { localDate } from "../src/domain/plan";
 
 // This test talks to an already running production build/container, never a real household.
@@ -45,6 +46,16 @@ try {
   const html = await parentPage.text();
   assert.ok(html.includes("Kinderprofile") && !html.includes("passwordHash"));
   const kid = await write("/api/parent/records/children", { name: "Mika Beispiel", avatar: "M", buddyKind: "fox", buddyName: "Fino", reducedMotion: true, active: true });
+  const imagePath = `/api/children/${kid.id}/image`;
+  const imageInput = await sharp({ create: { width: 80, height: 60, channels: 3, background: "#6d9a7a" } }).png().toBuffer();
+  const upload = await fetch(new URL(imagePath, origin), { method: "PUT", headers: { Origin: origin.origin, Cookie: parentCookie }, body: new Uint8Array(imageInput) });
+  assert.equal(upload.status, 200);
+  const image = await request(imagePath);
+  assert.equal(image.status, 200);
+  assert.equal(image.headers.get("content-type"), "image/webp");
+  assert.equal(image.headers.get("cache-control"), "private, no-store");
+  assert.equal((await sharp(Buffer.from(await image.arrayBuffer())).metadata()).width, 512);
+  assert.equal((await request(imagePath, "GET", undefined, "")).status, 401);
   await write("/api/parent/records/routines", { childId: kid.id, title: "Morgenroutine", steps: [{ title: "Zähne putzen", description: "Zahnbürste und Zahnpasta bereitlegen.", icon: "toothbrush", points: 5 }], section: "morning", scheduledTime: "07:20", weekdays: [1, 2, 3, 4, 5, 6, 7] });
   const task = await write("/api/parent/records/tasks", { childId: kid.id, title: "Rucksack bereitmachen", icon: "backpack", section: "morning", points: 10, date: localDate(new Date(), "Europe/Berlin") });
   await write("/api/parent/records/appointments", { childId: kid.id, title: "Musikstunde", icon: "calendar", startsAt: new Date(Date.now() + 3_600_000).toISOString() });
@@ -63,6 +74,10 @@ try {
   const pairing = await write("/api/parent/pairing-codes", { kind: "android", label: "Mikas Handy", childId: kid.id });
   const phone = await write("/api/device/pair", { code: pairing.code, kind: "android" });
   const phoneHeaders = { Authorization: `Bearer ${phone.token}` };
+  assert.equal((await request(imagePath, "GET", undefined, wallCookie)).status, 200);
+  assert.equal((await request(imagePath, "PUT", {}, wallCookie)).status, 401);
+  assert.equal((await request(imagePath, "GET", undefined, "", phoneHeaders)).status, 200);
+  assert.equal((await request(imagePath, "DELETE", undefined, parentCookie, phoneHeaders)).status, 403);
   // Maintenance setup needs a separate parent-issued capability, never the read-only bearer alone.
   assert.equal((await request(`/api/parent/devices/${phone.deviceId}/maintenance-code`, "POST", undefined, "", phoneHeaders)).status, 401);
   const maintenance = await write(`/api/parent/devices/${phone.deviceId}/maintenance-code`, undefined);
@@ -93,6 +108,9 @@ try {
   const revoked = await request(`/api/parent/devices/${phone.deviceId}`, "DELETE");
   assert.equal(revoked.status, 200);
   assert.equal((await request("/api/launcher/snapshot", "GET", undefined, "", phoneHeaders)).status, 401);
+  assert.equal((await request(imagePath, "GET", undefined, "", phoneHeaders)).status, 401);
+  assert.equal((await request(imagePath, "DELETE")).status, 200);
+  assert.equal((await request(imagePath)).status, 404);
   assert.equal((await request("/api/auth/logout", "POST")).status, 200);
   assert.equal((await request("/api/parent/data")).status, 401);
   const login = await request("/api/auth/login", "POST", { email, password }, "");
@@ -101,7 +119,7 @@ try {
   // Parent sessions are never silently retained on the shared child surface.
   const leaving = await (await request("/")).text();
   assert.ok(leaving.includes("Elternzugang wird auf diesem Gerät abgemeldet"));
-  console.info("HTTP smoke passed: registration/login/logout, parent CRUD, scoped device pairing, separate one-use parent maintenance confirmation, protected child screen, live launcher stars, mutation denial, idempotent completion and revocation.");
+  console.info("HTTP smoke passed: registration/login/logout, parent CRUD, scoped device pairing, separate one-use parent maintenance confirmation, private image upload/read/delete and cache headers, protected child screen, live launcher stars, mutation denial, idempotent completion and revocation.");
 } finally {
   if (created && process.env.SMOKE_KEEP_FIXTURES !== "1") {
     for (const table of ["allowed_apps", "device_pairing_codes", "devices", "parent_invitations", "parents", "appointments", "point_entries", "daily_tasks", "task_templates", "rewards", "children"]) {

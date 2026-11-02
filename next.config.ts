@@ -11,7 +11,7 @@ const config: NextConfig = {
       { key: "Referrer-Policy", value: "same-origin" },
       { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
       { key: "Cache-Control", value: "no-store" },
-    ] }];
+    ] }, { source: "/api/children/:id/image", headers: [{ key: "Cache-Control", value: "private, no-store" }] }];
   },
 };
 export default config;
