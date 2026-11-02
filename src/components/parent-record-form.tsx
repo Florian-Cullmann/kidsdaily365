@@ -41,7 +41,7 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onCance
   }
 
   return <form className="record-form" onSubmit={submit}>
-    <div className="record-form-heading"><h3>{record ? "Eintrag bearbeiten" : "Neuen Eintrag anlegen"}</h3><span>{resource === "children" ? "Ein eigenes Profil, ein eigener Buddy." : "Einfach und passend für euren Alltag."}</span></div>
+    <div className="record-form-heading"><h3>{record ? "Eintrag bearbeiten" : "Neuen Eintrag anlegen"}</h3></div>
     <fieldset disabled={busy} className="record-fields">
       {withChild && <label>Für welches Kind?<select name="childId" defaultValue={text("childId", data.children.find((child) => child.active)?.id)} required><option value="">Bitte auswählen</option>{data.children.map((child) => <option key={child.id} value={child.id}>{child.name}{child.active ? "" : " (archiviert)"}</option>)}</select></label>}
       {resource === "children" && <>
