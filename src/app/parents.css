@@ -153,6 +153,10 @@
   .parent-panel > .parent-records .parent-record > button { width: 100%; }
 }
 
-.routine-step-editor { display: grid; gap: 14px; padding: 18px; margin-bottom: 18px; border: 1px solid #cbd8cd; border-radius: 14px; }
-.routine-step-editor legend { padding: 0 8px; font-weight: 700; }
+.routine-step-editor { margin-bottom: 10px; border: 1px solid #cbd8cd; border-radius: 14px; background: #fff; overflow: hidden; }
+.routine-step-editor summary { cursor: pointer; padding: 16px 18px; min-height: 56px; color: #61536e; }
+.routine-step-editor summary:focus-visible { outline: 3px solid #79619d; outline-offset: -3px; }
+.routine-step-title { font-weight: 700; overflow-wrap: anywhere; }
+.routine-step-meta { display: block; margin: 6px 0 0 18px; font-size: 13px; color: #786584; }
+.routine-step-fields { display: grid; gap: 14px; padding: 0 18px 18px; }
 .routine-step-editor .record-form-actions { flex-wrap: wrap; }

@@ -106,3 +106,5 @@ Fehler als GitHub-Issue mit Reproduktionsschritten, Browser-/Android-Version und
 - Bestehende Routinen werden bei Migration zu Gruppen mit einem Schritt. Historische Aufgabentitel, IDs und Journalbuchungen bleiben erhalten.
 
 Screenshots mit ausschließlich fiktiven Daten: [Elterneditor](proof/routine-editor.png), [gespeicherter Gruppenfortschritt](proof/routine-progress.png).
+
+- Routineneditor: Vorhandene Schritte starten zugeklappt mit Titel, Symbol und Sternen. Neue Schritte öffnen sich direkt; beim Öffnen eines anderen Schritts klappt der bisherige zu. Auf-/Zuklappen auch mit der Tastatur prüfen. Ein leeres Pflichtfeld in einem geschlossenen Schritt muss beim Speichern sichtbar werden und den Fokus erhalten.
