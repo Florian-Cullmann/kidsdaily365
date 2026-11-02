@@ -1,6 +1,6 @@
 import type { RoutineStep } from "@/domain/management";
 import { sql } from "drizzle-orm";
-import { boolean, check, date, foreignKey, index, integer, jsonb, pgEnum, pgTable, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, customType, date, foreignKey, index, integer, jsonb, pgEnum, pgTable, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
 
 export const daySection = pgEnum("day_section", ["morning", "afternoon", "evening"]);
 export const taskIcon = pgEnum("task_icon", ["sun", "toothbrush", "backpack", "book", "moon", "heart"]);
@@ -24,6 +24,18 @@ export const children = pgTable("children", {
   buddyName: text().notNull().default("Fino"),
   active: boolean().notNull().default(true),
 }, (table) => [unique("children_family_identity").on(table.id, table.familyId)]);
+
+// Encoded image files live in the same transactional backup as their profiles.
+const imageBytes = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
+export const childImages = pgTable("child_images", {
+  childId: uuid().primaryKey(),
+  familyId: uuid().notNull(),
+  version: uuid().notNull().defaultRandom(),
+  data: imageBytes().notNull(),
+}, (table) => [
+  foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }).onDelete("cascade"),
+  check("profile_image_size", sql`octet_length(${table.data}) between 1 and 1048576`),
+]);
 
 // Templates describe routines; occurrences are immutable daily snapshots.
 export const taskTemplates = pgTable("task_templates", {

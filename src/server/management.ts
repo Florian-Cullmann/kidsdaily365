@@ -1,9 +1,10 @@
 import "server-only";
+import { profileImageUrl } from "@/domain/profile-image";
 import { and, asc, desc, eq, gte, isNull, sql } from "drizzle-orm";
 import { managementSchemas, type Resource } from "@/domain/management";
 import { localDate } from "@/domain/plan";
 import { db } from "./db/client";
-import { allowedApps, appointments, children, dailyTasks, devices, families, parents, pointEntries, rewards, taskTemplates } from "./db/schema";
+import { allowedApps, appointments, childImages, children, dailyTasks, devices, families, parents, pointEntries, rewards, taskTemplates } from "./db/schema";
 import { ApiError } from "./errors";
 import type { ParentActor } from "./auth/parent";
 import { isUniqueViolation } from "./auth/parent";
@@ -13,7 +14,7 @@ export async function getManagementData(parent: ParentActor) {
   const [family] = await db().select().from(families).where(eq(families.id, familyId));
   if (!family) throw new ApiError("Familie nicht gefunden.", 404);
   const today = localDate(new Date(), family.timezone);
-  const [kids, routines, tasks, dates, goals, apps, deviceRows, adults] = await Promise.all([
+  const [kids, routines, tasks, dates, goals, apps, deviceRows, adults, images] = await Promise.all([
     db().select().from(children).where(eq(children.familyId, familyId)).orderBy(asc(children.name)),
     db().select().from(taskTemplates).where(eq(taskTemplates.familyId, familyId)).orderBy(asc(taskTemplates.sortOrder)),
     db().select({ task: dailyTasks, completed: sql<boolean>`${pointEntries.id} is not null` }).from(dailyTasks)
@@ -25,10 +26,12 @@ export async function getManagementData(parent: ParentActor) {
     db().select().from(allowedApps).where(eq(allowedApps.familyId, familyId)).orderBy(asc(allowedApps.label)),
     db().select({ id: devices.id, childId: devices.childId, kind: devices.kind, label: devices.label, expiresAt: devices.expiresAt, revokedAt: devices.revokedAt }).from(devices).where(eq(devices.familyId, familyId)),
     db().select({ id: parents.id, name: parents.name, email: parents.email }).from(parents).where(eq(parents.familyId, familyId)),
+    db().select({ childId: childImages.childId, version: childImages.version }).from(childImages).where(eq(childImages.familyId, familyId)),
   ]);
+  const imageUrls = new Map(images.map((image) => [image.childId, profileImageUrl(image.childId, image.version)]));
   return {
     family: { name: family.name, timezone: family.timezone }, today,
-    children: kids, routines: routines.map((routine) => ({ ...routine, steps: routine.steps ?? [{ title: routine.title, description: routine.description, icon: routine.icon, points: routine.points }] })), tasks: tasks.map(({ task, completed }) => ({ ...task, completed })),
+    children: kids.map((child) => ({ ...child, imageUrl: imageUrls.get(child.id) ?? null })), routines: routines.map((routine) => ({ ...routine, steps: routine.steps ?? [{ title: routine.title, description: routine.description, icon: routine.icon, points: routine.points }] })), tasks: tasks.map(({ task, completed }) => ({ ...task, completed })),
     appointments: dates.map((item) => ({ ...item, startsAt: item.startsAt.toISOString(), endsAt: item.endsAt?.toISOString() ?? null })),
     rewards: goals, apps,
     devices: deviceRows.map((item) => ({ ...item, expiresAt: item.expiresAt.toISOString(), revokedAt: item.revokedAt?.toISOString() ?? null })),

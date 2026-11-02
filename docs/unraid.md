@@ -86,6 +86,10 @@ mkdir -p backups
 docker compose exec -T db pg_dump -U kidsdaily -d kidsdaily -Fc > backups/kidsdaily.dump
 ```
 
+Profilbilder liegen als fertig zugeschnittene WebP-Dateiinhalte in der PostgreSQL-Tabelle `child_images`, zusammen mit der Familien-/Kindzuordnung und einer Bildversion. Sie verwenden damit dieselbe persistente Unraid-Ablage `${APPDATA_PATH}/postgres`. Es gibt kein zusätzliches Upload-Verzeichnis oder Volume. Der vollständige `pg_dump` oben enthält sowohl die Bildreferenzen als auch die Bilddaten; beim Wiederherstellen keine Tabellen ausschließen. Ein App- oder Containerneustart verändert die Bilder nicht.
+
+Beim Ersetzen wird der bisherige Bildinhalt in derselben Transaktion überschrieben; beim Entfernen wird der Datensatz gelöscht. Es entstehen keine verwaisten Dateien auf dem Dateisystem. Bereits erstellte Backups behalten ihren damaligen Stand. Die Originaldatei wird nicht gespeichert: nur der gewählte Ausschnitt mit 512 × 512 Pixeln, ohne EXIF-/GPS-Metadaten. Zulässig sind unbewegte JPEG-, PNG- und WebP-Dateien bis 8 MB und 20 Megapixel. Die App liefert Bilder ausschließlich über einen berechtigungsgeprüften Endpunkt aus, nicht aus `public/`.
+
 Backups enthalten persönliche Kinderdaten: außerhalb von Git und mit beschränktem Zugriff aufbewahren. Für den produktiven Betrieb einen rotierenden, extern gesicherten Backup-Job einrichten und die Wiederherstellung zuerst mit einer separaten Testinstanz prüfen.
 
 Wiederherstellung **in eine leere Ersatzdatenbank** (App vorher stoppen):

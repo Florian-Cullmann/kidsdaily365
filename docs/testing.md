@@ -108,3 +108,13 @@ Fehler als GitHub-Issue mit Reproduktionsschritten, Browser-/Android-Version und
 Screenshots mit ausschließlich fiktiven Daten: [Elterneditor](proof/routine-editor.png), [gespeicherter Gruppenfortschritt](proof/routine-progress.png).
 
 - Routineneditor: Vorhandene Schritte starten zugeklappt mit Titel, Symbol und Sternen. Neue Schritte öffnen sich direkt; beim Öffnen eines anderen Schritts klappt der bisherige zu. Auf-/Zuklappen auch mit der Tastatur prüfen. Ein leeres Pflichtfeld in einem geschlossenen Schritt muss beim Speichern sichtbar werden und den Fokus erhalten.
+
+## Eigene Profilbilder
+
+1. Drei fiktive Kinder anlegen. Unter Kinderprofile → Profilbild für zwei Kinder unterschiedliche unpersönliche JPEG-/PNG-Testbilder auswählen. Vergrößerung sowie horizontalen und vertikalen Ausschnitt ändern; die Vorschau muss dem gespeicherten Bild entsprechen.
+2. Speichern, neu laden und den App-Server neu starten. Auf einem gekoppelten Wandbildschirm müssen beide Bilder in der Profilauswahl erscheinen; beim dritten Kind bleibt der Buddy als Fallback.
+3. Ein Bild ersetzen und entfernen. Beim Entfernen erscheint wieder der Buddy; Aufgaben, Sterne und die anderen Profile bleiben erhalten. Eine ungültige Datei darf das bisherige Bild nicht ersetzen.
+4. Ohne Sitzung/Pairing darf der Bild-Endpunkt keine Bilder liefern. Wandgeräte dürfen nur lesen; Android-Bearer nur das Bild ihres gebundenen Kindes lesen, niemals hochladen oder löschen. Nach Gerätewiderruf wird auch das Bild abgewiesen. Antworten werden mit `Cache-Control: private, no-store` ausgeliefert.
+5. Vollständigen PostgreSQL-Dump der separaten Testdatenbank in eine leere `*_test`-Datenbank zurückspielen. Bildversionen und SHA-256-Prüfsummen der `child_images.data`-Spalte müssen übereinstimmen. Die Unraid-Anleitung enthält den produktiven Backup-Weg.
+
+Automatisierte Bildtests prüfen echte Dekodierung, Größenlimits, Ausschnitt, EXIF-Ausrichtung und entfernte Metadaten. Die Datenbanktests prüfen Ersetzen/Entfernen, Rechte, Profiltrennung und unabhängigen Punktestand. Keine echten Kinderfotos in Tests oder Nachweisen verwenden.

@@ -7,7 +7,8 @@ import type { ParentActor } from "@/server/auth/parent";
 import type { ManagementData } from "@/server/management";
 import type { Resource } from "@/domain/management";
 import { ParentRecordForm, type EditableRecord } from "./parent-record-form";
-import { Buddy } from "./buddy";
+import { ProfilePicture } from "./profile-picture";
+import { ProfileImageEditor } from "./profile-image-editor";
 import { useRouter } from "next/navigation";
 
 type Tab = "overview" | Resource | "devices" | "account";
@@ -51,6 +52,8 @@ export function ParentConsole({ parent, initialData }: { parent: ParentActor; in
   const [data, setData] = useState(initialData);
   const [tab, setTab] = useState<Tab>("overview");
   const [editing, setEditing] = useState<EditableRecord | null>(null);
+  const [imageChildId, setImageChildId] = useState<string | null>(null);
+  const imageChild = data.children.find((child) => child.id === imageChildId);
   const [formOpen, setFormOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -61,7 +64,7 @@ export function ParentConsole({ parent, initialData }: { parent: ParentActor; in
   const activeChildren = data.children.filter((child) => child.active).length;
   const isResource = !["overview", "devices", "account"].includes(tab);
 
-  function navigate(id: Tab) { setTab(id); setFormOpen(false); setEditing(null); setError(""); setNotice(""); setIssuedCode(null); }
+  function navigate(id: Tab) { setImageChildId(null); setTab(id); setFormOpen(false); setEditing(null); setError(""); setNotice(""); setIssuedCode(null); }
   function createRecord(resource: Resource) {
     navigate(resource); setEditing(null); setFormOpen(true);
   }
@@ -115,7 +118,7 @@ export function ParentConsole({ parent, initialData }: { parent: ParentActor; in
       <div className="parent-sidebar-bottom"><Link href="/">Zum Kinderbildschirm</Link><button disabled={busy} onClick={() => action(async () => { await request("/api/auth/logout", "POST"); router.replace("/login"); router.refresh(); })}><LogOut size={18} /> Abmelden</button></div>
     </aside>
     <main className="parent-main"><header className="parent-topbar"><span>{data.family.name}</span><span><ShieldCheck size={17} /> Angemeldet als {parent.name}</span></header>
-      <div className="parent-title"><div><h1>{selected.label}</h1><p>{descriptions[tab]}</p></div>{isResource && !formOpen && <button className="parent-primary" onClick={() => { setEditing(null); setFormOpen(true); setError(""); }}><Plus size={20} />{tab === "children" ? "Kind hinzufügen" : "Neu anlegen"}</button>}</div>
+      <div className="parent-title"><div><h1>{selected.label}</h1><p>{descriptions[tab]}</p></div>{isResource && !formOpen && <button className="parent-primary" onClick={() => { setImageChildId(null); setEditing(null); setFormOpen(true); setError(""); }}><Plus size={20} />{tab === "children" ? "Kind hinzufügen" : "Neu anlegen"}</button>}</div>
       <div className="parent-feedback" aria-live="polite">{notice && <p className="parent-success"><Check size={19} />{notice}</p>}<p className="parent-error" role="alert">{error}</p></div>
 
       {tab === "overview" && <>
@@ -135,11 +138,12 @@ export function ParentConsole({ parent, initialData }: { parent: ParentActor; in
         {tab === "routines" && <div className="parent-callout">Routinen werden an den gewählten Wochentagen in den Tagesplan übernommen. Änderungen gelten für noch nicht angelegte Tagespläne. Bestehende Aufgaben kannst du unter Einzelaufgaben bearbeiten.</div>}
         {tab === "apps" && <div className="parent-callout">Diese Liste legt die erlaubten Apps je Kind fest. Die echte Sperre auf dem Handy benötigt später den verwalteten Android-Launcher. Ein normaler Startbildschirm allein schützt das Gerät nicht.</div>}
         {tab === "rewards" && <div className="parent-callout">Das Einlösen von Wünschen und Buddy-Kosmetik sind noch nicht verfügbar. Hier werden keine Sterne abgezogen.</div>}
+        {imageChild && <ProfileImageEditor key={imageChild.id} child={imageChild} onCancel={() => setImageChildId(null)} onDone={async () => { await refresh(); setImageChildId(null); setNotice("Profilbild aktualisiert."); }} />}
         {formOpen && <ParentRecordForm key={`${tab}-${editing?.id ?? "new"}`} resource={tab as Resource} data={data} record={editing} busy={busy} onSave={save} onCancel={() => setFormOpen(false)} />}
         <div className="parent-records">{(data[tab as Resource] as unknown as EditableRecord[]).map((record) => <article key={record.id} className={`parent-record ${record.active === false ? "is-archived" : ""}`}>
-          {tab === "children" && <div className="record-buddy"><Buddy kind={record.buddyKind as "fox" | "rabbit" | "bear"} /></div>}
+          {tab === "children" && <div className="record-buddy"><ProfilePicture imageUrl={record.imageUrl as string | null} buddyKind={record.buddyKind as "fox" | "rabbit" | "bear"} /></div>}
           <div className="record-description"><h3>{String(record.name ?? record.title ?? record.label)}</h3><p>{tab === "children" ? `Buddy: ${record.buddyName}` : tab === "apps" ? `${childName(record.childId)} · ${record.packageName}` : tab === "appointments" ? `${childName(record.childId)} · ${new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short", timeZone: data.family.timezone }).format(new Date(String(record.startsAt)))}` : tab === "routines" ? `${childName(record.childId)} · ${(record.steps as unknown[]).length} Schritte` : tab === "rewards" ? `${record.cost} Sterne` : `${childName(record.childId)} · ${record.points} Sterne${tab === "tasks" ? ` · ${record.date}` : ""}`}</p>{record.active === false && <span className="archive-label">Archiviert</span>}{record.completed === true && <span className="archive-label">Erledigt · Verlauf geschützt</span>}</div>
-          <div className="record-actions"><button disabled={busy || record.completed === true} onClick={() => { setEditing(record); setFormOpen(true); setError(""); }}>Bearbeiten</button>{record.active !== false && record.completed !== true && <button className="quiet-danger" disabled={busy} onClick={() => archive(record)}>{tab === "tasks" ? "Aus Plan nehmen" : "Archivieren"}</button>}</div>
+          <div className="record-actions">{tab === "children" && record.active !== false && <button disabled={busy} onClick={() => { setImageChildId(record.id); setFormOpen(false); setError(""); }}>Profilbild</button>}<button disabled={busy || record.completed === true} onClick={() => { setImageChildId(null); setEditing(record); setFormOpen(true); setError(""); }}>Bearbeiten</button>{record.active !== false && record.completed !== true && <button className="quiet-danger" disabled={busy} onClick={() => archive(record)}>{tab === "tasks" ? "Aus Plan nehmen" : "Archivieren"}</button>}</div>
         </article>)}{!formOpen && !data[tab as Resource].length && <div className="parent-empty"><selected.icon size={35} /><h3>{emptyMessages[tab as Resource]}</h3></div>}</div>
       </>}
 

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CalendarDays, Check, ChevronRight, Heart, House, Maximize, Star, Users } from "lucide-react";
 import { completeDemoTask, localDate, type DayPlan, type TaskIcon } from "@/domain/plan";
+import { ProfilePicture } from "./profile-picture";
 import { Buddy } from "./buddy";
 import Link from "next/link";
 
@@ -98,7 +99,7 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
     <div className="brand profile-brand"><span className="brand-mark"><House size={27} /></span><span>kidsdaily<span className="brand-number">365</span></span></div>
     <div className="profile-welcome"><span className="welcome-tag">Dein kleiner Alltagsbegleiter</span><h1>Wer ist heute dabei?</h1><p>Tippe auf dein Bild. Dein Buddy freut sich auf dich!</p></div>
     <div className="profile-grid">{plans.map((item, index) => <button key={item.child.id} className={`profile-tile tile-${index % 3}`} onClick={() => chooseProfile(item.child.id)}>
-      <span className="profile-art"><Buddy kind={item.child.buddyKind} priority /><span className="profile-initial">{item.child.avatar}</span></span>
+      <span className="profile-art"><ProfilePicture imageUrl={item.child.imageUrl} buddyKind={item.child.buddyKind} /><span className="profile-initial">{item.child.avatar}</span></span>
       <strong>{item.child.name}</strong><span>mit {item.child.buddyName}</span>
     </button>)}</div>
     <div className="profile-footer"><p>{demo ? "Zum Ausprobieren · Dein Fortschritt wird nicht gespeichert" : "Jeder hat seinen eigenen Tag. Und seinen eigenen Buddy."}</p><Link className="parent-entry-link" href="/eltern">Elternbereich</Link></div>

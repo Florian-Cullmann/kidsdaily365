@@ -2,6 +2,7 @@ export type DaySection = "morning" | "afternoon" | "evening";
 export type TaskIcon = "sun" | "toothbrush" | "backpack" | "book" | "moon" | "heart";
 export type BuddyKind = "fox" | "rabbit" | "bear";
 export type ChildProfile = {
+  imageUrl?: string | null;
   id: string; name: string; avatar: string; reducedMotion: boolean;
   buddyKind: BuddyKind; buddyName: string;
 };
