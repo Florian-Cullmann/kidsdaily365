@@ -253,3 +253,53 @@ describe("scoped devices and read-only launcher API", () => {
     expect((await create(new Request(`${origin}/api/parent/records/children`, { method: "POST", headers: { Origin: origin }, body: "{}" }), { params: Promise.resolve({ resource: "children" }) })).status).toBe(401);
   });
 });
+
+describe("device-specific parent maintenance confirmation", () => {
+  it("requires the owning household and Android device; stores only a digest", async () => {
+    const parent = await actor(); const kid = await child(parent);
+    const { createMaintenanceCode, exchangeMaintenanceCode } = await import("@/server/maintenance");
+    const pairing = await createPairingCode(parent, { kind: "android", childId: kid.id, label: "Phone" });
+    const phone = await exchangePairingCode(pairing.code, null, "android");
+    await expect(createMaintenanceCode(await actor(otherFamilyId), phone.id)).rejects.toMatchObject({ status: 404 });
+    const wallPair = await createPairingCode(parent, { kind: "wall", childId: null, label: "Wall" });
+    const wall = await exchangePairingCode(wallPair.code, origin, "wall");
+    await expect(createMaintenanceCode(parent, wall.id)).rejects.toMatchObject({ status: 404 });
+    const confirmation = await createMaintenanceCode(parent, phone.id);
+    const { deviceMaintenanceCodes } = await import("@/server/db/schema");
+    const [stored] = await db().select().from(deviceMaintenanceCodes).where(eq(deviceMaintenanceCodes.deviceId, phone.id));
+    expect(stored.codeHash).not.toBe(confirmation.code);
+    await expect(exchangeMaintenanceCode(wall.id, confirmation.code)).rejects.toMatchObject({ status: 401 });
+    await expect(exchangeMaintenanceCode(phone.id, pairing.code)).rejects.toMatchObject({ status: 401 });
+    expect(await exchangeMaintenanceCode(phone.id, confirmation.code)).toMatchObject({ authorized: true, deviceId: phone.id });
+  });
+
+  it("replaces old confirmations, rejects expiry and permits only one concurrent exchange", async () => {
+    const parent = await actor(); const kid = await child(parent);
+    const { createMaintenanceCode, exchangeMaintenanceCode } = await import("@/server/maintenance");
+    const { deviceMaintenanceCodes } = await import("@/server/db/schema");
+    const code = await createPairingCode(parent, { kind: "android", childId: kid.id, label: "Phone" });
+    const phone = await exchangePairingCode(code.code, null, "android");
+    const old = await createMaintenanceCode(parent, phone.id);
+    const current = await createMaintenanceCode(parent, phone.id);
+    await expect(exchangeMaintenanceCode(phone.id, old.code)).rejects.toMatchObject({ status: 401 });
+    const result = await Promise.allSettled([exchangeMaintenanceCode(phone.id, current.code), exchangeMaintenanceCode(phone.id, current.code)]);
+    expect(result.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const expired = await createMaintenanceCode(parent, phone.id);
+    await db().update(deviceMaintenanceCodes).set({ expiresAt: new Date(0) }).where(eq(deviceMaintenanceCodes.deviceId, phone.id));
+    await expect(exchangeMaintenanceCode(phone.id, expired.code)).rejects.toMatchObject({ status: 401 });
+  });
+
+  it("can restore local parent access after child token revocation without restoring child API access", async () => {
+    const parent = await actor(); const kid = await child(parent);
+    const { createMaintenanceCode, exchangeMaintenanceCode } = await import("@/server/maintenance");
+    const pairing = await createPairingCode(parent, { kind: "android", childId: kid.id, label: "Phone" });
+    const phone = await exchangePairingCode(pairing.code, null, "android");
+    await revokeDevice(parent, phone.id);
+    const confirmation = await createMaintenanceCode(parent, phone.id);
+    process.env.FAMILY_ID = otherFamilyId;
+    await expect(exchangeMaintenanceCode(phone.id, confirmation.code)).rejects.toMatchObject({ status: 401 });
+    process.env.FAMILY_ID = familyId;
+    expect(await exchangeMaintenanceCode(phone.id, confirmation.code)).toMatchObject({ authorized: true });
+    expect(await deviceFromToken(phone.token)).toBeNull();
+  });
+});

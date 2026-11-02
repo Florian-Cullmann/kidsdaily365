@@ -2,7 +2,7 @@
 
 ## Aktueller Stand
 
-Die Elternverwaltung und die getrennte Launcher-API sind umgesetzt. Eltern können ein Handy genau einem Kinderprofil zuweisen, die App-Freigaben je Kind pflegen und einen Gerätezugang widerrufen. Der Server liefert Sterne, Buddy und Freigaben ausschließlich lesend. Das kompilierbare native Projekt liegt unter `apps/android/`; es koppelt das Handy per Gerätecode, speichert Zugang und Cache Keystore-verschlüsselt und zeigt Buddy, Live-Sterne und freigegebene Apps. Die native Ansicht bleibt klar als ungeschützte Vorschau gekennzeichnet.
+Die Elternverwaltung und die getrennte Launcher-API sind umgesetzt. Eltern können ein Handy genau einem Kinderprofil zuweisen, die App-Freigaben je Kind pflegen und einen Gerätezugang widerrufen. Der Server liefert Sterne, Buddy und Freigaben ausschließlich lesend. Das kompilierbare native Projekt liegt unter `apps/android/`; es koppelt das Handy per Gerätecode, speichert Zugang und Cache Keystore-verschlüsselt und zeigt Buddy, Live-Sterne und freigegebene Apps. Ein getrennt eingerichteter lokaler Eltern-Code öffnet den offlinefähigen Wartungszugang für Verwaltungsaktionen. Die native Ansicht bleibt klar als ungeschützte Vorschau gekennzeichnet.
 
 **Die echte Gerätesperre ist noch nicht implementiert.** Sie wird in [Issue #2](https://github.com/Florian-Cullmann/kidsdaily365/issues/2) umgesetzt und auf dem tatsächlichen Telefon geprüft. [Buddy-Kosmetik und Käufe](https://github.com/Florian-Cullmann/kidsdaily365/issues/3) sind ein späterer, getrennter Funktionsblock.
 
@@ -82,8 +82,14 @@ Neue Kinderprofile erhalten [Audible (`com.audible.application`)](https://play.g
 - Implementiert: Snapshot samt Empfangszeit, monotoner Gerätezeit und Boot-Zählung speichern. Ungültige Antwort/unbekannte Version verwirft die bisherige Startliste auch über Prozessneustarts hinweg; Netzwerkfehler erhält ausschließlich den letzten gültigen Stand. Geräte- und Kinderbindung werden geprüft. Keine Fehlerbehandlung gibt zusätzliche Apps frei.
 - Implementiert in der Vorschau: maximal 24 Stunden App-Starts mit gültigem Cache, monoton gemessen; danach bleibt die Buddy-Ansicht ohne App-Starts. Ein Prozessneustart im selben Geräte-Boot erhält diese Frist. Nach Geräte-Neustart oder unbekanntem Boot-Zähler sind App-Starts bis zur Online-Bestätigung gesperrt. Die spätere DPC-Umsetzung muss die System-Policy schon beim Start wiederherstellen; die heutige Ansicht allein bietet keine Systemsperre.
 - Ein offline befindliches Telefon kann einen serverseitigen Widerruf erst beim nächsten Kontakt erkennen. Die API kann keine sofortige Offline-Fernsperre garantieren.
-- Vor Aktivierung echter Sperren muss es eine getrennte elterliche Wartungsfreigabe geben, die auch bei ausgefallenem Server funktioniert: eigener lokal geprüfter, stark gehashter Eltern-Recovery-Code, Rate Limit, kurze Wartungsfrist und nachvollziehbarer Rückweg in den Kindermodus. Niemals den Kinder-/Gerätetoken als Wartungsrecht verwenden.
+- Implementiert: getrennte lokale Elternfreigabe, auch ohne Server; PBKDF2-HMAC-SHA256 mit 600.000 Iterationen und eigenem Keystore-Speicher. Einrichtung/Online-Zurücksetzen braucht eine separate, zehn Minuten gültige Eltern-Bestätigung für genau dieses Gerät. Kindertokens erhalten dadurch keine zusätzlichen Rechte. Fehlversuche und Wartezeiten bleiben über Neustarts erhalten. Wartung gilt höchstens fünf Minuten und schließt bei Hintergrundwechsel, Prozessneustart oder Rückkehr zum Kindermodus. Die Einbindung in echte Android-Sperren/deren Wiederherstellung folgt im DPC-Schritt.
 - Notruf- und notwendige System-Sicherheitswege bleiben erhalten. Physisches Abschalten, Hardware-Recovery, Factory Reset über Recovery, entsperrte Bootloader und OS-Sicherheitslücken können nicht mit einer Launcher-Oberfläche vollständig verhindert werden. „Nicht schließbar“ bedeutet den geprüften verwalteten Alltagsbetrieb, keine absolute physische Manipulationssicherheit.
+
+## Eltern-Bestätigung
+
+`POST /api/parent/devices/:id/maintenance-code` benötigt eine echte Elternsitzung und gültigen Browser-Origin. Nur Android-Geräte derselben Familie; auch für abgelaufenen/widerrufenen Kinderzugang. Speichert ausschließlich den HMAC-Hash einer zufälligen 128-Bit-Bestätigung. Erneutes Ausstellen ersetzt alte unbenutzte Codes.
+
+`POST /api/device/maintenance` mit `{ deviceId, code }` verbraucht diese Bestätigung atomar und liefert `{ schemaVersion: 1, deviceId, authorized: true }`. Keine Cookies und kein Kindertoken; Authorization-Header werden abgewiesen. Kein Elternlogin auf dem Handy und keine Wiederherstellung widerrufener Kinderrechte. Das ist ausschließlich die Berechtigung, lokal einen neuen Eltern-Code einzurichten. Der lokale Code/Hash wird nie übertragen. Die [Android-README](../apps/android/README.md#elternzugang-und-offline-wartung) beschreibt Bedienung und Grenzen.
 
 ## Abnahmematrix für Issue #2
 

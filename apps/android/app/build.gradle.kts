@@ -10,8 +10,8 @@ android {
         applicationId = "de.kidsdaily365.launcher"
         minSdk = 33
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.2.0-preview"
+        versionCode = 2
+        versionName = "0.3.0-preview"
     }
     buildFeatures { buildConfig = true }
     sourceSets.getByName("test").resources.srcDir("../../../contracts")

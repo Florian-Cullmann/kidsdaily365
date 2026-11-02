@@ -28,19 +28,22 @@ private data class Connection(val server: ServerAddress, val token: String, val 
 
 /** One application-scoped repository serializes reset, pairing and refresh, including Activity recreation. */
 class ConnectedLauncher(private val api: LauncherApi, private val store: PrivateStore,
-    private val clock: LauncherClock, private val debug: Boolean) {
+    private val clock: LauncherClock, private val debug: Boolean, private val access: MaintenanceAccess) {
     private val mutex = Mutex()
     private var loaded = false
     private var connection: Connection? = null
     private var message = "Verbinde dich mit dem Server."
 
     suspend fun current(): LauncherView = locked { load(); view() }
+    suspend fun maintenanceTarget(): MaintenanceTarget? = locked { load(); connection?.let { MaintenanceTarget(it.server, it.deviceId) } }
 
     suspend fun pair(address: String, code: String): LauncherView = locked {
         load()
         check(connection == null) { "Bestehende Verbindung zuerst trennen." }
+        access.requirePairingAllowed()
         val server = ServerAddress.parse(address, debug)
         val pairing = api.pair(server, code)
+        access.requirePairingAllowed()
         // Persist immediately: a consumed one-use code must survive a failed first snapshot request.
         val next = Connection(server, pairing.token, pairing.deviceId, clock.wallMillis() + pairing.expiresIn * 1000)
         save(next)
@@ -73,7 +76,7 @@ class ConnectedLauncher(private val api: LauncherApi, private val store: Private
         view()
     }
 
-    suspend fun reset(): LauncherView = locked { load(); disconnect("Verbindung getrennt."); view() }
+    suspend fun reset(): LauncherView = locked { access.requireOpen(); load(); disconnect("Verbindung getrennt."); view() }
 
     /** Rechecked at tap time, not only when the app buttons were drawn. */
     suspend fun mayLaunch(packageName: String): Boolean = locked {

@@ -92,4 +92,22 @@ class HttpLauncherApiTest {
             assertThrows(ProtocolFailure::class.java) { HttpLauncherApi().snapshot(server.address, "a".repeat(43)) }
         }
     }
+    @Test fun `parent confirmation uses its own endpoint without a child bearer or cookies`() {
+        val target = snapshotFixture().device.id
+        val reply = JSONObject().put("schemaVersion", 1).put("deviceId", target).put("authorized", true).toString()
+        TestServer(Reply(body = reply)).use { server ->
+            HttpLauncherApi().authorize(MaintenanceTarget(server.address, target), "a".repeat(32))
+            val request = server.take()
+            assertEquals("POST /api/device/maintenance HTTP/1.1", request.line)
+            assertNull(request.headers["authorization"])
+            assertNull(request.headers["cookie"])
+            assertEquals(target, JSONObject(request.body).getString("deviceId"))
+        }
+        TestServer(Reply(body = reply.replace("true", "\"true\""))).use { server ->
+            assertThrows(ProtocolFailure::class.java) {
+                HttpLauncherApi().authorize(MaintenanceTarget(server.address, target), "a".repeat(32))
+            }
+        }
+    }
+
 }

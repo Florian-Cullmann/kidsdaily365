@@ -63,6 +63,18 @@ try {
   const pairing = await write("/api/parent/pairing-codes", { kind: "android", label: "Mikas Handy", childId: kid.id });
   const phone = await write("/api/device/pair", { code: pairing.code, kind: "android" });
   const phoneHeaders = { Authorization: `Bearer ${phone.token}` };
+  // Maintenance setup needs a separate parent-issued capability, never the read-only bearer alone.
+  assert.equal((await request(`/api/parent/devices/${phone.deviceId}/maintenance-code`, "POST", undefined, "", phoneHeaders)).status, 401);
+  const maintenance = await write(`/api/parent/devices/${phone.deviceId}/maintenance-code`, undefined);
+  const proofBody = { deviceId: phone.deviceId, code: maintenance.code };
+  assert.equal((await request("/api/device/maintenance", "POST", proofBody, "", phoneHeaders)).status, 403);
+  assert.equal((await request("/api/device/maintenance", "POST", { ...proofBody, deviceId: randomUUID() }, "")).status, 401);
+  const confirmed = await fetch(new URL("/api/device/maintenance", origin), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(proofBody) });
+  assert.equal(confirmed.status, 200);
+  assert.equal(confirmed.headers.get("set-cookie"), null);
+  assert.equal(confirmed.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await confirmed.json(), { schemaVersion: 1, deviceId: phone.deviceId, authorized: true });
+  assert.equal((await request("/api/device/maintenance", "POST", proofBody, "")).status, 401);
   const before = await (await request("/api/launcher/snapshot", "GET", undefined, "", phoneHeaders)).json();
   assert.equal(before.stars, 0);
   assert.equal(before.child.id, kid.id);
@@ -89,7 +101,7 @@ try {
   // Parent sessions are never silently retained on the shared child surface.
   const leaving = await (await request("/")).text();
   assert.ok(leaving.includes("Elternzugang wird auf diesem Gerät abgemeldet"));
-  console.info("HTTP smoke passed: registration/login/logout, parent CRUD, scoped device pairing, protected child screen, live launcher stars, mutation denial, idempotent completion and revocation.");
+  console.info("HTTP smoke passed: registration/login/logout, parent CRUD, scoped device pairing, separate one-use parent maintenance confirmation, protected child screen, live launcher stars, mutation denial, idempotent completion and revocation.");
 } finally {
   if (created && process.env.SMOKE_KEEP_FIXTURES !== "1") {
     for (const table of ["allowed_apps", "device_pairing_codes", "devices", "parent_invitations", "parents", "appointments", "point_entries", "daily_tasks", "task_templates", "rewards", "children"]) {

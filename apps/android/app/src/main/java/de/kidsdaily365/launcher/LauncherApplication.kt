@@ -5,11 +5,12 @@ import android.os.SystemClock
 import android.provider.Settings
 
 class LauncherApplication : Application() {
-    val repository by lazy {
-        ConnectedLauncher(HttpLauncherApi(), KeystorePrivateStore(this), object : LauncherClock {
-            override fun wallMillis() = System.currentTimeMillis()
-            override fun elapsedMillis() = SystemClock.elapsedRealtime()
-            override fun bootCount() = Settings.Global.getInt(contentResolver, Settings.Global.BOOT_COUNT, -1)
-        }, BuildConfig.DEBUG)
+    private val clock = object : LauncherClock {
+        override fun wallMillis() = System.currentTimeMillis()
+        override fun elapsedMillis() = SystemClock.elapsedRealtime()
+        override fun bootCount() = Settings.Global.getInt(contentResolver, Settings.Global.BOOT_COUNT, -1)
     }
+    private val api by lazy { HttpLauncherApi() }
+    val maintenance by lazy { MaintenanceController(KeystorePrivateStore(this, "maintenance"), clock, api, BuildConfig.DEBUG) }
+    val repository by lazy { ConnectedLauncher(api, KeystorePrivateStore(this), clock, BuildConfig.DEBUG, maintenance) }
 }
