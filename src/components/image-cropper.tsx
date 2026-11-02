@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { Minus, Plus, RotateCcw, Move } from "lucide-react";
-import { useEffect, useId, useRef, useState, type Dispatch, type SetStateAction, type PointerEvent } from "react";
+import { Minus, Plus, RotateCcw } from "lucide-react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction, type PointerEvent } from "react";
 import { cropRectangle, transformCrop, type ImageCrop } from "@/domain/profile-image";
 
 type Point = { x: number; y: number };
@@ -17,7 +17,6 @@ export function ImageCropper({ image, crop, setCrop, disabled }: {
   const viewport = useRef<HTMLDivElement>(null);
   const pointers = useRef(new Map<number, Point>());
   const [dragging, setDragging] = useState(false);
-  const helpId = useId();
   const { width, height } = image;
   const rectangle = cropRectangle(width, height, crop);
   useEffect(() => {
@@ -48,7 +47,7 @@ export function ImageCropper({ image, crop, setCrop, disabled }: {
   return <div className="image-cropper">
     <div className="crop-stage">
       <div ref={viewport} className={`image-crop-preview interactive-crop ${dragging ? "is-dragging" : ""}`}
-        role="group" tabIndex={disabled ? -1 : 0} aria-label="Bildausschnitt verschieben" aria-describedby={helpId} aria-disabled={disabled}
+        role="group" tabIndex={disabled ? -1 : 0} aria-label="Bildausschnitt verschieben" aria-disabled={disabled}
         onPointerDown={(event) => {
           if (disabled || event.button !== 0 || pointers.current.size >= 2) return;
           event.preventDefault(); event.currentTarget.focus({ preventScroll: true });
@@ -82,7 +81,6 @@ export function ImageCropper({ image, crop, setCrop, disabled }: {
           style={{ position: "absolute", maxWidth: "none", pointerEvents: "none", width: `${100 * width / rectangle.width}%`, height: `${100 * height / rectangle.height}%`, left: `${-100 * rectangle.left / rectangle.width}%`, top: `${-100 * rectangle.top / rectangle.height}%` }} />
         <span className="crop-grid" aria-hidden="true" />
       </div>
-      <span className="crop-stage-caption"><Move size={16} /> Bild im Rahmen verschieben</span>
     </div>
     <div className="crop-toolbar" role="group" aria-label="Bildausschnitt bearbeiten">
       <button type="button" disabled={disabled || crop.zoom <= 1} onClick={() => zoom(1 / 1.15)} aria-label="Verkleinern"><Minus size={20} /></button>
@@ -91,6 +89,5 @@ export function ImageCropper({ image, crop, setCrop, disabled }: {
       <span className="crop-toolbar-divider" />
       <button type="button" disabled={disabled} onClick={() => setCrop({ x: 50, y: 50, zoom: 1 })} aria-label="Ausschnitt zurücksetzen"><RotateCcw size={18} /><span>Zurücksetzen</span></button>
     </div>
-    <p id={helpId} className="field-help crop-help">Ziehen zum Verschieben · Zwei Finger oder Mausrad zum Zoomen.<br />Tastatur: Pfeiltasten verschieben, +/− vergrößern oder verkleinern.</p>
   </div>;
 }
