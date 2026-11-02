@@ -19,11 +19,17 @@ const tabs = [
   { id: "account", label: "Elternkonto", icon: Settings },
 ] as const;
 const descriptions: Record<Tab, string> = {
-  overview: "Ein gemeinsamer Platz, um euren Alltag zu gestalten.", children: "Jedes Kind bekommt seinen eigenen Tag und seinen eigenen Buddy.",
-  routines: "Wiederkehrende kleine Schritte, passend zu eurer Woche.", tasks: "Einmalige Aufgaben für heute oder einen späteren Tag.",
-  appointments: "Alles, was eure Kinder als Nächstes vorhaben.", rewards: "Gemeinsam Wünsche planen und sich auf etwas freuen.",
-  apps: "Welche Apps darf jedes Kind im Android-Launcher öffnen?", devices: "Bildschirme und Handys einzeln freigeben und verwalten.",
-  account: "Eure Elternzugänge und die Sicherheit deines Kontos.",
+  overview: "Kinderprofile, Planung und Geräte verwalten.", children: "Kinderprofile und Buddys verwalten.",
+  routines: "Aufgaben nach Wochentagen planen.", tasks: "Einmalige Aufgaben für heute oder einen späteren Tag.",
+  appointments: "Termine für jedes Kind verwalten.", rewards: "Wünsche und benötigte Sterne festlegen.",
+  apps: "App-Freigaben je Kind verwalten.", devices: "Bildschirme und Handys einzeln freigeben und verwalten.",
+  account: "Eltern einladen und dein Passwort ändern.",
+};
+
+const emptyMessages: Record<Resource, string> = {
+  children: "Noch keine Kinderprofile vorhanden.", routines: "Noch keine Routinen angelegt.",
+  tasks: "Keine aktuellen oder geplanten Einzelaufgaben vorhanden.", appointments: "Noch keine Termine angelegt.",
+  rewards: "Noch keine Wünsche angelegt.", apps: "Noch keine App-Freigaben vorhanden.",
 };
 
 class SessionExpired extends Error {}
@@ -56,6 +62,9 @@ export function ParentConsole({ parent, initialData }: { parent: ParentActor; in
   const isResource = !["overview", "devices", "account"].includes(tab);
 
   function navigate(id: Tab) { setTab(id); setFormOpen(false); setEditing(null); setError(""); setNotice(""); setIssuedCode(null); }
+  function createRecord(resource: Resource) {
+    navigate(resource); setEditing(null); setFormOpen(true);
+  }
   async function action(run: () => Promise<void>) {
     if (pending.current) return;
     pending.current = true;
@@ -106,25 +115,32 @@ export function ParentConsole({ parent, initialData }: { parent: ParentActor; in
       <div className="parent-sidebar-bottom"><Link href="/">Zum Kinderbildschirm</Link><button disabled={busy} onClick={() => action(async () => { await request("/api/auth/logout", "POST"); router.replace("/login"); router.refresh(); })}><LogOut size={18} /> Abmelden</button></div>
     </aside>
     <main className="parent-main"><header className="parent-topbar"><span>{data.family.name}</span><span><ShieldCheck size={17} /> Angemeldet als {parent.name}</span></header>
-      <div className="parent-title"><div><span className="parent-eyebrow">EUER ALLTAG, GEMEINSAM GESTALTET</span><h1>{selected.label}</h1><p>{descriptions[tab]}</p></div>{isResource && !formOpen && <button className="parent-primary" onClick={() => { setEditing(null); setFormOpen(true); setError(""); }}><Plus size={20} />{tab === "children" ? "Kind hinzufügen" : "Neu anlegen"}</button>}</div>
+      <div className="parent-title"><div><h1>{selected.label}</h1><p>{descriptions[tab]}</p></div>{isResource && !formOpen && <button className="parent-primary" onClick={() => { setEditing(null); setFormOpen(true); setError(""); }}><Plus size={20} />{tab === "children" ? "Kind hinzufügen" : "Neu anlegen"}</button>}</div>
       <div className="parent-feedback" aria-live="polite">{notice && <p className="parent-success"><Check size={19} />{notice}</p>}<p className="parent-error" role="alert">{error}</p></div>
 
       {tab === "overview" && <>
-        <section className="parent-welcome"><div><span className="parent-pill">Schön, dass ihr da seid.</span><h2>Ein eigener kleiner Kosmos<br />für jedes Kind.</h2><p>Legt gemeinsam eure Profile an. Danach könnt ihr Routinen planen und euren Familienbildschirm verbinden.</p><button className="parent-primary" onClick={() => navigate(data.children.some((child) => child.active) ? "devices" : "children")}>{data.children.some((child) => child.active) ? "Geräte verbinden" : "Erstes Kinderprofil anlegen"}</button></div><Buddy kind="fox" className="parent-welcome-buddy" /></section>
-        <div className="parent-overview-grid">{[{ title: "Kinderprofile", text: `${activeChildren} ${activeChildren === 1 ? "aktives Profil" : "aktive Profile"}`, view: "children" as Tab, icon: Users }, { title: "Routinen planen", text: "Kleine Schritte für die ganze Woche", view: "routines" as Tab, icon: BookOpen }, { title: "Geräte freigeben", text: "Wandbildschirm und Android getrennt", view: "devices" as Tab, icon: MonitorSmartphone }].map((card) => <button key={card.title} onClick={() => navigate(card.view)}><card.icon size={27} /><strong>{card.title}</strong><span>{card.text}</span></button>)}</div>
-        <div className="parent-callout">Auf dem Wandbildschirm können eure Kinder Aufgaben abhaken. Das Handy zeigt später nur Buddy, Sterne und freigegebene Apps. Neue Kinderprofile starten mit Audible in der App-Liste.</div>
+        {!activeChildren && <section className="parent-panel"><h2>{data.children.length ? "Keine aktiven Kinderprofile vorhanden." : "Noch keine Kinderprofile vorhanden."}</h2><p>Lege ein Kinderprofil an, um Aufgaben und Termine zuzuordnen.</p><button className="parent-primary" onClick={() => createRecord("children")}>Kind hinzufügen</button></section>}
+        <div className="parent-overview-grid">{[
+          { title: "Kinderprofile", text: `${activeChildren} ${activeChildren === 1 ? "aktives Profil" : "aktive Profile"}${activeChildren ? ` · ${data.children.filter((child) => child.active).map((child) => child.name).join(", ")}` : ""}`, view: "children" as Tab, icon: Users },
+          { title: "Routinen", text: `${data.routines.filter((routine) => routine.active).length} aktive Routinen`, view: "routines" as Tab, icon: BookOpen },
+          { title: "Einzelaufgaben", text: "Aktuelle und geplante Aufgaben bearbeiten", view: "tasks" as Tab, icon: ClipboardList },
+          { title: "Termine", text: "Termine anlegen und bearbeiten", view: "appointments" as Tab, icon: CalendarDays },
+          { title: "Geräte", text: "Wandbildschirme und Handys verbinden oder sperren", view: "devices" as Tab, icon: MonitorSmartphone },
+          { title: "Wünsche", text: "Wünsche und Sternwerte bearbeiten", view: "rewards" as Tab, icon: Gift },
+        ].map((card) => <button key={card.title} onClick={() => navigate(card.view)}><card.icon size={27} /><strong>{card.title}</strong><span>{card.text}</span></button>)}</div>
+        <div className="parent-callout">Auf dem Wandbildschirm können eure Kinder Aufgaben abhaken. Der Android-Launcher zeigt Buddy, Sterne und freigegebene Apps; er kann keine Aufgaben abhaken. Neue Kinderprofile starten mit Audible in der App-Liste.</div>
       </>}
 
       {isResource && <>
         {tab === "routines" && <div className="parent-callout">Routinen werden an den gewählten Wochentagen in den Tagesplan übernommen. Änderungen gelten für noch nicht angelegte Tagespläne. Bestehende Aufgaben kannst du unter Einzelaufgaben bearbeiten.</div>}
         {tab === "apps" && <div className="parent-callout">Diese Liste legt die erlaubten Apps je Kind fest. Die echte Sperre auf dem Handy benötigt später den verwalteten Android-Launcher. Ein normaler Startbildschirm allein schützt das Gerät nicht.</div>}
-        {tab === "rewards" && <div className="parent-callout">Wünsche sind gemeinsame Ziele. Das Einlösen und Buddy-Kosmetik kommen später hinzu; hier werden keine Sterne abgezogen.</div>}
+        {tab === "rewards" && <div className="parent-callout">Das Einlösen von Wünschen und Buddy-Kosmetik sind noch nicht verfügbar. Hier werden keine Sterne abgezogen.</div>}
         {formOpen && <ParentRecordForm key={`${tab}-${editing?.id ?? "new"}`} resource={tab as Resource} data={data} record={editing} busy={busy} onSave={save} onCancel={() => setFormOpen(false)} />}
         <div className="parent-records">{(data[tab as Resource] as unknown as EditableRecord[]).map((record) => <article key={record.id} className={`parent-record ${record.active === false ? "is-archived" : ""}`}>
           {tab === "children" && <div className="record-buddy"><Buddy kind={record.buddyKind as "fox" | "rabbit" | "bear"} /></div>}
-          <div className="record-description"><h3>{String(record.name ?? record.title ?? record.label)}</h3><p>{tab === "children" ? `Mit ${record.buddyName}` : tab === "apps" ? `${childName(record.childId)} · ${record.packageName}` : tab === "appointments" ? `${childName(record.childId)} · ${new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short", timeZone: data.family.timezone }).format(new Date(String(record.startsAt)))}` : tab === "routines" ? `${childName(record.childId)} · ${(record.steps as unknown[]).length} Schritte` : tab === "rewards" ? `${record.cost} Sterne` : `${childName(record.childId)} · ${record.points} Sterne${tab === "tasks" ? ` · ${record.date}` : ""}`}</p>{record.active === false && <span className="archive-label">Archiviert</span>}{record.completed === true && <span className="archive-label">Erledigt · Verlauf geschützt</span>}</div>
+          <div className="record-description"><h3>{String(record.name ?? record.title ?? record.label)}</h3><p>{tab === "children" ? `Buddy: ${record.buddyName}` : tab === "apps" ? `${childName(record.childId)} · ${record.packageName}` : tab === "appointments" ? `${childName(record.childId)} · ${new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short", timeZone: data.family.timezone }).format(new Date(String(record.startsAt)))}` : tab === "routines" ? `${childName(record.childId)} · ${(record.steps as unknown[]).length} Schritte` : tab === "rewards" ? `${record.cost} Sterne` : `${childName(record.childId)} · ${record.points} Sterne${tab === "tasks" ? ` · ${record.date}` : ""}`}</p>{record.active === false && <span className="archive-label">Archiviert</span>}{record.completed === true && <span className="archive-label">Erledigt · Verlauf geschützt</span>}</div>
           <div className="record-actions"><button disabled={busy || record.completed === true} onClick={() => { setEditing(record); setFormOpen(true); setError(""); }}>Bearbeiten</button>{record.active !== false && record.completed !== true && <button className="quiet-danger" disabled={busy} onClick={() => archive(record)}>{tab === "tasks" ? "Aus Plan nehmen" : "Archivieren"}</button>}</div>
-        </article>)}{!data[tab as Resource].length && <div className="parent-empty"><selected.icon size={35} /><h3>Hier ist noch Platz.</h3><p>{tab === "children" ? "Legt euer erstes Kinderprofil an." : "Mit einem neuen Eintrag beginnt eure Planung."}</p></div>}</div>
+        </article>)}{!formOpen && !data[tab as Resource].length && <div className="parent-empty"><selected.icon size={35} /><h3>{emptyMessages[tab as Resource]}</h3></div>}</div>
       </>}
 
       {tab === "devices" && <>

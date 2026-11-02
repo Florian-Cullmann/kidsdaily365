@@ -2,11 +2,8 @@
 .auth-page { min-height: 100dvh; display: grid; grid-template-columns: 1fr 1fr; background: #fbfafc; }
 .auth-story { min-height: 100dvh; background: linear-gradient(145deg, #e8e0f4, #edf1e6); padding: 36px 50px; display: flex; flex-direction: column; overflow: hidden; }
 .auth-story > div { margin: 65px 0 0; position: relative; z-index: 1; }
-.parent-eyebrow { font-size: 12px; font-weight: 800; letter-spacing: 1.4px; color: #8d7b9f; }
 .auth-story h1 { font-size: clamp(38px, 4.2vw, 64px); letter-spacing: -2px; line-height: 1.12; margin: 22px 0; }
 .auth-story p { color: #71677d; font-size: 20px; line-height: 1.7; }
-.auth-buddy { width: min(70%, 330px); height: 280px; align-self: flex-end; margin-top: 22px; }
-.auth-story-note { margin-top: auto; color: #7e7288; font-size: 15px; }
 .auth-form-side { display: grid; place-items: center; padding: 40px; }
 .auth-form { max-width: 430px; width: 100%; }
 .parent-pill { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: #786190; background: #eee7f5; border-radius: 20px; padding: 9px 13px; }
@@ -51,10 +48,6 @@
 .parent-feedback { margin-bottom: 20px; }
 .parent-success { display: flex; align-items: center; gap: 8px; padding: 13px 17px; background: #eaf3e9; color: #5e7e59; border-radius: 12px; font-size: 14px; }
 .parent-error:not(:empty) { margin: 12px 0; padding: 12px 16px; background: #fff0f4; border: 1px solid #f1d9e1; border-radius: 12px; }
-.parent-welcome { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: space-between; gap: 25px; padding: 35px 38px; border-radius: 24px; background: linear-gradient(120deg, #eee6f7, #e8eee2); min-height: 285px; }
-.parent-welcome h2 { font-size: 31px; line-height: 1.3; color: #68517d; letter-spacing: -.6px; margin: 20px 0 13px; }
-.parent-welcome p { max-width: 400px; color: #9b88a6; font-size: 15px; line-height: 1.8; margin-bottom: 21px; }
-.parent-welcome-buddy { width: 230px; height: 270px; flex-shrink: 0; }
 .parent-overview-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 17px; margin-top: 22px; }
 .parent-overview-grid button { text-align: left; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; padding: 24px; background: #fff; border: 1px solid #eee6f4; border-radius: 19px; }
 .parent-overview-grid svg { color: #a38cb8; }
@@ -62,7 +55,6 @@
 .parent-overview-grid span { font-size: 13px; line-height: 1.6; color: #786584; }
 .record-form, .parent-panel { margin-bottom: 22px; background: #fff; padding: 27px; border: 1px solid #e9e0f0; border-radius: 20px; }
 .record-form-heading h3 { color: #6e567f; font-size: 20px; margin-bottom: 8px; }
-.record-form-heading > span { color: #786584; font-size: 14px; }
 .record-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 0; margin: 25px 0 0; border: 0; min-width: 0; }
 .wide-field { grid-column: 1 / -1; }
 .parent-app textarea { resize: vertical; min-height: 83px; }
@@ -109,8 +101,6 @@
   .parent-sidebar .brand { font-size: 18px; gap: 6px; }
   .parent-title { align-items: flex-start; }
   .parent-title p { max-width: 400px; }
-  .parent-welcome { padding: 28px; }
-  .parent-welcome-buddy { width: 180px; height: 240px; }
   .parent-overview-grid { gap: 12px; }
   .parent-overview-grid button { padding: 20px; }
   .record-actions { flex-direction: column; }
@@ -120,7 +110,6 @@
   .auth-story { min-height: 0; padding: 25px; }
   .auth-story > div { margin-top: 28px; }
   .auth-story h1 { font-size: 36px; }
-  .auth-story p, .auth-story-note, .auth-buddy { display: none; }
   .auth-form-side { padding: 32px 24px; }
   .parent-app { display: block; }
   .parent-sidebar { height: auto; position: static; padding: 18px; border-right: 0; border-bottom: 1px solid #e8def0; }
@@ -134,8 +123,6 @@
   .parent-title { flex-direction: column; gap: 17px; margin-top: 25px; }
   .parent-title h1 { font-size: 31px; }
   .parent-title > button { min-height: 49px; }
-  .parent-welcome h2 { font-size: 26px; }
-  .parent-welcome-buddy { width: 140px; height: 210px; }
   .parent-overview-grid { grid-template-columns: 1fr; }
   .parent-overview-grid button { min-height: 130px; }
   .record-fields, .device-pair-form { grid-template-columns: 1fr; }
@@ -146,8 +133,6 @@
   .parent-app input, .parent-app select, .parent-app textarea { min-height: 52px; }
 }
 @media (max-width: 460px) {
-  .parent-welcome { padding: 22px; }
-  .parent-welcome-buddy { display: none; }
   .parent-topbar { align-items: flex-start; flex-direction: column; justify-content: center; gap: 7px; }
   .parent-title p { font-size: 14px; }
   .parent-panel > .parent-records .parent-record > button { width: 100%; }

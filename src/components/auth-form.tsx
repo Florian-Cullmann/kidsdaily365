@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { House, LockKeyhole, ArrowRight } from "lucide-react";
-import { Buddy } from "./buddy";
 import { useRouter } from "next/navigation";
 
 export function AuthForm({ mode, firstParent = false, demo = false }: {
@@ -32,11 +31,12 @@ export function AuthForm({ mode, firstParent = false, demo = false }: {
 
   return <main className="auth-page">
     <section className="auth-story"><Link href="/" className="brand"><span className="brand-mark"><House size={25} /></span><span>kidsdaily<span className="brand-number">365</span></span></Link>
-      <div><span className="parent-eyebrow">GEMEINSAM ALLTAG GESTALTEN</span><h1>Ein guter Tag<br />beginnt mit euch.</h1><p>Ein eigener Buddy für jedes Kind.<br />Ein gemeinsamer Platz für eure Pläne.</p></div><Buddy kind="fox" className="auth-buddy" priority /><span className="auth-story-note">Eure Familie. Euer Tempo.</span>
+      <div><h1>Elternbereich</h1><p>Kinderprofile, Aufgaben, Termine und Geräte verwalten.</p></div>
+
     </section>
     <section className="auth-form-side"><form onSubmit={submit} className="auth-form">
       <span className="parent-pill"><LockKeyhole size={17} /> Elternbereich</span>
-      <h2>{register ? firstParent ? "Eure Familie einrichten" : "Als Elternteil registrieren" : "Schön, dass du da bist."}</h2>
+      <h2>{register ? firstParent ? "Eure Familie einrichten" : "Als Elternteil registrieren" : "Anmelden"}</h2>
       <p>{register ? firstParent ? "Lege euren ersten Elternzugang an. Anschließend könnt ihr Kinderprofile und Tagespläne einrichten." : "Du brauchst eine Einladung eines bereits registrierten Elternteils." : "Melde dich an, um eure Profile, Pläne und Geräte zu verwalten."}</p>
       {demo && <div className="parent-callout">Du siehst gerade die Demo. Für echte Konten muss der Server im Live-Modus mit Datenbank laufen. Die Anleitung steht in der README.</div>}
       {register && <label htmlFor="auth-name">Dein Name<input id="auth-name" name="name" required maxLength={80} autoComplete="name" /></label>}
