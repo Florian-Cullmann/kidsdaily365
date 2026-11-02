@@ -111,7 +111,7 @@ Screenshots mit ausschließlich fiktiven Daten: [Elterneditor](proof/routine-edi
 
 ## Eigene Profilbilder
 
-1. Drei fiktive Kinder anlegen. Unter Kinderprofile → Profilbild für zwei Kinder unterschiedliche unpersönliche JPEG-/PNG-Testbilder auswählen. Vergrößerung sowie horizontalen und vertikalen Ausschnitt ändern; die Vorschau muss dem gespeicherten Bild entsprechen.
+1. Drei fiktive Kinder anlegen. Unter Kinderprofile → Profilbild für zwei Kinder unterschiedliche unpersönliche JPEG-/PNG-Testbilder auswählen. Das Bild direkt im Rahmen mit Maus oder Finger verschieben; mit Zwei-Finger-Geste, Mausrad oder Plus/Minus zoomen. Zurücksetzen und Tastaturbedienung (Pfeiltasten, +/−) prüfen. Die Vorschau muss dem gespeicherten Bild entsprechen, auch an den Bildrändern.
 2. Speichern, neu laden und den App-Server neu starten. Auf einem gekoppelten Wandbildschirm müssen beide Bilder in der Profilauswahl erscheinen; beim dritten Kind bleibt der Buddy als Fallback.
 3. Ein Bild ersetzen und entfernen. Beim Entfernen erscheint wieder der Buddy; Aufgaben, Sterne und die anderen Profile bleiben erhalten. Eine ungültige Datei darf das bisherige Bild nicht ersetzen.
 4. Ohne Sitzung/Pairing darf der Bild-Endpunkt keine Bilder liefern. Wandgeräte dürfen nur lesen; Android-Bearer nur das Bild ihres gebundenen Kindes lesen, niemals hochladen oder löschen. Nach Gerätewiderruf wird auch das Bild abgewiesen. Antworten werden mit `Cache-Control: private, no-store` ausgeliefert.

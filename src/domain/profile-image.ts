@@ -15,3 +15,17 @@ export function cropRectangle(width: number, height: number, crop: ImageCrop) {
 export function profileImageUrl(childId: string, version: string) {
   return `/api/children/${childId}/image?v=${version}`;
 }
+
+// Keep the image point under the gesture anchored while panning or zooming.
+export function transformCrop(width: number, height: number, crop: ImageCrop,
+  from: { x: number; y: number }, to: { x: number; y: number }, scale = 1): ImageCrop {
+  const previous = cropRectangle(width, height, crop);
+  const zoom = Math.max(1, Math.min(3, crop.zoom * scale));
+  const size = Math.max(1, Math.floor(Math.min(width, height) / zoom));
+  const position = (offset: number, extent: number) => extent > 0 ? Math.max(0, Math.min(100, offset / extent * 100)) : 50;
+  return {
+    zoom,
+    x: position(previous.left + from.x * previous.width - to.x * size, width - size),
+    y: position(previous.top + from.y * previous.height - to.y * size, height - size),
+  };
+}

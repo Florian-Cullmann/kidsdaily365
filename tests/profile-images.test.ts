@@ -41,3 +41,22 @@ describe("profile image sanitization", () => {
     await expect(boundedBytes(request, 4)).rejects.toThrow("Body too large");
   });
 });
+
+describe("direct crop gestures", () => {
+  it("pans with the image, clamps edges and keeps the zoom anchor", async () => {
+    const { transformCrop } = await import("@/domain/profile-image");
+    const initial = { x: 50, y: 50, zoom: 1 };
+    const moved = transformCrop(800, 600, initial, { x: .5, y: .5 }, { x: .6, y: .5 });
+    expect(moved.x).toBe(20);
+    expect(moved.y).toBe(50);
+    const zoomed = transformCrop(800, 600, initial, { x: .5, y: .5 }, { x: .5, y: .5 }, 2);
+    expect(zoomed).toEqual({ x: 50, y: 50, zoom: 2 });
+    const before = cropRectangle(800, 600, initial);
+    const anchored = cropRectangle(800, 600, transformCrop(800, 600, initial, { x: .25, y: .75 }, { x: .25, y: .75 }, 2));
+    expect(anchored.left + anchored.width * .25).toBe(before.left + before.width * .25);
+    expect(anchored.top + anchored.height * .75).toBe(before.top + before.height * .75);
+    const bounded = transformCrop(800, 600, zoomed, { x: .5, y: .5 }, { x: 20, y: -20 }, 100);
+    expect(bounded).toEqual({ x: 0, y: 100, zoom: 3 });
+    expect(transformCrop(600, 800, bounded, { x: .5, y: .5 }, { x: .5, y: .5 }, .01).zoom).toBe(1);
+  });
+});
