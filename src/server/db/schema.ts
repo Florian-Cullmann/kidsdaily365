@@ -25,6 +25,26 @@ export const children = pgTable("children", {
   active: boolean().notNull().default(true),
 }, (table) => [unique("children_family_identity").on(table.id, table.familyId)]);
 
+// Ownership survives unequipping. Equipment can only reference the same child's inventory.
+export const buddyOwnership = pgTable("buddy_ownership", {
+  familyId: uuid().notNull(),
+  childId: uuid().notNull(),
+  accessoryId: text().notNull(),
+  grantedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  unique("buddy_owned_identity").on(table.familyId, table.childId, table.accessoryId),
+  foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }).onDelete("cascade"),
+]);
+export const buddyEquipment = pgTable("buddy_equipment", {
+  familyId: uuid().notNull(),
+  childId: uuid().notNull(),
+  slot: text().notNull(),
+  accessoryId: text().notNull(),
+}, (table) => [
+  unique("buddy_equipped_slot").on(table.familyId, table.childId, table.slot),
+  foreignKey({ columns: [table.familyId, table.childId, table.accessoryId], foreignColumns: [buddyOwnership.familyId, buddyOwnership.childId, buddyOwnership.accessoryId] }).onDelete("cascade"),
+]);
+
 // Encoded image files live in the same transactional backup as their profiles.
 const imageBytes = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
 export const childImages = pgTable("child_images", {

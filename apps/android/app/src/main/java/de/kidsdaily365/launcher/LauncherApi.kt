@@ -31,7 +31,7 @@ class HttpLauncherApi : LauncherApi, MaintenanceAuthorizer {
 
     override fun snapshot(server: ServerAddress, token: String): LauncherSnapshot {
         require(LauncherProtocol.validToken(token))
-        return LauncherProtocol.snapshot(request(server, "/api/launcher/snapshot", token, null))
+        return LauncherProtocol.snapshot(request(server, "/api/launcher/snapshot?version=2", token, null))
     }
 
     private fun request(server: ServerAddress, path: String, token: String?, body: String?): String {

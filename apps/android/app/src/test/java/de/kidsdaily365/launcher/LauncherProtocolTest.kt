@@ -8,6 +8,21 @@ fun fixture(): String = checkNotNull(LauncherProtocolTest::class.java.getResourc
 fun snapshotFixture() = LauncherProtocol.snapshot(fixture())
 
 class LauncherProtocolTest {
+    @Test fun `v2 equipment survives offline serialization and never grants purchases`() {
+        val raw = checkNotNull(javaClass.getResource("/launcher-v2.example.json")).readText()
+        val s = LauncherProtocol.snapshot(raw)
+        assertEquals(listOf("star-badge"), s.buddy.cosmeticIds)
+        assertEquals(s, LauncherProtocol.snapshot(LauncherProtocol.encode(s)))
+        val future = JSONObject(raw)
+        future.getJSONObject("buddy").getJSONArray("cosmeticIds").put("future-item")
+        assertEquals(2, LauncherProtocol.snapshot(future.toString()).buddy.cosmeticIds.size)
+        future.getJSONObject("capabilities").put("purchases", true)
+        assertThrows(ProtocolFailure::class.java) { LauncherProtocol.snapshot(future.toString()) }
+        val malformed = JSONObject(raw)
+        malformed.getJSONObject("buddy").getJSONArray("cosmeticIds").put(3)
+        assertThrows(ProtocolFailure::class.java) { LauncherProtocol.snapshot(malformed.toString()) }
+    }
+
     @Test fun `shared server fixture round trips without losing policy or identity`() {
         val s = snapshotFixture()
         assertEquals(s, LauncherProtocol.snapshot(LauncherProtocol.encode(s)))
@@ -17,7 +32,7 @@ class LauncherProtocolTest {
 
     @Test fun `unknown versions broadened capabilities and coerced flags fail closed`() {
         val mutations: List<(JSONObject) -> Unit> = listOf(
-            { it.put("schemaVersion", 2) },
+            { it.put("schemaVersion", 3) },
             { it.getJSONObject("capabilities").put("taskCompletion", true) },
             { it.getJSONObject("capabilities").put("administration", "false") },
             { it.getJSONObject("capabilities").remove("purchases") },

@@ -99,7 +99,7 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
     <div className="brand profile-brand"><span className="brand-mark"><House size={27} /></span><span>kidsdaily<span className="brand-number">365</span></span></div>
     <div className="profile-welcome"><span className="welcome-tag">Dein kleiner Alltagsbegleiter</span><h1>Wer ist heute dabei?</h1><p>Tippe auf dein Bild. Dein Buddy freut sich auf dich!</p></div>
     <div className="profile-grid">{plans.map((item, index) => <button key={item.child.id} className={`profile-tile tile-${index % 3}`} onClick={() => chooseProfile(item.child.id)}>
-      <span className="profile-art"><ProfilePicture imageUrl={item.child.imageUrl} buddyKind={item.child.buddyKind} /><span className="profile-initial">{item.child.avatar}</span></span>
+      <span className="profile-art"><ProfilePicture imageUrl={item.child.imageUrl} buddyKind={item.child.buddyKind} equipped={item.child.equippedAccessories} /><span className="profile-initial">{item.child.avatar}</span></span>
       <strong>{item.child.name}</strong><span>mit {item.child.buddyName}</span>
     </button>)}</div>
     <div className="profile-footer"><p>{demo ? "Zum Ausprobieren · Dein Fortschritt wird nicht gespeichert" : "Jeder hat seinen eigenen Tag. Und seinen eigenen Buddy."}</p><Link className="parent-entry-link" href="/eltern">Elternbereich</Link></div>
@@ -143,7 +143,7 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
       </section>
 
       <aside className="buddy-space" aria-label={`Dein Buddy ${plan.child.buddyName}`}>
-        <div className="buddy-scene"><Buddy kind={plan.child.buddyKind} className="main-buddy" priority /><span className="buddy-name">Dein {plan.child.buddyName}</span>
+        <div className="buddy-scene"><Buddy kind={plan.child.buddyKind} equipped={plan.child.equippedAccessories} className="main-buddy" priority /><span className="buddy-name">Dein {plan.child.buddyName}</span>
           <button className="star-treasure" onClick={() => openView("rewards")} aria-label={`${plan.balance} Sterne gesammelt. Deine Wünsche ansehen.`}><span aria-hidden="true">⭐</span><div><strong>{plan.balance}</strong><span>deine Sterne</span></div><ChevronRight size={27} /></button>
         </div>
         <button className="peek-card appointment-peek" onClick={() => openView("appointments")}><span className="peek-picture" aria-hidden="true">📅</span><span className="peek-copy"><span>Dein nächster Termin</span><strong>{nextAppointment?.title ?? "Gerade nichts geplant"}</strong>{nextAppointment && <span>{appointmentDay(nextAppointment.startsAt, plan)} · {appointmentTime(nextAppointment.startsAt, plan.timezone)} Uhr</span>}</span><ChevronRight size={25} /></button>

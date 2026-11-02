@@ -39,7 +39,7 @@ Bei vergessenem Code: Im Eltern-Webbereich eine neue **Eltern-Bestätigung für 
 
 ## Aufbau und Grenzen
 
-- `LauncherProtocol`: strikte Version-1-Validierung einschließlich Identität, Berechtigungen und Paketnamen. Gemeinsame fiktive Vertragsdatei unter `contracts/`, geprüft durch Kotlin und Zod.
+- `LauncherProtocol`: strikte Version-1-/Version-2-Validierung einschließlich Identität, Berechtigungen und Paketnamen. Gemeinsame fiktive Vertragsdatei unter `contracts/`, geprüft durch Kotlin und Zod.
 - `HttpLauncherApi`: feste Pairing-/Snapshot-Pfade, Bearer statt Browsercookies, Zeit-/Größenlimits, keine Weiterleitungen und kein Zertifikats-Bypass.
 - `ConnectedLauncher`: anwendungsweite, serialisierte Kopplung/Synchronisierung/Trennung. Die Geräte-ID bleibt gebunden, die Kinder-ID ab dem ersten Snapshot ebenfalls. Bereits eingelöste Codes überleben einen fehlgeschlagenen ersten Datenabruf.
 - `KeystorePrivateStore`: AES-256-GCM mit nicht exportierbarem Android-Keystore-Schlüssel und atomarem Dateiersatz im privaten, vom Backup ausgeschlossenen Speicher. Kein Klartext-Token in Preferences, Bundle oder Logs. Der Code wird nach Absenden verworfen und die Eingabeseite vor Screenshots/Recents-Vorschauen geschützt.
@@ -48,3 +48,5 @@ Bei vergessenem Code: Im Eltern-Webbereich eine neue **Eltern-Bestätigung für 
 Offline bleibt der letzte gültige Stand sichtbar. Freigegebene Apps lassen sich höchstens 24 Stunden nach Empfang öffnen; die Frist läuft über monotone Gerätezeit, eine zurückgestellte Uhr verlängert sie nicht. Nach Geräte-Neustart oder unbekannter Boot-Zählung ist zunächst eine erfolgreiche Online-Bestätigung nötig. Ein normaler Prozessneustart im selben Geräte-Boot erhält den Cache. Ungültige Antworten verwerfen die bisherige Startliste dauerhaft, statt zusätzliche Apps freizugeben. Eine gültige neue Antwort kann sie wiederherstellen. Keine dieser UI-Regeln ersetzt Lock Task oder sichert den Rest des Systems ab.
 
 Zielgerät: Xiaomi/HyperOS; erste physische Tests: Xiaomi/LineageOS. Modell, Android-Version, Patchstand und Bootloader-/Root-Zustand pro Test dokumentieren. Emulator und Compiler sind kein Nachweis der Gerätesperren. Siehe [Android-Konzept](../../docs/android.md) und [Testleitfaden](../../docs/testing.md).
+
+Buddy-Ausstattung: [gemeinsame Ebenen, Katalog und versionierter Vertrag](../../docs/buddy-accessories.md). Der Launcher fragt Version 2 ab und zeigt ausschließlich angelegte Accessoires aus dem gebündelten Manifest.

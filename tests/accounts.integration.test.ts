@@ -1,3 +1,5 @@
+import { changeBuddyEquipment } from "@/server/buddy";
+import { POST as postBuddy } from "@/app/api/parent/children/[id]/buddy/route";
 import sharp from "sharp";
 import { readProfileImage, saveProfileImage, removeProfileImage } from "@/server/profile-images";
 import { GET as getImage, PUT as putImage, DELETE as deleteImage } from "@/app/api/children/[id]/image/route";
@@ -6,7 +8,7 @@ import { spawn } from "node:child_process";
 import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "@/server/db/client";
-import { allowedApps, appointments, childImages, children, dailyTasks, devicePairingCodes, devices, families, parentInvitations, parents, parentSessions, pointEntries, rewards, taskTemplates } from "@/server/db/schema";
+import { buddyOwnership, buddyEquipment, allowedApps, appointments, childImages, children, dailyTasks, devicePairingCodes, devices, families, parentInvitations, parents, parentSessions, pointEntries, rewards, taskTemplates } from "@/server/db/schema";
 import { changePassword, createInvitation, loginParent, logoutParent, parentFromToken, registerParent, type ParentActor } from "@/server/auth/parent";
 import { hashPassword } from "@/server/auth/password";
 import * as passwordModule from "@/server/auth/password";
@@ -372,5 +374,58 @@ describe("private profile images", () => {
     cookieState.set("kidsdaily_parent", await loginParent({ email: parent.email, password }));
     expect((await deleteImage(request("DELETE"), context())).status).toBe(200);
     expect((await getImage(request(), context())).status).toBe(404);
+  });
+});
+
+
+describe("buddy ownership and equipment", () => {
+  const accessoryId = "star-badge";
+  it("keeps ownership after unequipping, serializes repeats and never spends points", async () => {
+    const parent = await actor(); const first = await child(parent); const sibling = await child(parent, "Sibling");
+    await expect(changeBuddyEquipment(parent, first.id, { action: "equip", accessoryId })).rejects.toMatchObject({ status: 409 });
+    await Promise.all(Array.from({ length: 3 }, () => changeBuddyEquipment(parent, first.id, { action: "grant", accessoryId })));
+    await Promise.all(Array.from({ length: 3 }, () => changeBuddyEquipment(parent, first.id, { action: "equip", accessoryId })));
+    const data = await getManagementData(parent);
+    expect(data.children.find((c) => c.id === first.id)).toMatchObject({ ownedAccessories: [accessoryId], equippedAccessories: [accessoryId] });
+    expect(data.children.find((c) => c.id === sibling.id)).toMatchObject({ ownedAccessories: [], equippedAccessories: [] });
+    expect((await getDayPlans(familyId)).find((p) => p.child.id === first.id)?.child.equippedAccessories).toEqual([accessoryId]);
+    const pair = await createPairingCode(parent, { kind: "android", label: "Accessory test", childId: first.id });
+    const paired = await exchangePairingCode(pair.code, null);
+    const device = (await deviceFromToken(paired.token))!;
+    expect((await launcherSnapshot(device)).buddy.cosmeticIds).toEqual([]);
+    expect(await launcherSnapshot(device, 2)).toMatchObject({ schemaVersion: 2, buddy: { cosmeticIds: [accessoryId], manifestVersion: 1 }, capabilities: { purchases: false, administration: false, taskCompletion: false } });
+    await changeBuddyEquipment(parent, first.id, { action: "unequip", accessoryId });
+    expect((await launcherSnapshot(device, 2)).buddy.cosmeticIds).toEqual([]);
+    expect((await getManagementData(parent)).children.find((c) => c.id === first.id)).toMatchObject({ ownedAccessories: [accessoryId], equippedAccessories: [] });
+    expect(await db().select().from(pointEntries).where(eq(pointEntries.familyId, familyId))).toEqual([]);
+    expect(await db().select().from(buddyOwnership).where(eq(buddyOwnership.familyId, familyId))).toHaveLength(1);
+  });
+  it("rejects cross-household, unowned, inactive and client-selected prices or unknown catalog IDs", async () => {
+    const parent = await actor(); const first = await child(parent); const other = await actor(otherFamilyId); const outsider = await child(other);
+    await expect(changeBuddyEquipment(parent, outsider.id, { action: "grant", accessoryId })).rejects.toMatchObject({ status: 404 });
+    await expect(changeBuddyEquipment(parent, first.id, { action: "grant", accessoryId, price: 0 })).rejects.toThrow();
+    await expect(changeBuddyEquipment(parent, first.id, { action: "grant", accessoryId: "unlisted" })).rejects.toThrow();
+    await changeBuddyEquipment(other, outsider.id, { action: "grant", accessoryId });
+    await expect(db().insert(buddyEquipment).values({ familyId, childId: first.id, accessoryId, slot: "chest" })).rejects.toThrow();
+    await expect(db().insert(buddyOwnership).values({ familyId, childId: outsider.id, accessoryId })).rejects.toThrow();
+    await archiveRecord(parent, "children", first.id);
+    await expect(changeBuddyEquipment(parent, first.id, { action: "grant", accessoryId })).rejects.toMatchObject({ status: 404 });
+  });
+  it("requires same-origin parent authentication and rejects Android even with a parent cookie", async () => {
+    const parent = await actor(); const first = await child(parent);
+    const context = { params: Promise.resolve({ id: first.id }) };
+    const send = (headers: Record<string, string> = {}) => postBuddy(new Request(`${origin}/api/parent/children/${first.id}/buddy`, {
+      method: "POST", headers: { origin, "content-type": "application/json", ...headers }, body: JSON.stringify({ action: "grant", accessoryId }),
+    }), context);
+    expect((await send()).status).toBe(401);
+    const pair = await createPairingCode(parent, { kind: "wall", label: "Wall" });
+    cookieState.set("kidsdaily_device", (await exchangePairingCode(pair.code, origin)).token);
+    expect((await send()).status).toBe(401);
+    cookieState.set("kidsdaily_parent", await loginParent({ email: parent.email, password }));
+    const phone = await createPairingCode(parent, { kind: "android", label: "Phone", childId: first.id });
+    const token = (await exchangePairingCode(phone.code, null)).token;
+    expect((await send({ authorization: `Bearer ${token}` })).status).toBe(403);
+    expect((await send({ origin: "https://other.example" })).status).toBe(403);
+    expect((await send()).status).toBe(200);
   });
 });

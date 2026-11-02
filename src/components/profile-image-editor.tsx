@@ -8,7 +8,7 @@ import type { BuddyKind } from "@/domain/plan";
 import { ProfilePicture } from "./profile-picture";
 
 export function ProfileImageEditor({ child, onDone, onCancel }: {
-  child: { id: string; name: string; imageUrl: string | null; buddyKind: BuddyKind };
+  child: { id: string; name: string; imageUrl: string | null; buddyKind: BuddyKind; equippedAccessories?: string[] };
   onDone: () => Promise<void>; onCancel: () => void;
 }) {
   const [selection, setSelection] = useState<{ file: File; url: string; width: number; height: number } | null>(null);
@@ -56,7 +56,7 @@ export function ProfileImageEditor({ child, onDone, onCancel }: {
     <h2>Profilbild für {child.name}</h2>
     <div className="image-editor-layout">
       {selection ? <ImageCropper key={selection.url} image={selection} crop={crop} setCrop={setCrop} disabled={busy} /> : <div className="image-crop-empty">
-        <div className="image-crop-preview"><ProfilePicture imageUrl={child.imageUrl} buddyKind={child.buddyKind} /></div>
+        <div className="image-crop-preview"><ProfilePicture imageUrl={child.imageUrl} buddyKind={child.buddyKind} equipped={child.equippedAccessories} /></div>
       </div>}
       <div className="image-upload-panel">
         <input ref={fileInput} type="file" hidden aria-label="Bilddatei" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={(event) => { void choose(event.target.files?.[0]); }} />

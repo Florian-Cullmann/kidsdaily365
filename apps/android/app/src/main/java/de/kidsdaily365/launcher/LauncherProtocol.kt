@@ -51,7 +51,7 @@ object LauncherProtocol {
     fun snapshot(raw: String): LauncherSnapshot = guarded {
         val o = JSONObject(raw)
         check(o.keys().asSequence().toSet() == setOf("schemaVersion", "syncedAt", "pollAfterSeconds", "device", "child", "stars", "buddy", "policy", "capabilities"))
-        check(o.integer("schemaVersion", 1, 1) == 1L)
+        val version = o.integer("schemaVersion", 1, 2).toInt()
         val syncedAt = o.string("syncedAt").also { Instant.parse(it) }
         check(o.integer("pollAfterSeconds", 5, 5) == 5L)
         val d = o.getJSONObject("device")
@@ -60,7 +60,13 @@ object LauncherProtocol {
         val p = o.getJSONObject("policy")
         val caps = o.getJSONObject("capabilities")
         check(b.string("kind") in setOf("fox", "rabbit", "bear"))
-        check(b.getJSONArray("cosmeticIds").length() == 0)
+        val cosmeticArray = b.getJSONArray("cosmeticIds")
+        check(cosmeticArray.length() <= 16)
+        if (version == 1) check(cosmeticArray.length() == 0)
+        if (version == 2) check(b.integer("manifestVersion", 1, 1) == 1L)
+        val cosmeticIds = (0 until cosmeticArray.length()).map {
+            (cosmeticArray.get(it) as? String ?: error("string")).also { id -> check(id.length in 1..80) }
+        }
         check(p.string("desiredMode") == "managed-launcher")
         listOf("blockCamera", "blockOverview", "blockNotifications", "blockQuickSettings").forEach { check(p.bool(it)) }
         listOf("taskCompletion", "administration", "purchases").forEach { check(!caps.bool(it)) }
@@ -74,9 +80,9 @@ object LauncherProtocol {
             AllowedApp(pkg, app.string("label", 100))
         }
         check(allowedApps.map { it.packageName }.toSet().size == allowedApps.size)
-        LauncherSnapshot(1, syncedAt, 5, Device(d.uuid("id"), d.string("label", 100)),
+        LauncherSnapshot(version, syncedAt, 5, Device(d.uuid("id"), d.string("label", 100)),
             Child(c.uuid("id"), c.string("name", 100), c.string("avatar", 20), c.bool("reducedMotion")),
-            o.integer("stars", 0, 9_007_199_254_740_991), Buddy(b.string("kind"), b.string("name", 100), emptyList()),
+            o.integer("stars", 0, 9_007_199_254_740_991), Buddy(b.string("kind"), b.string("name", 100), cosmeticIds),
             LauncherPolicy(p.string("revision", 256), allowedApps, "managed-launcher", true, true, true, true,
                 p.integer("maxOfflineSeconds", 86_400, 86_400).toInt()), LauncherCapabilities())
     }
@@ -86,7 +92,7 @@ object LauncherProtocol {
         put("device", JSONObject().put("id", s.device.id).put("label", s.device.label))
         put("child", JSONObject().put("id", s.child.id).put("name", s.child.name).put("avatar", s.child.avatar).put("reducedMotion", s.child.reducedMotion))
         put("stars", s.stars)
-        put("buddy", JSONObject().put("kind", s.buddy.kind).put("name", s.buddy.name).put("cosmeticIds", JSONArray(s.buddy.cosmeticIds)))
+        put("buddy", JSONObject().put("kind", s.buddy.kind).put("name", s.buddy.name).put("cosmeticIds", JSONArray(s.buddy.cosmeticIds)).apply { if (s.schemaVersion == 2) put("manifestVersion", 1) })
         put("policy", JSONObject().put("revision", s.policy.revision).put("desiredMode", s.policy.desiredMode)
             .put("blockCamera", s.policy.blockCamera).put("blockOverview", s.policy.blockOverview)
             .put("blockNotifications", s.policy.blockNotifications).put("blockQuickSettings", s.policy.blockQuickSettings)

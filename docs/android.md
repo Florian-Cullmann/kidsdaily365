@@ -70,6 +70,8 @@ Die Einrichtungs- und Build-Schritte stehen in [apps/android/README.md](../apps/
 }
 ```
 
+Version 1 bleibt der Standard für bestehende Geräte. `?version=2` ergänzt angelegte Buddy-Accessoires; siehe [Buddy-Vertrag und Zeichenflächen](buddy-accessories.md).
+
 Der versionierte Zod-Vertrag liegt in `src/domain/launcher.ts`, passende native DTOs in `LauncherModels.kt`, die strikte Validierung in `LauncherProtocol.kt`. Eine gemeinsame fiktive Vertragsdatei unter `contracts/launcher-v1.example.json` wird durch Kotlin und Zod geprüft. Der Snapshot enthält keine Aufgaben, Termine, Elternkonten, Geschwisterdaten oder Passworthashes. `policy` beschreibt den gewünschten Zustand, **nicht den Nachweis**, dass ein Telefon ihn bereits durchsetzt. `revision` ändert sich bei einer Änderung der aktiven App-Liste; andere Snapshot-Felder werden trotzdem bei jedem Abruf neu gelesen.
 
 Die App fragt im Vordergrund alle fünf Sekunden ab. Das ist ein begrenztes Polling-Intervall und noch kein Push/SSE. Der Sternestand kommt ausschließlich vom Server. Gerätestatus und Alter der letzten erfolgreichen Synchronisierung müssen sichtbar sein. Im lokalen LAN ist der Server direkt erreichbar; außerhalb braucht das Telefon einen eingerichteten, HTTPS-geschützten Zugang/VPN. Es gibt keinen automatischen Cloud-Relay.

@@ -19,3 +19,13 @@ export const launcherSnapshotSchema = z.object({
   capabilities: z.object({ taskCompletion: z.literal(false), administration: z.literal(false), purchases: z.literal(false) }),
 }).strict();
 export type LauncherSnapshot = z.infer<typeof launcherSnapshotSchema>;
+
+// V1 stays unchanged for installed launchers. V2 carries only equipped catalog IDs.
+export const launcherSnapshotV2Schema = launcherSnapshotSchema.extend({
+  schemaVersion: z.literal(2),
+  buddy: z.object({
+    kind: z.enum(["fox", "rabbit", "bear"]), name: z.string(),
+    cosmeticIds: z.array(z.string().min(1).max(80)).max(16),
+    manifestVersion: z.literal(1),
+  }).strict(),
+});
