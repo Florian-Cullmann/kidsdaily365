@@ -29,7 +29,7 @@ export const packageNameSchema = z.string().min(3).max(255)
   .refine((value) => !protectedPackages.has(value), "Diese System-App kann nicht freigegeben werden.");
 
 export const managementSchemas = {
-  children: z.object({ name, avatar: z.string().trim().min(1).max(3), buddyKind: z.enum(["fox", "rabbit", "bear"]), buddyName: name, reducedMotion: z.boolean().default(true), active }).strict(),
+  children: z.object({ name, avatar: z.string().trim().min(1).max(3), buddyKind: z.enum(["fox", "rabbit", "bear"]).optional(), buddyName: name.optional(), reducedMotion: z.boolean().default(true), active }).strict(),
   routines: z.object({ childId: uuid, title: name, section: taskFields.section, scheduledTime: taskFields.scheduledTime, sortOrder: taskFields.sortOrder, steps: z.array(routineStepSchema).min(1).max(50), active, weekdays: z.array(z.number().int().min(1).max(7)).min(1).max(7).refine((value) => new Set(value).size === value.length) }).strict(),
   tasks: z.object({ ...taskFields, date: z.iso.date() }).strict(),
   appointments: z.object({ childId: uuid, title: name, icon: z.enum(["calendar", "tooth", "ball", "heart"]), startsAt: z.iso.datetime({ offset: true }), endsAt: z.iso.datetime({ offset: true }).nullable().default(null), active }).strict().refine((value) => !value.endsAt || new Date(value.endsAt) > new Date(value.startsAt), "Das Ende muss nach dem Beginn liegen."),

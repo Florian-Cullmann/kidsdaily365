@@ -53,6 +53,21 @@ class HttpLauncherApiTest {
         override fun close() { socket.close(); worker.join(1000); failure?.let { throw AssertionError(it) } }
     }
 
+    @Test fun `buddy setup uses only its separate capability and fixed payload`() {
+        TestServer(Reply(body = "{\"initialized\":false}"), Reply(body = "{\"initialized\":true}")).use { server ->
+            val api = HttpLauncherApi(); val token = "b".repeat(43)
+            assertFalse(api.buddySetup(server.address, token))
+            assertEquals("GET /api/device/buddy-setup HTTP/1.1", server.take().line)
+            assertTrue(api.buddySetup(server.address, token, "bear", " Bruno "))
+            val request = server.take()
+            assertEquals("POST /api/device/buddy-setup HTTP/1.1", request.line)
+            assertEquals("Bearer $token", request.headers["authorization"])
+            assertNull(request.headers["cookie"])
+            assertEquals(setOf("kind", "name"), JSONObject(request.body).keys().asSequence().toSet())
+            assertEquals("Bruno", JSONObject(request.body).getString("name"))
+        }
+    }
+
     @Test fun `native pairing and reads use fixed endpoints without browser credentials`() {
         val pairing = JSONObject().put("token", "a".repeat(43)).put("deviceId", snapshotFixture().device.id)
             .put("kind", "android").put("expiresIn", 7776000).toString()

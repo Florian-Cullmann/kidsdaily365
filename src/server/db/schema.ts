@@ -22,6 +22,7 @@ export const children = pgTable("children", {
   reducedMotion: boolean().notNull().default(true),
   buddyKind: buddyKind().notNull().default("fox"),
   buddyName: text().notNull().default("Fino"),
+  buddyInitialized: boolean().notNull().default(true),
   active: boolean().notNull().default(true),
 }, (table) => [unique("children_family_identity").on(table.id, table.familyId)]);
 
@@ -174,6 +175,7 @@ export const devices = pgTable("devices", {
   kind: deviceKind().notNull(),
   label: text().notNull(),
   tokenHash: text().notNull().unique(),
+  buddySetupTokenHash: text().unique(),
   expiresAt: timestamp({ withTimezone: true }).notNull(),
   revokedAt: timestamp({ withTimezone: true }),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),

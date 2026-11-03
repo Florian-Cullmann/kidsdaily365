@@ -39,7 +39,7 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onCance
     const field = (key: string) => String(form.get(key) ?? "").trim();
     const active = form.get("active") === "on";
     let input: unknown;
-    if (resource === "children") input = { name: field("name"), avatar: field("avatar") || Array.from(field("name"))[0], buddyName: field("buddyName"), buddyKind: field("buddyKind"), reducedMotion: form.get("reducedMotion") === "on", active };
+    if (resource === "children") input = { name: field("name"), avatar: field("avatar") || Array.from(field("name"))[0], ...(record?.buddyInitialized === true ? { buddyName: field("buddyName"), buddyKind: field("buddyKind") } : {}), reducedMotion: form.get("reducedMotion") === "on", active };
     else if (isTask) {
       const fields = { childId: field("childId"), title: field("title"), description: field("description"), icon: field("icon") || "heart", section: field("section"), scheduledTime: field("scheduledTime") || null, points: Number(field("points")), sortOrder: Number(field("sortOrder")) };
       input = resource === "routines" ? { childId: fields.childId, title: fields.title, section: fields.section, scheduledTime: fields.scheduledTime, sortOrder: fields.sortOrder, steps, active, weekdays: form.getAll("weekdays").map(Number) } : { ...fields, date: field("date") };
@@ -56,8 +56,10 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onCance
       {resource === "children" && <>
         <label>Name<input name="name" defaultValue={text("name")} required maxLength={80} autoComplete="off" /></label>
         <label>Profilkürzel<input name="avatar" defaultValue={text("avatar")} maxLength={3} placeholder="z. B. M" /></label>
+        {record?.buddyInitialized === true ? <>
         <label>Buddy<select name="buddyKind" defaultValue={text("buddyKind", "fox")}><option value="fox">Fuchs</option><option value="rabbit">Hase</option><option value="bear">Bär</option></select></label>
         <label>Name des Buddys<input name="buddyName" defaultValue={text("buddyName", "Fino")} required maxLength={80} /></label>
+        </> : <p>Dein Kind wählt und benennt seinen Buddy nach dem Verbinden selbst auf seinem Android-Gerät.</p>}
         <label className="check-field"><input name="reducedMotion" type="checkbox" defaultChecked={record?.reducedMotion !== false} /><span>Bewegungsarme Darstellung</span></label>
       </>}
       {(isTask || resource === "appointments" || resource === "rewards") && <label className="wide-field">{resource === "rewards" ? "Wunsch oder Belohnung" : "Bezeichnung"}<input name="title" defaultValue={text("title")} required maxLength={80} /></label>}

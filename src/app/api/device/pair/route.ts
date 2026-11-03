@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const { code, kind } = z.object({ code: z.string().trim().min(1).max(256), kind: z.enum(["wall", "android"]).optional() }).strict().parse(await inputJson(request));
     const result = await exchangePairingCode(code, origin, kind);
     if (result.kind === "android") {
-      return NextResponse.json({ token: result.token, deviceId: result.id, kind: result.kind, expiresIn: deviceSessionSeconds });
+      return NextResponse.json({ token: result.token, deviceId: result.id, kind: result.kind, expiresIn: deviceSessionSeconds, buddySetupToken: result.buddySetupToken });
     }
     const response = NextResponse.json({ ok: true, kind: result.kind });
     response.cookies.set(deviceCookie, result.token, cookieOptions(deviceSessionSeconds));

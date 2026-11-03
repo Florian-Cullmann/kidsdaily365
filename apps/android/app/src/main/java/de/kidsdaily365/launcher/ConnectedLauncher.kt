@@ -21,11 +21,11 @@ interface PrivateStore {
 
 data class LauncherView(val paired: Boolean, val snapshot: LauncherSnapshot?, val canLaunch: Boolean,
     val status: String, val receivedAt: Long?, val validFromElapsed: Long = 0,
-    val validUntilElapsed: Long = 0, val tokenExpiresAt: Long = 0)
+    val validUntilElapsed: Long = 0, val tokenExpiresAt: Long = 0, val buddySetupPending: Boolean = false)
 
 private data class Connection(val server: ServerAddress, val token: String, val deviceId: String,
     val expiresAt: Long, val childId: String? = null, val snapshot: LauncherSnapshot? = null,
-    val receivedAt: Long = 0, val elapsedAt: Long = -1, val bootCount: Int = -1)
+    val receivedAt: Long = 0, val elapsedAt: Long = -1, val bootCount: Int = -1, val buddySetupToken: String? = null)
 
 /** One application-scoped repository serializes reset, pairing and refresh, including Activity recreation. */
 class ConnectedLauncher(private val api: LauncherApi, private val store: PrivateStore,
@@ -46,7 +46,7 @@ class ConnectedLauncher(private val api: LauncherApi, private val store: Private
         val pairing = api.pair(server, code)
         access.requirePairingAllowed()
         // Persist immediately: a consumed one-use code must survive a failed first snapshot request.
-        val next = Connection(server, pairing.token, pairing.deviceId, clock.wallMillis() + pairing.expiresIn * 1000)
+        val next = Connection(server, pairing.token, pairing.deviceId, clock.wallMillis() + pairing.expiresIn * 1000, buddySetupToken = pairing.buddySetupToken)
         save(next)
         message = "Verbunden. Daten werden geladen …"
         view()
@@ -60,9 +60,10 @@ class ConnectedLauncher(private val api: LauncherApi, private val store: Private
             return@locked view()
         }
         try {
+            val setupToken = previous.buddySetupToken?.takeUnless { api.buddySetup(previous.server, it) }
             val snapshot = api.snapshot(previous.server, previous.token)
             if (snapshot.device.id != previous.deviceId || (previous.childId != null && snapshot.child.id != previous.childId)) throw ProtocolFailure()
-            save(previous.copy(childId = snapshot.child.id, snapshot = snapshot, receivedAt = clock.wallMillis(),
+            save(previous.copy(buddySetupToken = setupToken, childId = snapshot.child.id, snapshot = snapshot, receivedAt = clock.wallMillis(),
                 elapsedAt = clock.elapsedMillis(), bootCount = clock.bootCount()))
             message = "Mit dem Server verbunden"
         } catch (_: AccessRevoked) {
@@ -75,6 +76,16 @@ class ConnectedLauncher(private val api: LauncherApi, private val store: Private
             if (connection != null) message = "Server gerade nicht erreichbar · letzter gespeicherter Stand"
         }
         view()
+    }
+
+    suspend fun completeBuddy(kind: String, name: String): LauncherView {
+        locked {
+            load()
+            val c = connection ?: throw IllegalArgumentException("Bitte das Gerät erneut verbinden.")
+            val token = c.buddySetupToken ?: return@locked
+            if (api.buddySetup(c.server, token, kind, name)) save(c.copy(buddySetupToken = null))
+        }
+        return refresh()
     }
 
     suspend fun reset(): LauncherView = locked { access.requireOpen(); load(); disconnect("Verbindung getrennt."); view() }
@@ -100,7 +111,8 @@ class ConnectedLauncher(private val api: LauncherApi, private val store: Private
             val deviceId = o.getString("deviceId")
             check(snapshot == null || (snapshot.device.id == deviceId && snapshot.child.id == childId))
             connection = Connection(ServerAddress.parse(o.getString("server"), debug), token, deviceId,
-                o.getLong("expiresAt"), childId, snapshot, o.getLong("receivedAt"), o.getLong("elapsedAt"), o.getInt("bootCount"))
+                o.getLong("expiresAt"), childId, snapshot, o.getLong("receivedAt"), o.getLong("elapsedAt"), o.getInt("bootCount"),
+                if (o.isNull("buddySetupToken")) null else o.getString("buddySetupToken").also { check(LauncherProtocol.validToken(it)) })
             message = "Gespeicherter Stand · Verbindung wird geprüft"
         } catch (_: Exception) {
             disconnect("Gespeicherte Verbindung nicht lesbar. Bitte neu verbinden.")
@@ -109,6 +121,7 @@ class ConnectedLauncher(private val api: LauncherApi, private val store: Private
 
     private fun save(next: Connection) {
         val raw = JSONObject().put("version", 1).put("server", next.server.origin).put("token", next.token)
+            .put("buddySetupToken", next.buddySetupToken ?: JSONObject.NULL)
             .put("deviceId", next.deviceId).put("expiresAt", next.expiresAt).put("childId", next.childId ?: JSONObject.NULL)
             .put("snapshot", next.snapshot?.let { LauncherProtocol.encode(it) } ?: JSONObject.NULL)
             .put("receivedAt", next.receivedAt).put("elapsedAt", next.elapsedAt).put("bootCount", next.bootCount).toString()
@@ -140,6 +153,6 @@ class ConnectedLauncher(private val api: LauncherApi, private val store: Private
         val status = if (c?.snapshot != null && !valid) "Freigaben müssen online bestätigt werden. App-Starts pausiert." else message
         return LauncherView(c != null, c?.snapshot, valid, status, c?.receivedAt?.takeIf { it > 0 },
             c?.elapsedAt ?: 0, c?.let { it.elapsedAt + (it.snapshot?.policy?.maxOfflineSeconds ?: 0) * 1000L } ?: 0,
-            c?.expiresAt ?: 0)
+            c?.expiresAt ?: 0, c?.buddySetupToken != null)
     }
 }
