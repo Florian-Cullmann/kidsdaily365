@@ -29,9 +29,11 @@ import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
 
-/** Normal HOME entry point only. Device Owner and real system restrictions remain in issue #2. */
+/** HOME entry point for both unprovisioned preview and explicit Device Owner operation. */
 class MainActivity : Activity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val app get() = application as LauncherApplication
+    private val policy get() = app.policy
     private val repository get() = (application as LauncherApplication).repository
     private var polling: Job? = null
     private var operation: Job? = null
@@ -77,6 +79,12 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        policy.returnedHome()
+        if (policy.enabled && policy.owner) {
+            startForegroundService(android.content.Intent(this, PolicyService::class.java))
+            policy.reconcile(app.managedView, ensureHome = false)
+            policy.enter(this)
+        }
         active = true
         lastSnapshot = null // Recheck app installation/availability after returning from another app.
         lastRendered = null
@@ -104,8 +112,15 @@ class MainActivity : Activity() {
                 maintenance.rememberTarget(repository.maintenanceTarget())
                 var tick = 0
                 while (true) {
-                    var view = repository.current()
-                    if (view.paired && tick % 5 == 0) view = repository.refresh()
+                    var view = if (policy.enabled) app.managedView ?: LauncherView(false, null, false, "Freigaben werden geprüft …", null)
+                        else repository.current()
+                    if (!policy.enabled && view.paired && tick % 5 == 0) view = repository.refresh()
+                    if (policy.enabled) {
+                        val valid = view.canLaunch && policy.error == null && android.os.SystemClock.elapsedRealtime() < view.validUntilElapsed &&
+                            System.currentTimeMillis() < view.tokenExpiresAt
+                        view = view.copy(canLaunch = valid, status = if (view.canLaunch && !valid)
+                            "Freigaben müssen bestätigt werden. Apps bleiben gesperrt." else view.status)
+                    }
                     parentStatus = maintenance.status()
                     render(view)
                     tick++
@@ -118,15 +133,21 @@ class MainActivity : Activity() {
     private fun render(state: LauncherView) {
         val mayPair = parentStatus?.let { !it.configured && !it.damaged } == true || (showPairing && maintenance.isOpen())
         val nextKind = if (state.paired) 1 else if (mayPair) 0 else 2
-        if (layoutKind == nextKind && lastRendered == state) return
+        val mode = when {
+            policy.error != null -> policy.error!!
+            policy.enabled && policy.owner -> "Verwalteter Kindermodus"
+            else -> getString(R.string.unmanaged)
+        }
+        if (layoutKind == nextKind && lastRendered == state && (content.getChildAt(0) as? TextView)?.text == mode) return
         lastRendered = state
         if (content.childCount == 0 || layoutKind != nextKind) {
             content.removeAllViews()
             layoutKind = nextKind
             lastSnapshot = null
-            content.addView(text(getString(R.string.unmanaged), 14f, Color.rgb(126, 65, 77)))
+            content.addView(text(mode, 14f, Color.rgb(126, 65, 77)))
             when (nextKind) { 1 -> buildHome(); 0 -> buildPairing(); else -> buildDisconnected() }
         }
+        (content.getChildAt(0) as? TextView)?.text = mode
         val sync = state.receivedAt?.let { getString(R.string.last_sync, DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it))) }.orEmpty()
         connectionStatus.text = listOf(state.status, sync).filter { it.isNotEmpty() }.joinToString("\n")
         val snapshot = state.snapshot
@@ -151,7 +172,7 @@ class MainActivity : Activity() {
                                 }
                                 val intent = packageManager.getLaunchIntentForPackage(app.packageName)
                                 try {
-                                    if (intent != null) startActivity(intent) else throw ActivityNotFoundException()
+                                    if (intent != null) policy.launch(this@MainActivity, app.packageName) else throw ActivityNotFoundException()
                                 } catch (_: ActivityNotFoundException) { Toast.makeText(this@MainActivity, R.string.app_missing, Toast.LENGTH_LONG).show() }
                                 catch (_: SecurityException) { Toast.makeText(this@MainActivity, R.string.app_missing, Toast.LENGTH_LONG).show() }
                             }
@@ -183,6 +204,7 @@ class MainActivity : Activity() {
         connectionStatus = text("", 14f); content.addView(connectionStatus)
         content.addView(button(getString(R.string.retry)) { startPolling() })
         content.addView(button("Elternzugang") { parentPanel.open() })
+        addEmergencyButton()
     }
 
     private fun buildDisconnected() {
@@ -191,6 +213,19 @@ class MainActivity : Activity() {
         content.addView(text("Ein Elternteil kann den Zugang öffnen und dieses Handy neu koppeln. Der Eltern-Code funktioniert auch ohne Server.", 18f))
         connectionStatus = text("", 16f); content.addView(connectionStatus)
         content.addView(button("Elternzugang") { parentPanel.open() })
+        addEmergencyButton()
+    }
+
+    private fun addEmergencyButton() {
+        // Android's emergency-only dialer action; never grant a general phone app to Lock Task.
+        val intent = android.content.Intent("com.android.phone.EmergencyDialer.DIAL")
+        val handler = packageManager.resolveActivity(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY) ?: return
+        if (handler.activityInfo.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM == 0) return
+        intent.setPackage(handler.activityInfo.packageName)
+        content.addView(button("Notruf") {
+            try { startActivity(intent) }
+            catch (_: Exception) { Toast.makeText(this, "Notruf über das Power-Menü öffnen.", Toast.LENGTH_LONG).show() }
+        })
     }
 
     private fun buildPairing() {
@@ -231,6 +266,7 @@ class MainActivity : Activity() {
         }; content.addView(pairButton)
         connectionStatus = text("", 16f); content.addView(connectionStatus)
         if (parentStatus?.target != null) content.addView(button("Elternzugang") { parentPanel.open() })
+        addEmergencyButton()
         if (BuildConfig.DEBUG) content.addView(text(getString(R.string.debug_http), 14f))
     }
 

@@ -5,6 +5,8 @@ import android.os.SystemClock
 import android.provider.Settings
 
 class LauncherApplication : Application() {
+    val policy by lazy { DevicePolicyController(this, maintenance) }
+    var managedView: LauncherView? = null
     private val clock = object : LauncherClock {
         override fun wallMillis() = System.currentTimeMillis()
         override fun elapsedMillis() = SystemClock.elapsedRealtime()

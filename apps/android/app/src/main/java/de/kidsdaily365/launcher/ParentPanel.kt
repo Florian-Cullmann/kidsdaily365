@@ -2,8 +2,6 @@ package de.kidsdaily365.launcher
 
 import android.app.Activity
 import android.app.AlertDialog
-import android.content.Intent
-import android.provider.Settings
 import android.text.InputType
 import android.text.InputFilter
 import android.view.View
@@ -23,6 +21,7 @@ import kotlinx.coroutines.launch
 class ParentPanel(private val activity: Activity, private val scope: CoroutineScope,
     private val maintenance: MaintenanceController, private val repository: ConnectedLauncher,
     private val reconnect: () -> Unit, private val changed: () -> Unit) {
+    private val policy get() = (activity.application as LauncherApplication).policy
     private var dialog: AlertDialog? = null
     private var ticker: Job? = null
     private fun label(value: String) = TextView(activity).apply { text = value; textSize = 17f; setPadding(8, 14, 8, 14) }
@@ -114,10 +113,27 @@ class ParentPanel(private val activity: Activity, private val scope: CoroutineSc
     private fun actions() {
         maintenance.requireOpen()
         val content = box(); val remaining = label(""); content.addView(remaining)
-        content.addView(label("Die Vorschau erzwingt noch keine Android-Systemsperren. Diese Freigabe schützt die Verwaltungsfunktionen innerhalb von KidsDaily."))
+        content.addView(label(if (policy.enabled) "Verwalteter Kindermodus. Systemeinstellungen öffnen eine zeitlich begrenzte Wartung; nach spätestens fünf Minuten kehrt das Handy zum Kindermodus zurück."
+            else "Die Gerätesperren brauchen ein ausdrücklich als Device Owner eingerichtetes Handy und einen sicher aufbewahrten Eltern-Code."))
+        if (policy.owner && !policy.enabled) button("Gerätesperren aktivieren", content) {
+            AlertDialog.Builder(activity).setTitle("Verwalteten Kindermodus aktivieren?")
+                .setMessage("Nur auf einem dafür vorgesehenen Gerät aktivieren. Eltern-Code sicher außerhalb des Handys aufbewahren. Prüfe anschließend Offline-Wartung und Notruf am Gerät. Kamera, Systemleisten und nicht freigegebene Apps werden gesperrt.")
+                .setNegativeButton("Abbrechen", null)
+                .setPositiveButton("Aktivieren") { _, _ -> scope.launch { attempt(remaining) {
+                    policy.activate(activity, repository.current()); dismiss(); changed()
+                } } }.show()
+        }
+        if (policy.enabled) button("Gerätesperren ausschalten", content) {
+            AlertDialog.Builder(activity).setTitle("Gerätesperren ausschalten?")
+                .setMessage("Das Handy ist danach ungeschützt. Device Owner bleibt eingerichtet; du kannst die Sperren später wieder aktivieren.")
+                .setNegativeButton("Abbrechen", null)
+                .setPositiveButton("Ausschalten") { _, _ -> scope.launch { attempt(remaining) {
+                    policy.deactivate(activity); dismiss(); changed()
+                } } }.show()
+        }
         button("Eltern-Code ändern", content) { scope.launch { attempt(remaining) { maintenance.requireOpen(); setup(true) } } }
         button("Systemeinstellungen öffnen", content) { scope.launch { attempt(remaining) {
-            maintenance.requireOpen(); activity.startActivity(Intent(Settings.ACTION_SETTINGS))
+            maintenance.requireOpen(); policy.openSettings(activity)
         } } }
         button("Handy verbinden", content) { scope.launch { attempt(remaining) {
             maintenance.requireOpen()
