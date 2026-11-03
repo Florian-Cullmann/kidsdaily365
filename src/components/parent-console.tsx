@@ -1,5 +1,6 @@
 "use client";
 
+import { EndAppointmentSeries, type EndSeriesPreview } from "./end-appointment-series";
 import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
 import { BookOpen, CalendarDays, Check, ClipboardList, Gift, House, LayoutGrid, LogOut, MonitorSmartphone, Plus, Settings, ShieldCheck, Smartphone, Users } from "lucide-react";
@@ -50,6 +51,7 @@ async function request(url: string, method = "GET", body?: unknown) {
 export function ParentConsole({ parent, initialData, initialTab = "overview" }: { parent: ParentActor; initialData: ManagementData; initialTab?: Tab }) {
   const router = useRouter();
   const pending = useRef(false);
+  const [seriesPreview, setSeriesPreview] = useState<EndSeriesPreview | null>(null);
   const [data, setData] = useState(initialData);
   const [tab, setTab] = useState<Tab>(initialTab);
   const [editing, setEditing] = useState<EditableRecord | null>(null);
@@ -67,7 +69,7 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
   const activeChildren = data.children.filter((child) => child.active).length;
   const isResource = !["overview", "devices", "account"].includes(tab);
 
-  function navigate(id: Tab) { setBuddyChildId(null); setImageChildId(null); setTab(id); setFormOpen(false); setEditing(null); setError(""); setNotice(""); setIssuedCode(null); }
+  function navigate(id: Tab) { setSeriesPreview(null); setBuddyChildId(null); setImageChildId(null); setTab(id); setFormOpen(false); setEditing(null); setError(""); setNotice(""); setIssuedCode(null); }
   function createRecord(resource: Resource) {
     navigate(resource); setEditing(null); setFormOpen(true);
   }
@@ -87,6 +89,25 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
     await action(async () => {
       await request(`/api/parent/records/${tab}${editing ? `/${editing.id}` : ""}`, editing ? "PUT" : "POST", input);
       await refresh(); setFormOpen(false); setEditing(null); setNotice("Gespeichert.");
+    });
+  }
+  async function saveSeries(input: unknown) {
+    await action(async () => {
+      await request("/api/parent/appointment-series", "POST", input);
+      await refresh(); setFormOpen(false); setEditing(null); setNotice("Terminserie gespeichert.");
+    });
+  }
+  async function showSeriesEnd(id: string) {
+    await action(async () => {
+      const preview = await request(`/api/parent/appointment-series/${id}`);
+      setFormOpen(false); setSeriesPreview(preview);
+    });
+  }
+  async function confirmSeriesEnd() {
+    if (!seriesPreview) return;
+    await action(async () => {
+      await request(`/api/parent/appointment-series/${seriesPreview.id}`, "POST", { version: seriesPreview.version });
+      await refresh(); setSeriesPreview(null); setNotice("Serie beendet. Vergangene und laufende Termine bleiben erhalten.");
     });
   }
   async function archive(record: EditableRecord) {
@@ -121,7 +142,7 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
       <div className="parent-sidebar-bottom"><Link href="/">Zum Kinderbildschirm</Link><button disabled={busy} onClick={() => action(async () => { await request("/api/auth/logout", "POST"); router.replace("/login"); router.refresh(); })}><LogOut size={18} /> Abmelden</button></div>
     </aside>
     <main className="parent-main"><header className="parent-topbar"><span>{data.family.name}</span><span><ShieldCheck size={17} /> Angemeldet als {parent.name}</span></header>
-      <div className="parent-title"><div><h1>{selected.label}</h1><p>{descriptions[tab]}</p></div>{isResource && !formOpen && <button className="parent-primary" onClick={() => { setBuddyChildId(null); setImageChildId(null); setEditing(null); setFormOpen(true); setError(""); }}><Plus size={20} />{tab === "children" ? "Kind hinzufügen" : "Neu anlegen"}</button>}</div>
+      <div className="parent-title"><div><h1>{selected.label}</h1><p>{descriptions[tab]}</p></div>{isResource && !formOpen && <button className="parent-primary" onClick={() => { setBuddyChildId(null); setImageChildId(null); setSeriesPreview(null); setEditing(null); setFormOpen(true); setError(""); }}><Plus size={20} />{tab === "children" ? "Kind hinzufügen" : "Neu anlegen"}</button>}</div>
       <div className="parent-feedback" aria-live="polite">{notice && <p className="parent-success"><Check size={19} />{notice}</p>}<p className="parent-error" role="alert">{error}</p></div>
 
       {tab === "overview" && <>
@@ -143,11 +164,12 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
         {tab === "rewards" && <div className="parent-callout">Das Einlösen von Wünschen und der Kauf von Buddy-Accessoires sind noch nicht verfügbar. Hier werden keine Sterne abgezogen.</div>}
         {buddyChild && <BuddyWardrobe child={buddyChild} busy={busy} onClose={() => setBuddyChildId(null)} onAction={(accessoryId, command) => action(async () => { await request(`/api/parent/children/${buddyChild.id}/buddy`, "POST", { accessoryId, action: command }); await refresh(); setNotice("Buddy-Ausstattung gespeichert."); })} />}
         {imageChild && <ProfileImageEditor key={imageChild.id} child={imageChild} onCancel={() => setImageChildId(null)} onDone={async () => { await refresh(); setImageChildId(null); setNotice("Profilbild aktualisiert."); }} />}
-        {formOpen && <ParentRecordForm key={`${tab}-${editing?.id ?? "new"}`} resource={tab as Resource} data={data} record={editing} busy={busy} onSave={save} onCancel={() => setFormOpen(false)} />}
+        {tab === "appointments" && seriesPreview && <EndAppointmentSeries preview={seriesPreview} childName={childName(seriesPreview.childId)} timezone={data.family.timezone} busy={busy} onConfirm={confirmSeriesEnd} onCancel={() => setSeriesPreview(null)} />}
+        {formOpen && <ParentRecordForm key={`${tab}-${editing?.id ?? "new"}`} resource={tab as Resource} data={data} record={editing} busy={busy} onSave={save} onSaveSeries={saveSeries} onCancel={() => setFormOpen(false)} />}
         <div className="parent-records">{(data[tab as Resource] as unknown as EditableRecord[]).map((record) => <article key={record.id} className={`parent-record ${record.active === false ? "is-archived" : ""}`}>
           {tab === "children" && <div className="record-buddy"><ProfilePicture imageUrl={record.imageUrl as string | null} buddyKind={record.buddyKind as "fox" | "rabbit" | "bear"} equipped={record.equippedAccessories as string[]} /></div>}
-          <div className="record-description"><h3>{String(record.name ?? record.title ?? record.label)}</h3><p>{tab === "children" ? (record.buddyInitialized === false ? "Buddy wählt das Kind auf Android" : `Buddy: ${record.buddyName}`) : tab === "apps" ? `${childName(record.childId)} · ${record.packageName}` : tab === "appointments" ? `${childName(record.childId)} · ${new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short", timeZone: data.family.timezone }).format(new Date(String(record.startsAt)))}` : tab === "routines" ? `${childName(record.childId)} · ${(record.steps as unknown[]).length} Schritte` : tab === "rewards" ? `${record.cost} Sterne` : `${childName(record.childId)} · ${record.points} Sterne${tab === "tasks" ? ` · ${record.date}` : ""}`}</p>{record.active === false && <span className="archive-label">Archiviert</span>}{record.completed === true && <span className="archive-label">Erledigt · Verlauf geschützt</span>}</div>
-          <div className="record-actions">{tab === "children" && record.active !== false && <button disabled={busy} onClick={() => { setBuddyChildId(record.id); setImageChildId(null); setFormOpen(false); setError(""); }}>Ausstattung</button>}{tab === "children" && record.active !== false && <button disabled={busy} onClick={() => { setBuddyChildId(null); setImageChildId(record.id); setFormOpen(false); setError(""); }}>Profilbild</button>}<button disabled={busy || record.completed === true} onClick={() => { setBuddyChildId(null); setImageChildId(null); setEditing(record); setFormOpen(true); setError(""); }}>Bearbeiten</button>{record.active !== false && record.completed !== true && <button className="quiet-danger" disabled={busy} onClick={() => archive(record)}>{tab === "tasks" ? "Aus Plan nehmen" : "Archivieren"}</button>}</div>
+          <div className="record-description"><h3>{String(record.name ?? record.title ?? record.label)}</h3><p>{tab === "children" ? (record.buddyInitialized === false ? "Buddy wählt das Kind auf Android" : `Buddy: ${record.buddyName}`) : tab === "apps" ? `${childName(record.childId)} · ${record.packageName}` : tab === "appointments" ? `${childName(record.childId)} · ${new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short", timeZone: data.family.timezone }).format(new Date(String(record.startsAt)))}` : tab === "routines" ? `${childName(record.childId)} · ${(record.steps as unknown[]).length} Schritte` : tab === "rewards" ? `${record.cost} Sterne` : `${childName(record.childId)} · ${record.points} Sterne${tab === "tasks" ? ` · ${record.date}` : ""}`}</p>{record.seriesId ? <span className="archive-label">Wöchentliche Serie · einzelnes Vorkommen</span> : null}{record.active === false && <span className="archive-label">Archiviert</span>}{record.completed === true && <span className="archive-label">Erledigt · Verlauf geschützt</span>}</div>
+          <div className="record-actions">{tab === "appointments" && typeof record.seriesId === "string" && <button disabled={busy} onClick={() => showSeriesEnd(String(record.seriesId))}>Serie beenden …</button>}{tab === "children" && record.active !== false && <button disabled={busy} onClick={() => { setBuddyChildId(record.id); setImageChildId(null); setFormOpen(false); setError(""); }}>Ausstattung</button>}{tab === "children" && record.active !== false && <button disabled={busy} onClick={() => { setBuddyChildId(null); setImageChildId(record.id); setFormOpen(false); setError(""); }}>Profilbild</button>}<button disabled={busy || record.completed === true} onClick={() => { setBuddyChildId(null); setImageChildId(null); setSeriesPreview(null); setEditing(record); setFormOpen(true); setError(""); }}>Bearbeiten</button>{record.active !== false && record.completed !== true && <button className="quiet-danger" disabled={busy} onClick={() => archive(record)}>{tab === "tasks" ? "Aus Plan nehmen" : tab === "appointments" ? "Termin absagen" : "Archivieren"}</button>}</div>
         </article>)}{!formOpen && !data[tab as Resource].length && <div className="parent-empty"><selected.icon size={35} /><h3>{emptyMessages[tab as Resource]}</h3></div>}</div>
       </>}
 
