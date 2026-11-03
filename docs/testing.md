@@ -6,7 +6,7 @@
 - **Manueller Live-Test:** `APP_MODE=live` mit eigener PostgreSQL-Datenbank. Profile und Fortschritt bleiben bestehen. Zuerst fiktive Namen verwenden, bis Einrichtung und Backups geprüft sind.
 - **Automatische Tests:** ausschließlich eine separate, wegwerfbare Datenbank mit Namen `*_test`. Der HTTP-Smoke-Test entfernt den gesamten zugehörigen Testhaushalt. Niemals die Datenbank für euren manuellen Test oder eure Familie dafür verwenden.
 
-Die Web-/Backend-Tests und das native Grundgerüst können jetzt geprüft werden. Die tatsächliche Android-Gerätesperre ist noch nicht implementiert und kann deshalb noch nicht als Schutz auf einem Kinderhandy abgenommen werden.
+Die Web-/Backend-Tests und das native Grundgerüst können jetzt geprüft werden. Der Device Policy Controller ist implementiert und wird im separaten Emulator geprüft. Die physische Herstellergeräte-Abnahme steht noch aus; siehe [Abnahmematrix](android-device-acceptance.md).
 
 ## 1. Elternzugang und Profile
 
@@ -47,7 +47,7 @@ Wenn der Browser auf einem anderen Rechner über die Server-IP zugreift, muss `A
 
 ## 4. Android: Was jetzt prüfbar ist
 
-Die native App unter `apps/android/` verbindet sich mit dem Backend, zeigt Buddy und Live-Sterne und öffnet konfigurierte installierte Apps. Sie bleibt eine **ungeschützte Vorschau**. Eine Installation aktiviert keine Device-Owner- oder Systemsperren.
+Die native App unter `apps/android/` verbindet sich mit dem Backend, zeigt Buddy und Live-Sterne und öffnet konfigurierte installierte Apps. Ohne ausdrückliche Provisionierung und lokale Elternaktivierung bleibt sie eine **ungeschützte Vorschau**. Eine Installation allein aktiviert keine Device-Owner- oder Systemsperren.
 
 Mit JDK 17 und Android SDK 36:
 
@@ -70,7 +70,7 @@ Für einen getrennten Entwicklungs-Emulator oder ein bewusst vorgesehenes Testge
 
 JVM-Tests prüfen zusätzlich 24-Stunden-Grenze und Uhrenrückstellung, Neustart/Boot-Wechsel, falsches Kind/Gerät, unbekannte Versionen, unzulässige Berechtigungen/Pakete, Token-Widerruf, Speicherfehler, gleichzeitige Trennung/Synchronisierung sowie reale Loopback-HTTP-Requests ohne Browsercookies oder Redirect-Folgen. Diese Tests ersetzen keine echte Geräte-Sicherheitsabnahme. Die automatischen Backend-HTTP-Tests prüfen weiterhin Live-Sterne und die getrennten Schreibrechte.
 
-Die echten Tests für Recents, Kamera, Quick Settings, Benachrichtigungen, Autostart, Offline-Policy, erlaubte Apps und elterliche Wiederherstellung folgen in [Issue #2](https://github.com/Florian-Cullmann/kidsdaily365/issues/2). Mindestplattform Android 13; LineageOS und HyperOS getrennt abnehmen. Siehe [Android-Konzept](android.md).
+Die noch offenen physischen Tests für Recents, Kamera, Quick Settings, Benachrichtigungen, Autostart, Offline-Policy, erlaubte Apps und elterliche Wiederherstellung stehen in [Issue #2](https://github.com/Florian-Cullmann/kidsdaily365/issues/2). Mindestplattform Android 13; LineageOS und HyperOS getrennt abnehmen. Siehe [Android-Konzept](android.md).
 
 ## 5. Automatische Prüfungen
 

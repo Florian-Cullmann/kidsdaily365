@@ -20,7 +20,8 @@ interface PrivateStore {
 }
 
 data class LauncherView(val paired: Boolean, val snapshot: LauncherSnapshot?, val canLaunch: Boolean,
-    val status: String, val receivedAt: Long?)
+    val status: String, val receivedAt: Long?, val validFromElapsed: Long = 0,
+    val validUntilElapsed: Long = 0, val tokenExpiresAt: Long = 0)
 
 private data class Connection(val server: ServerAddress, val token: String, val deviceId: String,
     val expiresAt: Long, val childId: String? = null, val snapshot: LauncherSnapshot? = null,
@@ -137,6 +138,8 @@ class ConnectedLauncher(private val api: LauncherApi, private val store: Private
         val c = connection
         val valid = validCache()
         val status = if (c?.snapshot != null && !valid) "Freigaben müssen online bestätigt werden. App-Starts pausiert." else message
-        return LauncherView(c != null, c?.snapshot, valid, status, c?.receivedAt?.takeIf { it > 0 })
+        return LauncherView(c != null, c?.snapshot, valid, status, c?.receivedAt?.takeIf { it > 0 },
+            c?.elapsedAt ?: 0, c?.let { it.elapsedAt + (it.snapshot?.policy?.maxOfflineSeconds ?: 0) * 1000L } ?: 0,
+            c?.expiresAt ?: 0)
     }
 }

@@ -14,7 +14,7 @@ Eine selbst gehostete Familien-App für neurodivergente Kinder: eigener Buddy, �
 - Wandbildschirme und Android-Geräte einzeln freigeben und sperren. Android-Geräte gehören genau einem Kind und haben keine Schreibrechte.
 - Lokaler Android-Elternzugang mit Offline-Wartung, einmaliger Eltern-Bestätigung zur Einrichtung und begrenzten Fehlversuchen.
 - App-Freigaben je Kind im Elternbereich; Audible als erste Freigabe bei neuen Profilen.
-- Launcher-API für Buddy, Sternestand und App-Liste. Das native Projekt unter `apps/android/` ist eine **ungeschützte Vorschau** mit Gerätecode-Kopplung, Keystore-Speicher und Live-Sternen. Echte Gerätesperren folgen in [Issue #2](https://github.com/Florian-Cullmann/kidsdaily365/issues/2).
+- Launcher-API für Buddy, Sternestand und App-Liste. Das native Projekt unter `apps/android/` bleibt ohne Provisionierung ungeschützt. Auf ausdrücklich eingerichteten Device-Owner-Geräten stehen Lock Task, Kamera-/Systemleisten-Sperren und Offline-Wartung bereit; die physische Geräteabnahme aus [Issue #2](https://github.com/Florian-Cullmann/kidsdaily365/issues/2) steht noch aus. [Provisionierung und Recovery](apps/android/README.md#device-owner-bewusst-provisionieren).
 
 Belohnungseinlösung und [Buddy-Kosmetik](https://github.com/Florian-Cullmann/kidsdaily365/issues/3) sind noch nicht umgesetzt. Es gibt keine Werbung, zufälligen Belohnungen, Streak-Strafen, externen Fonts oder automatisch gestarteten Sounds. [Illustrationen und Prompts](docs/illustrations.md) liegen im Projekt.
 

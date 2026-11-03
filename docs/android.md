@@ -2,9 +2,9 @@
 
 ## Aktueller Stand
 
-Die Elternverwaltung und die getrennte Launcher-API sind umgesetzt. Eltern können ein Handy genau einem Kinderprofil zuweisen, die App-Freigaben je Kind pflegen und einen Gerätezugang widerrufen. Der Server liefert Sterne, Buddy und Freigaben ausschließlich lesend. Das kompilierbare native Projekt liegt unter `apps/android/`; es koppelt das Handy per Gerätecode, speichert Zugang und Cache Keystore-verschlüsselt und zeigt Buddy, Live-Sterne und freigegebene Apps. Ein getrennt eingerichteter lokaler Eltern-Code öffnet den offlinefähigen Wartungszugang für Verwaltungsaktionen. Die native Ansicht bleibt klar als ungeschützte Vorschau gekennzeichnet.
+Die Elternverwaltung und die getrennte Launcher-API sind umgesetzt. Eltern können ein Handy genau einem Kinderprofil zuweisen, die App-Freigaben je Kind pflegen und einen Gerätezugang widerrufen. Der Server liefert Sterne, Buddy und Freigaben ausschließlich lesend. Das kompilierbare native Projekt liegt unter `apps/android/`; es koppelt das Handy per Gerätecode, speichert Zugang und Cache Keystore-verschlüsselt und zeigt Buddy, Live-Sterne und freigegebene Apps. Ein getrennt eingerichteter lokaler Eltern-Code öffnet den offlinefähigen Wartungszugang für Verwaltungsaktionen. Ohne Device-Owner-Provisionierung und ausdrückliche lokale Elternaktivierung bleibt die Ansicht als ungeschützte Vorschau gekennzeichnet.
 
-**Die echte Gerätesperre ist noch nicht implementiert.** Sie wird in [Issue #2](https://github.com/Florian-Cullmann/kidsdaily365/issues/2) umgesetzt und auf dem tatsächlichen Telefon geprüft. [Buddy-Kosmetik und Käufe](https://github.com/Florian-Cullmann/kidsdaily365/issues/3) sind ein späterer, getrennter Funktionsblock.
+**Der Device Policy Controller ist implementiert; die physische Geräteabnahme steht noch aus.** [Issue #2](https://github.com/Florian-Cullmann/kidsdaily365/issues/2) bleibt bis zu diesen Nachweisen offen. [Provisionierung und Recovery](../apps/android/README.md#device-owner-bewusst-provisionieren), [Abnahmematrix](android-device-acceptance.md). [Buddy-Kosmetik und Käufe](https://github.com/Florian-Cullmann/kidsdaily365/issues/3) sind ein späterer, getrennter Funktionsblock.
 
 ## Zielbild
 
@@ -14,7 +14,7 @@ Ein gewöhnlicher Launcher kann die gewünschten Systemgrenzen nicht zuverlässi
 
 ## Zuordnung der Anforderungen
 
-| Wunsch | Geplante native Umsetzung |
+| Wunsch | Native Umsetzung |
 | --- | --- |
 | Android-Start direkt im Launcher | HOME-Activity, als persistenter bevorzugter Home-Handler durch den DPC eingerichtet; Wiederaufnahme der lokalen Policy beim Start |
 | Quadratischer Recents-/Overview-Button und entsprechende Geste gesperrt | Multi-App Lock Task ohne Overview-Freigabe; Home führt zum eigenen Launcher |
@@ -82,9 +82,9 @@ Neue Kinderprofile erhalten [Audible (`com.audible.application`)](https://play.g
 
 - Implementiert: Token und letzter validierter Snapshot liegen gemeinsam AES-256-GCM-verschlüsselt im privaten No-Backup-Speicher; der Schlüssel bleibt im Android Keystore. Kein SharedPreferences-Klartext, keine Zugangsdaten-Backups. Der Gerätecode wird nicht gespeichert. Bei Widerruf/Token-Ablauf wird die Verbindung gelöscht.
 - Implementiert: Snapshot samt Empfangszeit, monotoner Gerätezeit und Boot-Zählung speichern. Ungültige Antwort/unbekannte Version verwirft die bisherige Startliste auch über Prozessneustarts hinweg; Netzwerkfehler erhält ausschließlich den letzten gültigen Stand. Geräte- und Kinderbindung werden geprüft. Keine Fehlerbehandlung gibt zusätzliche Apps frei.
-- Implementiert in der Vorschau: maximal 24 Stunden App-Starts mit gültigem Cache, monoton gemessen; danach bleibt die Buddy-Ansicht ohne App-Starts. Ein Prozessneustart im selben Geräte-Boot erhält diese Frist. Nach Geräte-Neustart oder unbekanntem Boot-Zähler sind App-Starts bis zur Online-Bestätigung gesperrt. Die spätere DPC-Umsetzung muss die System-Policy schon beim Start wiederherstellen; die heutige Ansicht allein bietet keine Systemsperre.
+- Implementiert: maximal 24 Stunden App-Starts mit gültigem Cache, monoton gemessen; danach bleibt die Buddy-Ansicht ohne App-Starts. Ein Prozessneustart im selben Geräte-Boot erhält diese Frist. Nach Geräte-Neustart oder unbekanntem Boot-Zähler sind App-Starts bis zur Online-Bestätigung gesperrt. Der DPC stellt beim Boot zunächst die Launcher-only-Policy her; der Device-Owner-Foreground-Service übernimmt die lokale Fristprüfung unabhängig von Netzwerkanfragen.
 - Ein offline befindliches Telefon kann einen serverseitigen Widerruf erst beim nächsten Kontakt erkennen. Die API kann keine sofortige Offline-Fernsperre garantieren.
-- Implementiert: getrennte lokale Elternfreigabe, auch ohne Server; PBKDF2-HMAC-SHA256 mit 600.000 Iterationen und eigenem Keystore-Speicher. Einrichtung/Online-Zurücksetzen braucht eine separate, zehn Minuten gültige Eltern-Bestätigung für genau dieses Gerät. Kindertokens erhalten dadurch keine zusätzlichen Rechte. Fehlversuche und Wartezeiten bleiben über Neustarts erhalten. Wartung gilt höchstens fünf Minuten und schließt bei Hintergrundwechsel, Prozessneustart oder Rückkehr zum Kindermodus. Die Einbindung in echte Android-Sperren/deren Wiederherstellung folgt im DPC-Schritt.
+- Implementiert: getrennte lokale Elternfreigabe, auch ohne Server; PBKDF2-HMAC-SHA256 mit 600.000 Iterationen und eigenem Keystore-Speicher. Einrichtung/Online-Zurücksetzen braucht eine separate, zehn Minuten gültige Eltern-Bestätigung für genau dieses Gerät. Kindertokens erhalten dadurch keine zusätzlichen Rechte. Fehlversuche und Wartezeiten bleiben über Neustarts erhalten. Wartung gilt höchstens fünf Minuten und schließt bei Hintergrundwechsel, Prozessneustart oder Rückkehr zum Kindermodus. Die ausdrücklich geöffnete externe Systemwartung erhält eine eigene, nicht persistierte Frist bis maximal zum Ende der Elternsitzung. Rückkehr, Ablauf oder Prozessneustart stellt die Gerätesperren wieder her.
 - Notruf- und notwendige System-Sicherheitswege bleiben erhalten. Physisches Abschalten, Hardware-Recovery, Factory Reset über Recovery, entsperrte Bootloader und OS-Sicherheitslücken können nicht mit einer Launcher-Oberfläche vollständig verhindert werden. „Nicht schließbar“ bedeutet den geprüften verwalteten Alltagsbetrieb, keine absolute physische Manipulationssicherheit.
 
 ## Eltern-Bestätigung
