@@ -1,3 +1,5 @@
+import { buddySetup } from "@/server/buddy-setup";
+import { GET as getBuddySetup, POST as postBuddySetup } from "@/app/api/device/buddy-setup/route";
 import { changeBuddyEquipment } from "@/server/buddy";
 import { POST as postBuddy } from "@/app/api/parent/children/[id]/buddy/route";
 import sharp from "sharp";
@@ -427,5 +429,72 @@ describe("buddy ownership and equipment", () => {
     expect((await send({ authorization: `Bearer ${token}` })).status).toBe(403);
     expect((await send({ origin: "https://other.example" })).status).toBe(403);
     expect((await send()).status).toBe(200);
+  });
+});
+
+
+describe("child buddy onboarding", () => {
+  it("issues a separate capability, preserves completed buddies and isolates launcher reads", async () => {
+    const parent = await actor();
+    const kid = await saveRecord(parent, "children", { name: "Mika", avatar: "M" });
+    const pair = async () => exchangePairingCode((await createPairingCode(parent, { kind: "android", label: "Test", childId: kid.id })).code, null, "android");
+    const first = await pair(); const second = await pair();
+    const auth = `Bearer ${first.buddySetupToken}`;
+    expect(first.buddySetupToken).toBeTruthy();
+    expect(first.buddySetupToken).not.toBe(first.token);
+    expect(await deviceFromToken(first.buddySetupToken!)).toBeNull();
+    await expect(buddySetup(`Bearer ${first.token}`, { kind: "bear", name: "Bruno" })).rejects.toMatchObject({ status: 401 });
+    expect(await buddySetup(auth)).toEqual({ initialized: false });
+    const results = await Promise.all([
+      buddySetup(auth, { kind: "bear", name: "Bruno" }),
+      buddySetup(`Bearer ${second.buddySetupToken}`, { kind: "rabbit", name: "Lumi" }),
+    ]);
+    expect(results.every((result) => result.initialized)).toBe(true);
+    const saved = (await launcherSnapshot((await deviceFromToken(first.token))!)).buddy;
+    expect(["Bruno", "Lumi"]).toContain(saved.name);
+    await buddySetup(auth, { kind: "fox", name: "Overwrite" });
+    expect((await launcherSnapshot((await deviceFromToken(first.token))!)).buddy).toEqual(saved);
+    expect(await buddySetup(auth)).toEqual({ initialized: true });
+    expect((await pair()).buddySetupToken).toBeNull();
+    // Editing profile details never resets onboarding or overwrites the chosen buddy.
+    await saveRecord(parent, "children", { name: "Mika Neu", avatar: "M" }, kid.id);
+    expect((await launcherSnapshot((await deviceFromToken(first.token))!)).buddy).toEqual(saved);
+  });
+
+  it("rejects foreign, revoked, expired and archived scopes and validates the HTTP boundary", async () => {
+    const parent = await actor(); const kid = await child(parent);
+    const code = await createPairingCode(parent, { kind: "android", label: "Test", childId: kid.id });
+    const pair = await exchangePairingCode(code.code, null, "android");
+    const auth = `Bearer ${pair.buddySetupToken}`;
+    const request = (input: unknown, authorization = auth, requestOrigin = origin) => new Request(`${origin}/api/device/buddy-setup`, {
+      method: "POST", headers: { authorization, origin: requestOrigin, "content-type": "application/json" }, body: JSON.stringify(input),
+    });
+    for (const input of [{ kind: "dragon", name: "X" }, { kind: "fox", name: " " }, { kind: "fox", name: "x".repeat(81) }, { kind: "fox", name: "X", childId: randomUUID() }, { kind: "fox", name: "X", points: 100 }]) {
+      expect((await postBuddySetup(request(input))).status).toBe(400);
+    }
+    expect((await postBuddySetup(request({ kind: "bear", name: "Bruno" }, auth, "https://foreign.test"))).status).toBe(403);
+    expect((await getBuddySetup(new Request(`${origin}/api/device/buddy-setup`, { headers: { authorization: `Bearer ${pair.token}` } }))).status).toBe(401);
+    process.env.FAMILY_ID = otherFamilyId;
+    await expect(buddySetup(auth)).rejects.toMatchObject({ status: 401 });
+    process.env.FAMILY_ID = familyId;
+    await db().update(devices).set({ expiresAt: new Date(0) }).where(eq(devices.id, pair.id));
+    await expect(buddySetup(auth, { kind: "bear", name: "Bruno" })).rejects.toMatchObject({ status: 401 });
+    await db().update(devices).set({ expiresAt: new Date(Date.now() + 60_000) }).where(eq(devices.id, pair.id));
+    await db().update(children).set({ active: false }).where(eq(children.id, kid.id));
+    await expect(buddySetup(auth)).rejects.toMatchObject({ status: 401 });
+    await db().update(children).set({ active: true }).where(eq(children.id, kid.id));
+    await revokeDevice(parent, pair.id);
+    await expect(buddySetup(auth)).rejects.toMatchObject({ status: 401 });
+  });
+
+  it("keeps pre-existing profiles and wall pairing unchanged", async () => {
+    const parent = await actor();
+    const [kid] = await db().insert(children).values({ familyId, name: "Existing", avatar: "E", buddyKind: "bear", buddyName: "Existing Buddy" }).returning();
+    const android = await createPairingCode(parent, { kind: "android", label: "Test", childId: kid.id });
+    expect((await exchangePairingCode(android.code, null, "android")).buddySetupToken).toBeNull();
+    const wall = await createPairingCode(parent, { kind: "wall", label: "Wall" });
+    const paired = await exchangePairingCode(wall.code, origin, "wall");
+    expect(paired.buddySetupToken).toBeNull();
+    await expect(buddySetup(`Bearer ${paired.token}`)).rejects.toMatchObject({ status: 401 });
   });
 });

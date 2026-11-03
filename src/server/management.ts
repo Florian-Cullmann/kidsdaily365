@@ -64,7 +64,7 @@ export async function saveRecord(parent: ParentActor, resource: Resource, input:
             if (!data.active) await tx.update(devices).set({ revokedAt: new Date() }).where(and(eq(devices.familyId, familyId), eq(devices.childId, id)));
             return result;
           }
-          const [child] = await tx.insert(children).values({ ...data, familyId }).returning({ id: children.id });
+          const [child] = await tx.insert(children).values({ ...data, familyId, buddyInitialized: false }).returning({ id: children.id });
           await tx.insert(allowedApps).values({ familyId, childId: child.id, packageName: "com.audible.application", label: "Audible" });
           return child;
         });

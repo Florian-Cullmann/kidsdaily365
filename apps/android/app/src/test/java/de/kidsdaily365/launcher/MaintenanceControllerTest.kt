@@ -122,6 +122,7 @@ class MaintenanceControllerTest {
         c.status(); c.rememberTarget(destination); c.setup("parent-proof", secret, secret); c.close()
         val connectionStore = Store()
         val api = object : LauncherApi {
+            override fun buddySetup(server: ServerAddress, token: String, kind: String?, name: String?) = error("unused")
             override fun pair(server: ServerAddress, code: String): Pairing = error("must not call network")
             override fun snapshot(server: ServerAddress, token: String): LauncherSnapshot = error("unused")
         }

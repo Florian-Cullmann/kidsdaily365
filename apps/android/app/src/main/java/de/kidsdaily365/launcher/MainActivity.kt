@@ -60,9 +60,14 @@ class MainActivity : Activity() {
     private lateinit var address: EditText
     private lateinit var code: EditText
     private lateinit var pairButton: Button
+    private var chosenBuddy: String? = null
+    private var chosenName = ""
+    private var setupName: EditText? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        chosenBuddy = savedInstanceState?.getString("chosenBuddy")
+        chosenName = savedInstanceState?.getString("chosenName").orEmpty()
         content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -80,6 +85,12 @@ class MainActivity : Activity() {
         parentPanel = ParentPanel(this, scope, maintenance, repository,
             reconnect = { showPairing = true; layoutKind = -1; startPolling() },
             changed = { showPairing = false; layoutKind = -1; startPolling() })
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("chosenBuddy", chosenBuddy)
+        outState.putString("chosenName", setupName?.text?.toString() ?: chosenName)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onResume() {
@@ -137,7 +148,7 @@ class MainActivity : Activity() {
 
     private fun render(state: LauncherView) {
         val mayPair = parentStatus?.let { !it.configured && !it.damaged } == true || (showPairing && maintenance.isOpen())
-        val nextKind = if (state.paired) 1 else if (mayPair) 0 else 2
+        val nextKind = if (state.paired && state.buddySetupPending) 3 else if (state.paired) 1 else if (mayPair) 0 else 2
         val mode = when {
             policy.error != null -> policy.error!!
             policy.enabled && policy.owner -> "Verwalteter Kindermodus"
@@ -149,7 +160,7 @@ class MainActivity : Activity() {
             content.removeAllViews()
             layoutKind = nextKind
             lastSnapshot = null
-            when (nextKind) { 1 -> buildHome(); 0 -> buildPairing(); else -> buildDisconnected() }
+            when (nextKind) { 3 -> buildBuddySetup(); 1 -> buildHome(); 0 -> buildPairing(); else -> buildDisconnected() }
             modeStatus = text(mode, 12f, Color.rgb(126, 65, 77))
             content.addView(modeStatus)
         }
@@ -158,7 +169,7 @@ class MainActivity : Activity() {
         val sync = state.receivedAt?.let { getString(R.string.last_sync, DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it))) }.orEmpty()
         connectionStatus.text = listOf(state.status, sync).filter { it.isNotEmpty() }.joinToString("\n")
         val snapshot = state.snapshot
-        if (state.paired) {
+        if (nextKind == 1) {
             greeting.text = snapshot?.let { getString(R.string.greeting, it.child.name) } ?: getString(R.string.loading)
             stars.text = snapshot?.let { "★ ${it.stars}" } ?: "☆"
             stars.contentDescription = snapshot?.let { resources.getQuantityString(R.plurals.stars, if (it.stars == 1L) 1 else 2, it.stars) }
@@ -205,6 +216,68 @@ class MainActivity : Activity() {
                 }
             }
         }
+    }
+
+    private fun buildBuddySetup() {
+        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        content.addView(text("Dein neuer Buddy", 30f))
+        content.addView(text("Wer soll dich begleiten? Wähle deinen Buddy aus.", 18f))
+        val choices = LinearLayout(this).apply {
+            orientation = if (resources.configuration.fontScale > 1.3f) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
+        }
+        val buttons = mutableMapOf<String, Button>()
+        listOf("fox" to "Fuchs", "rabbit" to "Hase", "bear" to "Bär").forEach { (kind, label) ->
+            val card = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL }
+            card.addView(BuddyView(this).apply { show(Buddy(kind, label, emptyList())); contentDescription = label },
+                LinearLayout.LayoutParams(dp(90), dp(100)))
+            val choice = button(label) {
+                chosenBuddy = kind
+                buttons.forEach { (id, button) ->
+                    button.isSelected = id == kind
+                    button.text = (if (id == kind) "✓ " else "") + button.tag.toString()
+                }
+            }.apply { tag = label; minWidth = 0; textSize = 16f; setPadding(dp(2), 0, dp(2), 0) }
+            buttons[kind] = choice
+            if (chosenBuddy == kind) { choice.text = "✓ $label"; choice.isSelected = true }
+            card.addView(choice)
+            choices.addView(card, if (choices.orientation == LinearLayout.HORIZONTAL)
+                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f) else fullWidth())
+        }
+        content.addView(choices, fullWidth())
+        content.addView(text("Wie heißt dein Buddy?", 22f))
+        val name = EditText(this).apply {
+            hint = "Dein Wunschname"; contentDescription = "Name deines Buddys"
+            isSingleLine = true; minHeight = dp(60)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            filters = arrayOf(android.text.InputFilter.LengthFilter(80))
+            setText(chosenName)
+        }
+        setupName = name
+        content.addView(name, fullWidth())
+        val error = text("", 16f, Color.rgb(126, 65, 77)); content.addView(error)
+        val save = button("Das ist mein Buddy!") {}
+        save.setOnClickListener {
+            val kind = chosenBuddy
+            chosenName = name.text.toString().trim()
+            if (kind == null || chosenName.isEmpty()) {
+                error.text = "Wähle einen Buddy und gib ihm einen Namen."
+                return@setOnClickListener
+            }
+            save.isEnabled = false; error.text = "Dein Buddy wird gespeichert …"
+            operation = scope.launch {
+                try {
+                    val view = repository.completeBuddy(kind, chosenName)
+                    if (policy.enabled) app.managedView = view
+                    render(view)
+                    chosenBuddy = null; chosenName = ""; setupName = null
+                } catch (e: CancellationException) { throw e }
+                catch (_: Exception) { error.text = "Das Speichern hat nicht geklappt. Prüfe die Verbindung und versuche es noch einmal." }
+                finally { save.isEnabled = true }
+            }
+        }
+        content.addView(save)
+        connectionStatus = text("", 12f); content.addView(connectionStatus)
+        content.addView(button("Elternzugang") { parentPanel.open() })
     }
 
     private fun buildHome() {
