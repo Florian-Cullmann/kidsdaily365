@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useLayoutEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import type { Resource, RoutineStep } from "@/domain/management";
 import type { ManagementData } from "@/server/management";
 
@@ -15,12 +15,44 @@ function localInput(iso: unknown) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-export function ParentRecordForm({ resource, data, record, busy, onSave, onCancel }: {
+export type RecordDraft = { isDirty: () => boolean; focus: () => void };
+
+// Read raw controls, including unnamed routine steps and disabled fields during save.
+// Also compare unchecked checkboxes and the invalid-number-input flag.
+function snapshot(form: HTMLFormElement) {
+  return JSON.stringify(Array.from(form.querySelectorAll("input, select, textarea")).map((element) => {
+    const control = element as HTMLInputElement;
+    return [control.name, control.type, control.value, control.checked ?? null, control.validity.badInput];
+  }));
+}
+
+export function ParentRecordForm({ resource, data, record, busy, draftRef, onSave, onCancel }: {
   resource: Resource; data: ManagementData; record: EditableRecord | null; busy: boolean;
+  draftRef: RefObject<RecordDraft | null>;
   onSave: (input: unknown) => Promise<void>; onCancel: () => void;
 }) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const lastFocus = useRef<HTMLElement | null>(null);
   const [steps, setSteps] = useState<RoutineStep[]>(() => (record?.steps as RoutineStep[] | undefined) ?? [{ title: "", description: "", icon: "heart", points: 5 }]);
   const [openStep, setOpenStep] = useState<number | null>(record ? null : 0);
+  useLayoutEffect(() => {
+    const form = formRef.current!;
+    const baseline = snapshot(form);
+    const draft = {
+      isDirty: () => snapshot(form) !== baseline,
+      focus: () => {
+        const target = lastFocus.current?.isConnected ? lastFocus.current : form.querySelector<HTMLElement>("input, select, textarea");
+        const detail = target?.closest("details");
+        if (detail) {
+          setOpenStep(Array.from(form.querySelectorAll("details")).indexOf(detail));
+          detail.open = true;
+        }
+        target?.focus();
+      },
+    };
+    draftRef.current = draft;
+    return () => { if (draftRef.current === draft) draftRef.current = null; };
+  }, [draftRef]);
   function updateStep(index: number, patch: Partial<RoutineStep>) {
     setSteps((items) => items.map((item, i) => i === index ? { ...item, ...patch } : item));
   }
@@ -35,6 +67,7 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onCance
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
     const form = new FormData(event.currentTarget);
     const field = (key: string) => String(form.get(key) ?? "").trim();
     const active = form.get("active") === "on";
@@ -49,7 +82,7 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onCance
     await onSave(input);
   }
 
-  return <form className="record-form" onSubmit={submit}>
+  return <form ref={formRef} className="record-form" onSubmit={submit} onFocusCapture={(event) => { if (event.target.matches("input, select, textarea")) lastFocus.current = event.target; }}>
     <div className="record-form-heading"><h3>{record ? "Eintrag bearbeiten" : "Neuen Eintrag anlegen"}</h3></div>
     <fieldset disabled={busy} className="record-fields">
       {withChild && <label>Für welches Kind?<select name="childId" defaultValue={text("childId", data.children.find((child) => child.active)?.id)} required><option value="">Bitte auswählen</option>{data.children.map((child) => <option key={child.id} value={child.id}>{child.name}{child.active ? "" : " (archiviert)"}</option>)}</select></label>}
