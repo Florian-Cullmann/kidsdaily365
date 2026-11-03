@@ -15,8 +15,8 @@ function localInput(iso: unknown) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-export function ParentRecordForm({ resource, data, record, busy, onSave, onCancel }: {
-  resource: Resource; data: ManagementData; record: EditableRecord | null; busy: boolean;
+export function ParentRecordForm({ resource, data, record, defaultChildId, busy, onSave, onCancel }: {
+  resource: Resource; data: ManagementData; record: EditableRecord | null; defaultChildId?: string; busy: boolean;
   onSave: (input: unknown) => Promise<void>; onCancel: () => void;
 }) {
   const [steps, setSteps] = useState<RoutineStep[]>(() => (record?.steps as RoutineStep[] | undefined) ?? [{ title: "", description: "", icon: "heart", points: 5 }]);
@@ -52,7 +52,7 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onCance
   return <form className="record-form" onSubmit={submit}>
     <div className="record-form-heading"><h3>{record ? "Eintrag bearbeiten" : "Neuen Eintrag anlegen"}</h3></div>
     <fieldset disabled={busy} className="record-fields">
-      {withChild && <label>Für welches Kind?<select name="childId" defaultValue={text("childId", data.children.find((child) => child.active)?.id)} required><option value="">Bitte auswählen</option>{data.children.map((child) => <option key={child.id} value={child.id}>{child.name}{child.active ? "" : " (archiviert)"}</option>)}</select></label>}
+      {withChild && <label>Für welches Kind?<select name="childId" defaultValue={text("childId", defaultChildId ?? data.children.find((child) => child.active)?.id)} required><option value="">Bitte auswählen</option>{data.children.filter((child) => child.active || child.id === record?.childId).map((child) => <option key={child.id} value={child.id}>{child.name}{child.active ? "" : " (archiviert)"}</option>)}</select></label>}
       {resource === "children" && <>
         <label>Name<input name="name" defaultValue={text("name")} required maxLength={80} autoComplete="off" /></label>
         <label>Profilkürzel<input name="avatar" defaultValue={text("avatar")} maxLength={3} placeholder="z. B. M" /></label>
