@@ -11,8 +11,8 @@ android {
         minSdk = 33
         targetSdk = 36
         testInstrumentationRunner = "de.kidsdaily365.launcher.ManagedDeviceTestRunner"
-        versionCode = 4
-        versionName = "0.5.0-managed-preview"
+        versionCode = 5
+        versionName = "0.6.0-device-management"
     }
     buildFeatures { buildConfig = true }
     sourceSets.getByName("main").assets.srcDir("../../../contracts/buddy-assets")

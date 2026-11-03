@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
@@ -36,6 +37,7 @@
              Lint only models the alternative alarm-permission eligibility path. -->
         <service tools:ignore="ForegroundServicePermission" android:name=".PolicyService" android:exported="false" android:directBootAware="true"
             android:foregroundServiceType="systemExempted" />
+        <activity android:name=".MessagesActivity" android:exported="false" android:windowSoftInputMode="adjustResize" android:lockTaskMode="if_whitelisted" />
         <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask"
             android:lockTaskMode="if_whitelisted">
             <intent-filter>

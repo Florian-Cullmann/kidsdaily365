@@ -22,8 +22,10 @@ import kotlin.concurrent.thread
 class ManagedDeviceTestRunner : Instrumentation() {
     private var reportPort: Int? = null
     private var leaveManaged = false
+    private var managementServer: String? = null
     override fun onCreate(arguments: Bundle?) {
         super.onCreate(arguments)
+        managementServer = arguments?.getString("managementServer")
         reportPort = arguments?.getString("reportPort")?.toInt()?.also { require(it in 1024..65535) }
         leaveManaged = arguments?.getString("leaveManaged") == "true"
         start()
@@ -42,6 +44,12 @@ class ManagedDeviceTestRunner : Instrumentation() {
         val result = Bundle()
         try {
             check(android.os.Build.FINGERPRINT.contains("generic") || android.os.Build.MODEL.contains("sdk")) { "Disposable emulator only" }
+            managementServer?.let {
+                managementScenario(this, it, ::report)
+                result.putString("stream", "Device management live integration passed.\n")
+                finish(Activity.RESULT_OK, result)
+                return
+            }
             exercise()
             result.putString("stream", "Device Owner checks passed: lock task, camera, restrictions, live app removal, offline expiry, settings recovery, parent authorization.\n")
             report("result", result.getString("stream")!!.toByteArray())

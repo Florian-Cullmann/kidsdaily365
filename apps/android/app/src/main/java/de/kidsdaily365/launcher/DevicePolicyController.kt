@@ -20,7 +20,10 @@ class DevicePolicyController(private val context: Context, private val maintenan
     private val prefs = context.createDeviceProtectedStorageContext().getSharedPreferences("managed-mode", Context.MODE_PRIVATE)
     private val lease = SettingsLease()
     private var applied: Set<String>? = null
+    private var suspendedApplied: Set<String>? = null
     private var wasInSettings = false
+    var remoteAppliedLocked = false; private set
+    private val remote get() = (context.applicationContext as LauncherApplication).management
     var error: String? = null
         private set
     val owner get() = manager.isDeviceOwnerApp(context.packageName)
@@ -52,9 +55,29 @@ class DevicePolicyController(private val context: Context, private val maintenan
         if (inSettings) return
         val returning = wasInSettings
         wasInSettings = false
-        val packages = ManagedPolicy.apps(view, SystemClock.elapsedRealtime(), System.currentTimeMillis()) + context.packageName
+        val allowed = ManagedPolicy.apps(view, SystemClock.elapsedRealtime(), System.currentTimeMillis())
+        val remoteLocked = if (context.getSystemService(UserManager::class.java).isUserUnlocked && remote.initialized) remote.locked
+            else prefs.getBoolean("remote-locked", false)
+        val packages = (if (remoteLocked) emptySet() else allowed) + context.packageName
         var contracted = false
         try {
+            if (prefs.getBoolean("remote-locked", false) != remoteLocked) check(prefs.edit().putBoolean("remote-locked", remoteLocked).commit())
+            val suspended = prefs.getStringSet("remote-suspended", emptySet())!!.toSet()
+            if (remoteLocked) {
+                val targets = (suspended + allowed + manager.getLockTaskPackages(admin)).filter { it != context.packageName }.toSet()
+                if (suspendedApplied != targets || returning) {
+                    // Persist before the platform call: a crash must not lose the list to restore.
+                    check(prefs.edit().putStringSet("remote-suspended", targets).commit())
+                    val installed = targets.filter { runCatching { context.packageManager.getApplicationInfo(it, 0) }.isSuccess }
+                    check(manager.setPackagesSuspended(admin, installed.toTypedArray(), true).isEmpty()) { "Einige Apps konnten nicht pausiert werden." }
+                    suspendedApplied = targets
+                }
+            } else if (suspended.isNotEmpty()) {
+                check(manager.setPackagesSuspended(admin, suspended.filter { runCatching { context.packageManager.getApplicationInfo(it, 0) }.isSuccess }.toTypedArray(), false).isEmpty())
+                check(prefs.edit().remove("remote-suspended").commit())
+                suspendedApplied = null
+            }
+            remoteAppliedLocked = remoteLocked
             if (applied != packages || returning || error != null) {
                 // Remove revoked running tasks before any other operation. Android finishes removed locked tasks.
                 val old = manager.getLockTaskPackages(admin).toSet()
@@ -86,7 +109,7 @@ class DevicePolicyController(private val context: Context, private val maintenan
             }
         } catch (failure: Exception) {
             if (error == null) android.util.Log.e("KidsDailyPolicy", "Device policy application failed", failure)
-            applied = null
+            applied = null; suspendedApplied = null
             error = "Systemsperren prüfen · Apps bleiben gesperrt. Elternzugang ist verfügbar."
             runCatching { manager.setLockTaskPackages(admin, arrayOf(context.packageName)) }
             if (ensureHome && context.getSystemService(ActivityManager::class.java).lockTaskModeState != ActivityManager.LOCK_TASK_MODE_LOCKED) {
@@ -102,6 +125,7 @@ class DevicePolicyController(private val context: Context, private val maintenan
     }
 
     fun launch(activity: Activity, packageName: String) {
+        check(!remote.locked) { "Das Gerät ist pausiert." }
         check(!enabled || (owner && !inSettings && error == null && applied?.contains(packageName) == true))
         val intent = context.packageManager.getLaunchIntentForPackage(packageName)
             ?: throw android.content.ActivityNotFoundException()
@@ -150,6 +174,11 @@ class DevicePolicyController(private val context: Context, private val maintenan
         manager.setStatusBarDisabled(admin, false)
         // Temporary settings access must not allow stopping the service that enforces its deadline.
         if (permanent) {
+            val suspended = prefs.getStringSet("remote-suspended", emptySet())!!.toTypedArray()
+            check(manager.setPackagesSuspended(admin, suspended, false).isEmpty())
+            check(prefs.edit().remove("remote-suspended").commit())
+                suspendedApplied = null
+            remoteAppliedLocked = false
             manager.setUninstallBlocked(admin, context.packageName, false)
             manager.setUserControlDisabledPackages(admin, emptyList())
         }

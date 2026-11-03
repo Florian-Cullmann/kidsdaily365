@@ -39,6 +39,7 @@ class PolicyService : Service() {
         // No credentials or child data are read before the Android user unlocks after boot.
         scope.launch {
             while (isActive) {
+                if (getSystemService(UserManager::class.java).isUserUnlocked) app.management.initialize()
                 app.policy.reconcile(app.managedView)
                 delay(500)
             }
@@ -51,6 +52,7 @@ class PolicyService : Service() {
                     try {
                         app.managedView = app.repository.current()
                         app.managedView = app.repository.refresh()
+                        app.management.sync()
                     } catch (e: kotlinx.coroutines.CancellationException) { throw e }
                     catch (_: Exception) { app.managedView = null }
                 }

@@ -34,7 +34,7 @@ class HttpLauncherApi : LauncherApi, MaintenanceAuthorizer {
         return LauncherProtocol.snapshot(request(server, "/api/launcher/snapshot?version=2", token, null))
     }
 
-    private fun request(server: ServerAddress, path: String, token: String?, body: String?): String {
+    internal fun request(server: ServerAddress, path: String, token: String?, body: String?, method: String = "POST"): String {
         val connection = URL(server.origin + path).openConnection() as HttpURLConnection
         try {
             connection.instanceFollowRedirects = false
@@ -45,7 +45,7 @@ class HttpLauncherApi : LauncherApi, MaintenanceAuthorizer {
             connection.setRequestProperty("Cache-Control", "no-store")
             token?.let { connection.setRequestProperty("Authorization", "Bearer $it") }
             if (body != null) {
-                connection.requestMethod = "POST"
+                connection.requestMethod = method
                 connection.doOutput = true
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
                 val bytes = body.toByteArray(Charsets.UTF_8)
@@ -65,5 +65,5 @@ class HttpLauncherApi : LauncherApi, MaintenanceAuthorizer {
         }
     }
 
-    companion object { const val MAX_RESPONSE_BYTES = 65_536 }
+    companion object { const val MAX_RESPONSE_BYTES = 524_288 }
 }

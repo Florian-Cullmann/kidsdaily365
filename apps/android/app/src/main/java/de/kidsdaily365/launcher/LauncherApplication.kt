@@ -5,6 +5,7 @@ import android.os.SystemClock
 import android.provider.Settings
 
 class LauncherApplication : Application() {
+    val management by lazy { DeviceManagementClient(this, this) }
     val policy by lazy { DevicePolicyController(this, maintenance) }
     var managedView: LauncherView? = null
     private val clock = object : LauncherClock {
