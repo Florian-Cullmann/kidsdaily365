@@ -57,6 +57,12 @@ tests/                    Unit-, API-Grenz- und Datenbanktests
 
 Next.js/TypeScript und PostgreSQL/Drizzle bilden einen modularen Monolithen. Der Wandbildschirm verwendet ein eigenes Gerätecookie; Eltern erhalten ein getrenntes Sitzungscookie; Android verwendet einen kindgebundenen Bearer-Token. [Architektur](docs/architecture.md) und [Android-Konzept](docs/android.md) erklären die Sicherheitsgrenzen und den aktuellen Umsetzungsstand.
 
+## Konfiguration vor dem Start prüfen
+
+Nach `npm ci` prüft `npm run config:check` die lokale `.env`. Bereits gesetzte Umgebungsvariablen haben Vorrang. Im Demo-Modus sind keine Live-Zugangsdaten nötig; im Live-Modus gelten dieselben Regeln wie im Server. Ohne `APP_MODE` gilt bei `NODE_ENV=production` Live, sonst Demo. Der Befehl meldet nur Variablennamen, keine Werte oder Geheimnisse, und endet bei Fehlern mit Exitcode 1.
+
+Ein Erfolg bestätigt ausschließlich die App-Konfiguration: keine Datenbankverbindung, Migration oder Netzwerkprüfung. Docker-/Postgres-Parameter wie `POSTGRES_PASSWORD` werden nicht geprüft. Im Compose-Betrieb wird `DATABASE_URL` gesondert gesetzt; ein lokaler Check prüft die lokale Umgebung, nicht die spätere Containerkonfiguration.
+
 ## Prüfen
 
 Der [manuelle Testleitfaden](docs/testing.md) führt durch Registrierung, Profile, Wandbildschirm, Rechte und den aktuellen Android-Stand. Automatische Tests immer von euren manuellen Live-Daten trennen.
