@@ -1,6 +1,6 @@
 import "server-only";
 import { profileImageUrl } from "@/domain/profile-image";
-import { and, asc, eq, gte, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { localDate, type DayPlan } from "@/domain/plan";
 import { db } from "./db/client";
 import { buddyEquipment, appointments, childImages, children, dailyTasks, families, pointEntries, rewards, taskTemplates } from "./db/schema";
@@ -52,7 +52,10 @@ export async function getDayPlans(familyId: string, now = new Date()): Promise<D
       .orderBy(asc(dailyTasks.sortOrder), asc(dailyTasks.templateId), asc(dailyTasks.stepIndex), asc(dailyTasks.id)),
     db().select({ childId: pointEntries.childId, balance: sql`sum(${pointEntries.amount})`.mapWith(Number) })
       .from(pointEntries).where(eq(pointEntries.familyId, familyId)).groupBy(pointEntries.childId),
-    db().select().from(appointments).where(and(eq(appointments.familyId, familyId), eq(appointments.active, true), gte(appointments.startsAt, now))).orderBy(asc(appointments.startsAt)),
+    db().select().from(appointments).where(and(eq(appointments.familyId, familyId), eq(appointments.active, true), or(
+      gt(appointments.endsAt, now),
+      and(isNull(appointments.endsAt), sql`(${appointments.startsAt} at time zone ${timezone})::date >= ${date}::date`),
+    ))).orderBy(asc(appointments.startsAt)),
     db().select({ id: rewards.id, title: rewards.title, cost: rewards.cost }).from(rewards)
       .where(and(eq(rewards.familyId, familyId), eq(rewards.active, true))).orderBy(asc(rewards.cost)),
     db().select({ childId: childImages.childId, version: childImages.version }).from(childImages).where(eq(childImages.familyId, familyId)),
@@ -64,7 +67,7 @@ export async function getDayPlans(familyId: string, now = new Date()): Promise<D
     date, timezone,
     child: { id: child.id, name: child.name, avatar: child.avatar, equippedAccessories: equipment.filter((item) => item.childId === child.id).map((item) => item.accessoryId), imageUrl: imageUrls.get(child.id) ?? null, reducedMotion: child.reducedMotion, buddyKind: child.buddyKind, buddyName: child.buddyName },
     balance: balances.find((row) => row.childId === child.id)?.balance ?? 0,
-    appointments: upcoming.filter((item) => item.childId === child.id).slice(0, 3).map((item) => ({ id: item.id, title: item.title, startsAt: item.startsAt.toISOString(), icon: item.icon })),
+    appointments: upcoming.filter((item) => item.childId === child.id).map((item) => ({ id: item.id, title: item.title, startsAt: item.startsAt.toISOString(), endsAt: item.endsAt?.toISOString() ?? null, icon: item.icon })),
     rewards: rewardOptions,
     tasks: tasks.filter(({ task }) => task.childId === child.id).map(({ task, completedAt }) => ({
       id: task.id, routineId: task.templateId, routineTitle: task.routineTitle, title: task.title, description: task.description, icon: task.icon,
