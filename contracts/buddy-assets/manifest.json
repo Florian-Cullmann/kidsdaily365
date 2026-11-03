@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "viewBox": 512,
+  "slots": {
+    "chest": {
+      "layer": 10
+    }
+  },
+  "buddies": {
+    "fox": {
+      "chest": {
+        "x": 309,
+        "y": 294,
+        "size": 64
+      }
+    },
+    "rabbit": {
+      "chest": {
+        "x": 214,
+        "y": 315,
+        "size": 58
+      }
+    },
+    "bear": {
+      "chest": {
+        "x": 202,
+        "y": 270,
+        "size": 66
+      }
+    }
+  },
+  "accessories": {
+    "star-badge": {
+      "label": "Stern-Anstecker",
+      "slot": "chest",
+      "points": [
+        [
+          50,
+          5
+        ],
+        [
+          63,
+          34
+        ],
+        [
+          95,
+          38
+        ],
+        [
+          71,
+          60
+        ],
+        [
+          77,
+          92
+        ],
+        [
+          50,
+          76
+        ],
+        [
+          23,
+          92
+        ],
+        [
+          29,
+          60
+        ],
+        [
+          5,
+          38
+        ],
+        [
+          37,
+          34
+        ]
+      ],
+      "fill": "#ffd569",
+      "stroke": "#9c651e",
+      "strokeWidth": 4
+    }
+  }
+}

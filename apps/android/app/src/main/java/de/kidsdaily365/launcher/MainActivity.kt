@@ -14,7 +14,6 @@ import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.EditText
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -49,7 +48,7 @@ class MainActivity : Activity() {
     private lateinit var greeting: TextView
     private lateinit var stars: TextView
     private lateinit var buddyName: TextView
-    private lateinit var buddyImage: ImageView
+    private lateinit var buddyImage: BuddyView
     private lateinit var apps: LinearLayout
     private lateinit var address: EditText
     private lateinit var code: EditText
@@ -135,11 +134,7 @@ class MainActivity : Activity() {
             greeting.text = snapshot?.let { getString(R.string.greeting, it.child.name) } ?: getString(R.string.loading)
             stars.text = snapshot?.let { resources.getQuantityString(R.plurals.stars, if (it.stars == 1L) 1 else 2, it.stars) } ?: "☆"
             buddyName.text = snapshot?.buddy?.name.orEmpty()
-            buddyImage.setImageResource(when (snapshot?.buddy?.kind) {
-                "rabbit" -> R.drawable.buddy_rabbit
-                "bear" -> R.drawable.buddy_bear
-                else -> R.drawable.buddy_fox
-            })
+            buddyImage.show(snapshot?.buddy)
             buddyImage.contentDescription = snapshot?.let { getString(R.string.buddy_description, it.buddy.name) }
             if (snapshot != lastSnapshot || apps.childCount == 0) {
                 apps.removeAllViews()
@@ -175,8 +170,7 @@ class MainActivity : Activity() {
     private fun buildHome() {
         window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         greeting = text("", 30f).apply { setTypeface(typeface, Typeface.BOLD) }; content.addView(greeting)
-        buddyImage = ImageView(this).apply {
-            adjustViewBounds = true
+        buddyImage = BuddyView(this).apply {
             layoutParams = LinearLayout.LayoutParams(dp(240), dp(240))
         }; content.addView(buddyImage)
         buddyName = text("", 22f); content.addView(buddyName)

@@ -10,10 +10,11 @@ android {
         applicationId = "de.kidsdaily365.launcher"
         minSdk = 33
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.3.0-preview"
+        versionCode = 3
+        versionName = "0.4.0-preview"
     }
     buildFeatures { buildConfig = true }
+    sourceSets.getByName("main").assets.srcDir("../../../contracts/buddy-assets")
     sourceSets.getByName("test").resources.srcDir("../../../contracts")
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

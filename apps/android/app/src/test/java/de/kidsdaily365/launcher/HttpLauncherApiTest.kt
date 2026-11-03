@@ -68,7 +68,7 @@ class HttpLauncherApiTest {
             assertEquals("android", JSONObject(pairRequest.body).getString("kind"))
             assertEquals(snapshotFixture(), api.snapshot(server.address, paired.token))
             val snapshotRequest = server.take()
-            assertEquals("GET /api/launcher/snapshot HTTP/1.1", snapshotRequest.line)
+            assertEquals("GET /api/launcher/snapshot?version=2 HTTP/1.1", snapshotRequest.line)
             assertEquals("Bearer ${paired.token}", snapshotRequest.headers["authorization"])
             assertNull(snapshotRequest.headers["cookie"])
         }
@@ -78,7 +78,7 @@ class HttpLauncherApiTest {
         TestServer(Reply(302, location = "https://example.test/trap")).use { server ->
             val failure = assertThrows(HttpFailure::class.java) { HttpLauncherApi().snapshot(server.address, "a".repeat(43)) }
             assertEquals(302, failure.status)
-            assertEquals("GET /api/launcher/snapshot HTTP/1.1", server.take().line)
+            assertEquals("GET /api/launcher/snapshot?version=2 HTTP/1.1", server.take().line)
             assertTrue(server.requests.isEmpty())
         }
     }

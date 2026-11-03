@@ -176,3 +176,11 @@
   .crop-toolbar { gap: 0; }
   .crop-toolbar button span { display: none; }
 }
+
+.wardrobe-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.wardrobe-heading h2 { margin: 0; }
+.wardrobe-content { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 28px; padding: 20px 0; }
+.wardrobe-preview { width: min(280px, 100%); height: auto; }
+.wardrobe-accessory { min-width: 200px; padding: 24px; border-radius: 24px; background: #fff8e8; text-align: center; }
+.wardrobe-star { font-size: 50px; color: #bf861f; }
+.wardrobe-accessory h3 { margin: 8px 0; }
