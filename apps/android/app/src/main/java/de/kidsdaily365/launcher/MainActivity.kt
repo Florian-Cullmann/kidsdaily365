@@ -6,6 +6,8 @@ import android.content.ActivityNotFoundException
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
@@ -153,16 +155,17 @@ class MainActivity : Activity() {
         val snapshot = state.snapshot
         if (state.paired) {
             greeting.text = snapshot?.let { getString(R.string.greeting, it.child.name) } ?: getString(R.string.loading)
-            stars.text = snapshot?.let { resources.getQuantityString(R.plurals.stars, if (it.stars == 1L) 1 else 2, it.stars) } ?: "☆"
+            stars.text = snapshot?.let { "★ ${it.stars}" } ?: "☆"
+            stars.contentDescription = snapshot?.let { resources.getQuantityString(R.plurals.stars, if (it.stars == 1L) 1 else 2, it.stars) }
             buddyName.text = snapshot?.buddy?.name.orEmpty()
             buddyImage.show(snapshot?.buddy)
             buddyImage.contentDescription = snapshot?.let { getString(R.string.buddy_description, it.buddy.name) }
             if (snapshot != lastSnapshot || apps.childCount == 0) {
                 apps.removeAllViews()
                 if (snapshot?.policy?.allowedApps.isNullOrEmpty()) apps.addView(text(getString(R.string.no_apps), 18f))
-                snapshot?.policy?.allowedApps?.forEach { app ->
+                snapshot?.policy?.allowedApps?.forEachIndexed { index, app ->
                     val installed = packageManager.getLaunchIntentForPackage(app.packageName) != null
-                    apps.addView(button(if (installed) app.label else getString(R.string.not_installed, app.label)) {
+                    apps.addView(appCard(app.packageName, app.label, installed, index) {
                         operation = scope.launch {
                             safely {
                                 if (!repository.mayLaunch(app.packageName)) {
@@ -177,7 +180,7 @@ class MainActivity : Activity() {
                                 catch (_: SecurityException) { Toast.makeText(this@MainActivity, R.string.app_missing, Toast.LENGTH_LONG).show() }
                             }
                         }
-                    }.apply { tag = installed })
+                    })
                 }
                 lastSnapshot = snapshot
             }
@@ -190,21 +193,79 @@ class MainActivity : Activity() {
 
     private fun buildHome() {
         window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        greeting = text("", 30f).apply { setTypeface(typeface, Typeface.BOLD) }; content.addView(greeting)
-        buddyImage = BuddyView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(240), dp(240))
-        }; content.addView(buddyImage)
-        buddyName = text("", 22f); content.addView(buddyName)
-        stars = text("☆", 42f, Color.rgb(126, 86, 11)).apply {
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.TOP
+        }
+        val welcome = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        stars = text("☆", 16f, Color.rgb(112, 76, 13)).apply {
             setTypeface(typeface, Typeface.BOLD)
-            background = rounded(Color.rgb(255, 240, 196))
-        }; content.addView(stars, fullWidth())
-        content.addView(text(getString(R.string.your_apps), 24f))
-        apps = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; content.addView(apps, fullWidth())
+            setPadding(dp(14), dp(8), dp(14), dp(8))
+            background = rounded(Color.rgb(255, 237, 178))
+        }
+        welcome.addView(stars, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        greeting = text("", 28f).apply {
+            gravity = Gravity.START
+            setPadding(0, dp(20), 0, dp(4))
+            setTypeface(typeface, Typeface.BOLD)
+        }
+        welcome.addView(greeting)
+        welcome.addView(text("Schön, dass du da bist!", 16f).apply {
+            gravity = Gravity.START; setPadding(0, dp(4), 0, dp(8))
+        })
+        header.addView(welcome, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        val buddy = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+        buddyImage = BuddyView(this)
+        buddy.addView(buddyImage, LinearLayout.LayoutParams(dp(112), dp(112)))
+        buddyName = text("", 16f).apply { setPadding(0, 0, 0, dp(8)) }
+        buddy.addView(buddyName, LinearLayout.LayoutParams(dp(112), LinearLayout.LayoutParams.WRAP_CONTENT))
+        header.addView(buddy)
+        content.addView(header, fullWidth())
+        val garden = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(16))
+            background = rounded(Color.WHITE)
+        }
+        garden.addView(text(getString(R.string.your_apps), 24f).apply {
+            gravity = Gravity.START; setTypeface(typeface, Typeface.BOLD)
+        })
+        garden.addView(text("Was möchtest du entdecken?", 16f).apply {
+            gravity = Gravity.START; setPadding(dp(8), 0, dp(8), dp(12))
+        })
+        apps = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        garden.addView(apps, fullWidth())
+        content.addView(garden, fullWidth())
         connectionStatus = text("", 14f); content.addView(connectionStatus)
         content.addView(button(getString(R.string.retry)) { startPolling() })
         content.addView(button("Elternzugang") { parentPanel.open() })
         addEmergencyButton()
+    }
+
+    private fun appCard(packageName: String, label: String, installed: Boolean, index: Int, action: () -> Unit): Button {
+        val colors = intArrayOf(0xFFE4F2E8.toInt(), 0xFFECE6FA.toInt(), 0xFFFFEBD7.toInt(), 0xFFE1EFFB.toInt())
+        return button(if (installed) label else getString(R.string.not_installed, label), action).apply {
+            tag = installed
+            gravity = Gravity.CENTER_VERTICAL or Gravity.START
+            minHeight = dp(96)
+            setPadding(dp(18), dp(18), dp(18), dp(18))
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_enabled), intArrayOf()),
+                intArrayOf(Color.rgb(54, 40, 78), Color.rgb(104, 99, 113))
+            ))
+            backgroundTintList = null
+            background = RippleDrawable(ColorStateList.valueOf(0x2236284E), rounded(colors[index % colors.size]), null)
+            compoundDrawablePadding = dp(16)
+            val icon = try { packageManager.getApplicationIcon(packageName) }
+                catch (_: android.content.pm.PackageManager.NameNotFoundException) {
+                    packageManager.defaultActivityIcon
+                }
+            icon.setBounds(0, 0, dp(44), dp(44))
+            setCompoundDrawablesRelative(icon, null, null, null)
+        }
     }
 
     private fun buildDisconnected() {
