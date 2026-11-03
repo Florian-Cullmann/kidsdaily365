@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import type { Resource, RoutineStep } from "@/domain/management";
+import { firstRoutineDate, type Resource, type RoutineStep } from "@/domain/management";
 import type { ManagementData } from "@/server/management";
 
 export type EditableRecord = Record<string, unknown> & { id: string };
@@ -15,10 +15,13 @@ function localInput(iso: unknown) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-export function ParentRecordForm({ resource, data, record, busy, onSave, onCancel }: {
-  resource: Resource; data: ManagementData; record: EditableRecord | null; busy: boolean;
+export function ParentRecordForm({ resource, data, record, copySource, busy, onSave, onCancel }: {
+  copySource?: string; resource: Resource; data: ManagementData; record: EditableRecord | null; busy: boolean;
   onSave: (input: unknown) => Promise<void>; onCancel: () => void;
 }) {
+  const [weekdays, setWeekdays] = useState<number[]>(() => record?.weekdays as number[] ?? [1, 2, 3, 4, 5, 6, 7]);
+  const [enabled, setEnabled] = useState(record?.active !== false);
+  const firstDate = firstRoutineDate(data.today, weekdays);
   const [steps, setSteps] = useState<RoutineStep[]>(() => (record?.steps as RoutineStep[] | undefined) ?? [{ title: "", description: "", icon: "heart", points: 5 }]);
   const [openStep, setOpenStep] = useState<number | null>(record ? null : 0);
   function updateStep(index: number, patch: Partial<RoutineStep>) {
@@ -50,9 +53,10 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onCance
   }
 
   return <form className="record-form" onSubmit={submit}>
-    <div className="record-form-heading"><h3>{record ? "Eintrag bearbeiten" : "Neuen Eintrag anlegen"}</h3></div>
+    <div className="record-form-heading"><h3>{copySource ? "Routine kopieren" : record ? "Eintrag bearbeiten" : "Neuen Eintrag anlegen"}</h3></div>
+    {copySource && <div className="parent-callout"><p>Quelle: {copySource} · {String(record?.title)}</p><p>Unabhängige Kopie: Verlauf, verdiente Sterne und Pausen werden nicht übernommen. Abbrechen speichert nichts.</p><p>{enabled && firstDate ? `Erster Wirksamkeitstag: ${new Intl.DateTimeFormat("de-DE", { dateStyle: "long", timeZone: "UTC" }).format(new Date(`${firstDate}T12:00:00Z`))}. Die Aufgaben entstehen beim nächsten Abruf des Tagesplans an diesem Tag, auch heute. Bestehende Aufgaben der Quelle bleiben unverändert.` : "Ohne Aktivierung und Wiederholungstag entstehen keine Tagesaufgaben."}</p></div>}
     <fieldset disabled={busy} className="record-fields">
-      {withChild && <label>Für welches Kind?<select name="childId" defaultValue={text("childId", data.children.find((child) => child.active)?.id)} required><option value="">Bitte auswählen</option>{data.children.map((child) => <option key={child.id} value={child.id}>{child.name}{child.active ? "" : " (archiviert)"}</option>)}</select></label>}
+      {withChild && <label>{copySource ? "Zielkind" : "Für welches Kind?"}<select name="childId" defaultValue={text("childId", data.children.find((child) => child.active)?.id)} required><option value="">Bitte auswählen</option>{data.children.filter((child) => !copySource || child.active).map((child) => <option key={child.id} value={child.id}>{child.name}{child.active ? "" : " (archiviert)"}</option>)}</select></label>}
       {resource === "children" && <>
         <label>Name<input name="name" defaultValue={text("name")} required maxLength={80} autoComplete="off" /></label>
         <label>Profilkürzel<input name="avatar" defaultValue={text("avatar")} maxLength={3} placeholder="z. B. M" /></label>
@@ -73,7 +77,7 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onCance
         {resource === "tasks" && <label>Sterne<input name="points" type="number" defaultValue={value("points", 5)} min={0} max={1000} required /></label>}
         <label>Reihenfolge<input name="sortOrder" type="number" defaultValue={value("sortOrder", 0)} min={0} max={1000} required /></label>
         {resource === "tasks" && <label>Datum<input name="date" type="date" defaultValue={text("date", data.today)} required /></label>}
-        {resource === "routines" && <fieldset className="weekday-fields wide-field"><legend>Wiederholt sich an</legend>{weekLabels.map((label, index) => <label key={label}><input name="weekdays" type="checkbox" value={index + 1} defaultChecked={!record || (record.weekdays as number[]).includes(index + 1)} /><span>{label}</span></label>)}</fieldset>}
+        {resource === "routines" && <fieldset className="weekday-fields wide-field"><legend>Wiederholt sich an</legend>{weekLabels.map((label, index) => <label key={label}><input name="weekdays" type="checkbox" value={index + 1} checked={weekdays.includes(index + 1)} onChange={(event) => setWeekdays((days) => event.target.checked ? [...days, index + 1] : days.filter((day) => day !== index + 1))} /><span>{label}</span></label>)}</fieldset>}
       </>}
       {resource === "routines" && <div className="wide-field routine-editor">
         <h4>Aufgaben in dieser Routine</h4>
@@ -113,7 +117,7 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onCance
         <label>Anzeigename<input name="label" defaultValue={text("label")} required maxLength={80} placeholder="Audible" /></label>
         <label className="wide-field">Android-Paketname<input name="packageName" defaultValue={text("packageName")} required maxLength={255} placeholder="com.audible.application" autoCapitalize="none" autoCorrect="off" spellCheck={false} /><span className="field-help">Exakter Paketname der installierten App, keine Website oder Suchbegriffe.</span></label>
       </>}
-      {resource !== "tasks" && <label className="check-field wide-field"><input name="active" type="checkbox" defaultChecked={record?.active !== false} /><span>{resource === "apps" ? "App freigegeben" : "Aktiv"}</span></label>}
+      {resource !== "tasks" && <label className="check-field wide-field"><input name="active" type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} /><span>{resource === "apps" ? "App freigegeben" : "Aktiv"}</span></label>}
     </fieldset>
     <div className="record-form-actions"><button type="button" className="parent-secondary" onClick={onCancel} disabled={busy}>Abbrechen</button><button className="parent-primary" disabled={busy}>{busy ? "Wird gespeichert …" : "Speichern"}</button></div>
   </form>;
