@@ -127,11 +127,16 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
         {view === "day" && <div className="tasks-scroll">
           {groups.map((group) => <section key={group.id} className="routine-group" aria-label={group.tasks[0].routineTitle ?? "Einzelaufgabe"}>
           {group.tasks[0].routineTitle && <div className="routine-heading"><h3>{group.tasks[0].routineTitle}</h3><span>{group.tasks.filter((task) => task.completed).length} von {group.tasks.length} geschafft</span></div>}
-          {group.tasks.map((task) => <button key={task.id} className={`task-row ${task.completed ? "is-done" : ""} ${next?.id === task.id ? "is-next" : ""}`} disabled={task.completed || !!busy} aria-label={`${task.title}${task.time ? `, ${task.time} Uhr` : ""}, ${task.points} Sterne${task.completed ? ", erledigt" : ", abhaken"}`} onClick={() => complete(task.id)}>
+          {group.tasks.map((task) => <div key={task.id} className="task-with-help"><button className={`task-row ${task.completed ? "is-done" : ""} ${next?.id === task.id ? "is-next" : ""}`} disabled={task.completed || !!busy} aria-label={`${task.title}${task.time ? `, ${task.time} Uhr` : ""}, ${task.points} Sterne${task.completed ? ", erledigt" : ", abhaken"}`} onClick={() => complete(task.id)}>
             <span className="task-picture" aria-hidden="true">{taskPictures[task.icon]}</span>
             <span className="task-words"><strong>{task.title}</strong><span>{task.completed ? "Geschafft!" : task.time ? `${task.time} Uhr` : "In deinem Tempo"}<span className="row-stars"><Star size={15} fill="currentColor" />{task.completed ? "" : "+"}{task.points}</span></span></span>
             <span className="check-circle" aria-hidden="true">{busy === task.id ? <span className="saving-dots">•••</span> : task.completed ? <Check size={30} strokeWidth={3.5} /> : null}</span>
-          </button>)}</section>)}
+          </button>
+          {task.description.trim() && <details className="task-help">
+            <summary><span className="help-show">Hilfe anzeigen</span><span className="help-hide">Hilfe schließen</span><span className="sr-only">: {task.title}</span></summary>
+            <p>{task.description}</p>
+          </details>}
+          </div>)}</section>)}
           {!plan.tasks.length && <div className="empty-state"><span aria-hidden="true">🌈</span><h3>Heute ist Platz für dich.</h3><p>Gerade stehen keine Aufgaben an.</p></div>}
         </div>}
 
