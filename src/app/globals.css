@@ -292,3 +292,19 @@ progress::-moz-progress-bar { background: #efb832; border-radius: 20px; }
 .routine-group { display: grid; gap: 10px; }
 
 .profile-photo { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+
+/* Optional single-step view uses the same plan and completion action. */
+.play-space.view-step { grid-template-columns: minmax(0, 820px); justify-content: center; }
+.step-toggle, .step-navigation button { min-height: 56px; padding: 12px 18px; border: 2px solid #d6c9e8; border-radius: 16px; background: #f6f1fc; color: #594278; font-weight: 700; }
+.step-toggle { margin-bottom: 14px; flex-shrink: 0; }
+.single-step { padding: 8px 12px; }
+.step-card { text-align: center; padding: 4px 12px; }
+.step-routine { color: #62577e; font-size: 18px; margin-bottom: 10px; }
+.step-card h3 { font-size: clamp(28px, 3vw, 36px); overflow-wrap: anywhere; }
+.step-description { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 20px; line-height: 1.5; margin: 12px 0; }
+.step-reward, .step-hint { color: #62577e; font-size: 16px; }
+.single-step .primary-button { margin-top: 12px; }
+.step-navigation { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0 8px; }
+.step-navigation button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.step-navigation button:disabled { opacity: .5; }
+.step-hint { text-align: center; line-height: 1.5; }

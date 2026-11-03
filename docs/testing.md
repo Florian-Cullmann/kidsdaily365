@@ -118,3 +118,11 @@ Screenshots mit ausschließlich fiktiven Daten: [Elterneditor](proof/routine-edi
 5. Vollständigen PostgreSQL-Dump der separaten Testdatenbank in eine leere `*_test`-Datenbank zurückspielen. Bildversionen und SHA-256-Prüfsummen der `child_images.data`-Spalte müssen übereinstimmen. Die Unraid-Anleitung enthält den produktiven Backup-Weg.
 
 Automatisierte Bildtests prüfen echte Dekodierung, Größenlimits, Ausschnitt, EXIF-Ausrichtung und entfernte Metadaten. Die Datenbanktests prüfen Ersetzen/Entfernen, Rechte, Profiltrennung und unabhängigen Punktestand. Keine echten Kinderfotos in Tests oder Nachweisen verwenden.
+
+## Freiwilliger Einzelschritt-Modus
+
+- Im Tagesplan „Einen Schritt nach dem anderen ansehen“ wählen. Nur ein offener Schritt mit Erklärung und Routinezuordnung erscheint; Termin-/Wunschkarten sind ausgeblendet.
+- Vorwärts und rückwärts wechseln (auch vom letzten zum ersten offenen Schritt), dann zum vollständigen Tagesplan zurückkehren: Aufgaben und Sterne bleiben unverändert.
+- „Das habe ich geschafft“ wählen: Erst nach erfolgreicher Antwort erscheint der nächste offene Schritt. Bei Netzwerk-/Serverfehler bleibt der Schritt offen und lässt sich erneut abschließen. Während des Speicherns bleibt die Rückkehr zum Tagesplan möglich.
+- Alle Schritte abschließen und den Modus erneut öffnen: ruhiger Abschlusszustand. Einen leeren Tagesplan ebenfalls prüfen. Profilwechsel startet immer mit dem vollständigen Tagesplan.
+- Auf 1366 × 768 und schmalem Bildschirm prüfen: Erklärung lesbar, große Bedienelemente, Rückkehr und Navigation erreichbar. Lange Erklärungen scrollen; keine Timer oder Sounds.

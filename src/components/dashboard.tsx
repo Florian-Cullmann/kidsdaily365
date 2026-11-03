@@ -5,9 +5,10 @@ import { CalendarDays, Check, ChevronRight, Heart, House, Maximize, Star, Users 
 import { completeDemoTask, localDate, type DayPlan, type TaskIcon } from "@/domain/plan";
 import { ProfilePicture } from "./profile-picture";
 import { Buddy } from "./buddy";
+import { SingleStep } from "./single-step";
 import Link from "next/link";
 
-type View = "day" | "appointments" | "rewards";
+type View = "day" | "step" | "appointments" | "rewards";
 const taskPictures: Record<TaskIcon, string> = {
   sun: "🥣", toothbrush: "🪥", backpack: "🎒", book: "📚", moon: "🌙", heart: "💛",
 };
@@ -75,14 +76,14 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
         const response = await fetch(`/api/tasks/${taskId}/complete`, { method: "POST" });
         const data = await response.json();
         if (!response.ok) {
-          setError(typeof data.error === "string" ? data.error : "Das Speichern hat nicht geklappt. Bitte erneut versuchen.");
+          if (context === noticeContext.current) setError(typeof data.error === "string" ? data.error : "Das Speichern hat nicht geklappt. Bitte erneut versuchen.");
           return;
         }
         setPlans((previous) => previous.map((item) => item.child.id === data.childId ? data.plan : item));
         if (context === noticeContext.current) setNotice({ text: data.awarded ? `Geschafft! ${data.awarded} neue Sterne für dich.` : "Das hast du geschafft!" });
       }
     } catch {
-      setError("Der Server ist gerade nicht erreichbar. Deine Aufgabe bleibt offen. Bitte erneut versuchen.");
+      if (context === noticeContext.current) setError("Der Server ist gerade nicht erreichbar. Deine Aufgabe bleibt offen. Bitte erneut versuchen.");
     } finally { pending.current = false; setBusy(null); }
   }
 
@@ -116,13 +117,18 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
 
   return <div className="child-world forest-world" data-calm={plan.child.reducedMotion}>
     <header className="child-header">
-      <div><p className="date-label">{dateLabel}</p><h1>Hallo {plan.child.name}! <span className="hello-sun" aria-hidden="true">☀️</span></h1><p className="hello-caption">{view === "day" ? "Ein kleiner Schritt nach dem anderen." : view === "appointments" ? "Das hast du als Nächstes vor." : "Hier wohnen deine gesammelten Sterne."}</p></div>
+      <div><p className="date-label">{dateLabel}</p><h1>Hallo {plan.child.name}! <span className="hello-sun" aria-hidden="true">☀️</span></h1><p className="hello-caption">{(view === "day" || view === "step") ? "Ein kleiner Schritt nach dem anderen." : view === "appointments" ? "Das hast du als Nächstes vor." : "Hier wohnen deine gesammelten Sterne."}</p></div>
       <div className="header-actions">{demo && <span className="demo-badge">Demo · ohne Speicherung</span>}<button className="fullscreen-button" onClick={fullscreen}><Maximize size={25} /><span>Vollbild</span></button></div>
     </header>
 
     <main className={`play-space view-${view}`}>
-      <section className="day-paper" aria-label={view === "day" ? "Deine Aufgaben heute" : view === "appointments" ? "Deine Termine" : "Deine Belohnungen"}>
-        <div className="paper-heading"><h2>{view === "day" ? "Heute" : view === "appointments" ? "Deine Termine" : "Deine Wünsche"}</h2>{view === "day" && <span className="done-badge"><Star size={24} fill="currentColor" /><span>{done} von {plan.tasks.length} geschafft</span></span>}</div>
+      <section className="day-paper" aria-label={(view === "day" || view === "step") ? "Deine Aufgaben heute" : view === "appointments" ? "Deine Termine" : "Deine Belohnungen"}>
+        <div className="paper-heading"><h2>{view === "step" ? "Ein Schritt für dich" : view === "day" ? "Heute" : view === "appointments" ? "Deine Termine" : "Deine Wünsche"}</h2>{view === "day" && <span className="done-badge"><Star size={24} fill="currentColor" /><span>{done} von {plan.tasks.length} geschafft</span></span>}</div>
+
+        {(view === "day" || view === "step") && <button className="step-toggle" onClick={() => openView(view === "step" ? "day" : "step")}>
+          {view === "step" ? "Zurück zum vollständigen Tagesplan" : "Einen Schritt nach dem anderen ansehen"}
+        </button>}
+        {view === "step" && <SingleStep key={plan.child.id} tasks={plan.tasks} busy={!!busy} onComplete={complete} />}
 
         {view === "day" && <div className="tasks-scroll">
           {groups.map((group) => <section key={group.id} className="routine-group" aria-label={group.tasks[0].routineTitle ?? "Einzelaufgabe"}>
@@ -142,18 +148,18 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
         <div className="paper-footer"><Heart size={19} /><span>Pausen gehören auch dazu.</span></div>
       </section>
 
-      <aside className="buddy-space" aria-label={`Dein Buddy ${plan.child.buddyName}`}>
+      {view !== "step" && <aside className="buddy-space" aria-label={`Dein Buddy ${plan.child.buddyName}`}>
         <div className="buddy-scene"><Buddy kind={plan.child.buddyKind} equipped={plan.child.equippedAccessories} className="main-buddy" priority /><span className="buddy-name">Dein {plan.child.buddyName}</span>
           <button className="star-treasure" onClick={() => openView("rewards")} aria-label={`${plan.balance} Sterne gesammelt. Deine Wünsche ansehen.`}><span aria-hidden="true">⭐</span><div><strong>{plan.balance}</strong><span>deine Sterne</span></div><ChevronRight size={27} /></button>
         </div>
         <button className="peek-card appointment-peek" onClick={() => openView("appointments")}><span className="peek-picture" aria-hidden="true">📅</span><span className="peek-copy"><span>Dein nächster Termin</span><strong>{nextAppointment?.title ?? "Gerade nichts geplant"}</strong>{nextAppointment && <span>{appointmentDay(nextAppointment.startsAt, plan)} · {appointmentTime(nextAppointment.startsAt, plan.timezone)} Uhr</span>}</span><ChevronRight size={25} /></button>
         <button className="peek-card reward-peek" onClick={() => openView("rewards")}><span className="peek-picture" aria-hidden="true">🎁</span><span className="peek-copy"><span>Darauf kannst du dich freuen</span><strong>{goal?.title ?? "Dein nächster Wunsch"}</strong>{goal && <progress value={Math.min(plan.balance, goal.cost)} max={goal.cost} aria-label={`Fortschritt für ${goal.title}`} />}</span><ChevronRight size={25} /></button>
-      </aside>
+      </aside>}
     </main>
 
     <div className="message-area"><div className={`success-message ${notice ? "has-message" : ""}`} aria-live="polite" role="status">{notice && <><Star size={23} fill="currentColor" />{notice.text}</>}</div>{error && <div className="error-message" role="alert"><p>{error}</p><button onClick={() => window.location.reload()}>Neu laden</button></div>}</div>
     <nav className="touch-dock" aria-label="Deine Bereiche">
-      <button aria-pressed={view === "day"} className={view === "day" ? "active" : ""} onClick={() => openView("day")}><House size={29} /><span>Mein Tag</span></button>
+      <button aria-pressed={view === "day" || view === "step"} className={view === "day" || view === "step" ? "active" : ""} onClick={() => openView("day")}><House size={29} /><span>Mein Tag</span></button>
       <button aria-pressed={view === "appointments"} className={view === "appointments" ? "active" : ""} onClick={() => openView("appointments")}><CalendarDays size={29} /><span>Termine</span></button>
       <button aria-pressed={view === "rewards"} className={view === "rewards" ? "active" : ""} onClick={() => openView("rewards")}><Star size={29} /><span>Sterne</span></button>
       <span className="dock-divider" />
