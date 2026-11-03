@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
+import android.graphics.drawable.LayerDrawable
 import android.content.res.ColorStateList
 import android.os.Bundle
 import android.text.InputType
@@ -140,7 +141,7 @@ class MainActivity : Activity() {
         val mode = when {
             policy.error != null -> policy.error!!
             policy.enabled && policy.owner -> "Verwalteter Kindermodus"
-            else -> getString(R.string.unmanaged)
+            else -> ""
         }
         if (layoutKind == nextKind && lastRendered == state && modeStatus.text == mode) return
         lastRendered = state
@@ -153,6 +154,7 @@ class MainActivity : Activity() {
             content.addView(modeStatus)
         }
         modeStatus.text = mode
+        modeStatus.visibility = if (mode.isEmpty()) View.GONE else View.VISIBLE
         val sync = state.receivedAt?.let { getString(R.string.last_sync, DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it))) }.orEmpty()
         connectionStatus.text = listOf(state.status, sync).filter { it.isNotEmpty() }.joinToString("\n")
         val snapshot = state.snapshot
@@ -187,11 +189,20 @@ class MainActivity : Activity() {
                         }
                     })
                 }
+                if (!snapshot?.policy?.allowedApps.isNullOrEmpty()) {
+                    // Keep a partially filled last row aligned like a phone home screen.
+                    while (apps.childCount % apps.columnCount != 0) {
+                        apps.addView(android.widget.Space(this), launcherCell())
+                    }
+                }
                 lastSnapshot = snapshot
             }
             for (i in 0 until apps.childCount) {
                 val child = apps.getChildAt(i)
-                if (child is Button) child.isEnabled = state.canLaunch && child.tag == true
+                if (child is Button) {
+                    child.isEnabled = state.canLaunch && child.tag == true
+                    child.alpha = if (child.isEnabled) 1f else 0.6f
+                }
             }
         }
     }
@@ -239,8 +250,12 @@ class MainActivity : Activity() {
             setTypeface(typeface, Typeface.BOLD)
         }, fullWidth())
         apps = GridLayout(this).apply {
-            // Large system text gets a single column to preserve readable labels.
-            columnCount = if (resources.configuration.fontScale > 1.2f || resources.configuration.screenWidthDp < 340) 1 else 2
+            // Adapt the familiar icon grid to available space and system text size.
+            columnCount = when {
+                resources.configuration.fontScale > 1.5f -> 1
+                resources.configuration.fontScale > 1.2f || resources.configuration.screenWidthDp < 360 -> 2
+                else -> 3
+            }
             alignmentMode = GridLayout.ALIGN_BOUNDS
             useDefaultMargins = false
         }
@@ -275,47 +290,40 @@ class MainActivity : Activity() {
         setStroke(dp(1), 0xCCFFFFFF.toInt())
     }
 
+    private fun launcherCell() = GridLayout.LayoutParams().apply {
+        width = 0
+        height = GridLayout.LayoutParams.WRAP_CONTENT
+        columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+        setGravity(Gravity.FILL)
+        setMargins(dp(2), dp(4), dp(2), dp(10))
+    }
+
     private fun appCard(packageName: String, label: String, installed: Boolean, index: Int, action: () -> Unit): Button {
-        val colors = arrayOf(
-            0xFFF4E5FF.toInt() to 0xFFE3C8F4.toInt(),
-            0xFFFFEADF.toInt() to 0xFFFFCFC2.toInt(),
-            0xFFE6F4E9.toInt() to 0xFFC8E7DF.toInt(),
-            0xFFE4F2FF.toInt() to 0xFFBEDDF8.toInt()
-        )
-        return button(if (installed) label else getString(R.string.not_installed, label), action).apply {
+        val colors = intArrayOf(0xFFE8D4F5.toInt(), 0xFFFFDDCF.toInt(), 0xFFD7EDE1.toInt(), 0xFFD4E8FA.toInt())
+        return button(if (installed) label else "$label\nNicht installiert", action).apply {
             tag = installed
-            layoutParams = GridLayout.LayoutParams().apply {
-                width = 0
-                height = GridLayout.LayoutParams.WRAP_CONTENT
-                columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
-                setGravity(Gravity.FILL)
-                setMargins(dp(5), dp(5), dp(5), dp(9))
-            }
-            gravity = Gravity.CENTER
+            layoutParams = launcherCell()
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             minWidth = 0
-            minHeight = dp(158)
-            textSize = 20f
-            setPadding(dp(10), dp(18), dp(10), dp(18))
+            minHeight = dp(112)
+            textSize = 14f
+            setPadding(dp(4), dp(8), dp(4), dp(8))
             typeface = Typeface.create("sans-serif-rounded", Typeface.BOLD)
-            setTextColor(ColorStateList(
-                arrayOf(intArrayOf(android.R.attr.state_enabled), intArrayOf()),
-                intArrayOf(Color.rgb(67, 37, 80), Color.rgb(106, 87, 113))
-            ))
+            setTextColor(Color.rgb(67, 37, 80))
             backgroundTintList = null
-            val (top, bottom) = colors[index % colors.size]
-            background = RippleDrawable(ColorStateList.valueOf(0x2236284E), softSurface(top, bottom), null)
+            background = RippleDrawable(ColorStateList.valueOf(0x2236284E), rounded(Color.TRANSPARENT), rounded(Color.WHITE))
             stateListAnimator = null
-            outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
-            elevation = dp(5).toFloat()
-            setOutlineAmbientShadowColor(0xFF906D9E.toInt())
-            setOutlineSpotShadowColor(0xFF906D9E.toInt())
-            compoundDrawablePadding = dp(12)
+            elevation = 0f
+            compoundDrawablePadding = dp(8)
             val icon = try { packageManager.getApplicationIcon(packageName) }
                 catch (_: android.content.pm.PackageManager.NameNotFoundException) {
                     requireNotNull(getDrawable(R.drawable.ic_app_placeholder))
                 }
-            icon.setBounds(0, 0, dp(64), dp(64))
-            setCompoundDrawablesRelative(null, icon, null, null)
+            val framedIcon = LayerDrawable(arrayOf(softSurface(Color.WHITE, colors[index % colors.size]), icon)).apply {
+                setLayerInset(1, dp(8), dp(8), dp(8), dp(8))
+                setBounds(0, 0, dp(68), dp(68))
+            }
+            setCompoundDrawablesRelative(null, framedIcon, null, null)
         }
     }
 
