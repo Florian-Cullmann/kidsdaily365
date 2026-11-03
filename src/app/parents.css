@@ -33,7 +33,7 @@
 .parent-sidebar .brand-number { font-size: 14px; }
 .parent-sidebar-caption { margin: 34px 14px 14px; color: #786584; letter-spacing: 1.4px; font-size: 10px; font-weight: 800; }
 .parent-sidebar nav { display: flex; flex-direction: column; gap: 5px; }
-.parent-sidebar nav button { display: flex; gap: 13px; align-items: center; text-align: left; background: transparent; padding: 12px 15px; min-height: 45px; border: 0; border-radius: 11px; color: #8b7b9b; font-size: 14px; }
+.parent-sidebar nav button, .parent-sidebar nav a { display: flex; gap: 13px; align-items: center; text-align: left; background: transparent; padding: 12px 15px; min-height: 45px; border: 0; border-radius: 11px; color: #8b7b9b; font-size: 14px; }
 .parent-sidebar nav button.active { background: #eee7f6; color: #765a96; font-weight: 700; }
 .parent-sidebar-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 16px; padding: 25px 14px 0; font-size: 13px; color: #786584; }
 .parent-sidebar-bottom button { display: flex; align-items: center; gap: 8px; border: 0; background: none; padding: 0; width: fit-content; color: #8a7998; font-size: 13px; min-height: 35px; }
@@ -115,7 +115,7 @@
   .parent-sidebar { height: auto; position: static; padding: 18px; border-right: 0; border-bottom: 1px solid #e8def0; }
   .parent-sidebar-caption { margin: 15px 5px 10px; }
   .parent-sidebar nav { flex-direction: row; overflow-x: auto; padding-bottom: 8px; }
-  .parent-sidebar nav button { flex-shrink: 0; min-height: 48px; }
+  .parent-sidebar nav button, .parent-sidebar nav a { flex-shrink: 0; min-height: 48px; }
   .parent-sidebar-bottom { padding-top: 12px; flex-direction: row; justify-content: space-between; align-items: center; gap: 12px; }
   .parent-sidebar-bottom button { min-height: 40px; }
   .parent-main { padding-inline: 20px; }
