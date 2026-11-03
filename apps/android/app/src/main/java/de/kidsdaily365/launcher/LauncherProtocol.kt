@@ -29,7 +29,7 @@ class ServerAddress private constructor(val origin: String) {
     }
 }
 
-data class Pairing(val token: String, val deviceId: String, val expiresIn: Long)
+data class Pairing(val token: String, val deviceId: String, val expiresIn: Long, val buddySetupToken: String? = null)
 
 /** Strict boundary: never infer permissions from defaults or coerce JSON strings to booleans. */
 object LauncherProtocol {
@@ -45,7 +45,8 @@ object LauncherProtocol {
         val o = JSONObject(raw)
         check(o.string("kind") == "android")
         val token = o.string("token").also { check(validToken(it)) }
-        Pairing(token, o.uuid("deviceId"), o.integer("expiresIn", 1, 7_776_000))
+        val setupToken = if (o.isNull("buddySetupToken")) null else o.string("buddySetupToken").also { check(validToken(it) && it != token) }
+        Pairing(token, o.uuid("deviceId"), o.integer("expiresIn", 1, 7_776_000), setupToken)
     }
 
     fun snapshot(raw: String): LauncherSnapshot = guarded {

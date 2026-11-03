@@ -71,17 +71,20 @@ export async function exchangePairingCode(code: string, origin: string | null, e
     if (expectedKind && pairing.kind !== expectedKind) throw new ApiError("Dieser Gerätecode gehört zu einem anderen Gerätetyp.", 409);
     const expectedOrigin = new URL(liveConfig().APP_ORIGIN).origin;
     if ((origin && origin !== expectedOrigin) || (pairing.kind === "wall" && origin !== expectedOrigin)) throw new ApiError("Ungültiger Ursprung.", 403);
+    let buddySetupToken: string | null = null;
     if (pairing.childId) {
-      const [child] = await tx.select({ id: children.id }).from(children).where(and(eq(children.id, pairing.childId), eq(children.familyId, pairing.familyId), eq(children.active, true))).for("share");
+      const [child] = await tx.select({ id: children.id, buddyInitialized: children.buddyInitialized }).from(children).where(and(eq(children.id, pairing.childId), eq(children.familyId, pairing.familyId), eq(children.active, true))).for("share");
       if (!child) throw new ApiError("Kinderprofil nicht verfügbar.", 409);
+      if (!child.buddyInitialized && pairing.kind === "android") buddySetupToken = newToken();
     }
     const token = newToken();
     const [device] = await tx.insert(devices).values({
       familyId: pairing.familyId, childId: pairing.childId, kind: pairing.kind, label: pairing.label,
+      buddySetupTokenHash: buddySetupToken ? digestToken(buddySetupToken) : null,
       tokenHash: digestToken(token), expiresAt: new Date(Date.now() + deviceSessionSeconds * 1000),
     }).returning({ id: devices.id, kind: devices.kind });
     await tx.update(devicePairingCodes).set({ usedAt: new Date() }).where(eq(devicePairingCodes.id, pairing.id));
-    return { token, ...device };
+    return { token, buddySetupToken, ...device };
   });
 }
 

@@ -7,6 +7,7 @@ import java.net.URL
 
 interface LauncherApi {
     fun pair(server: ServerAddress, code: String): Pairing
+    fun buddySetup(server: ServerAddress, token: String, kind: String? = null, name: String? = null): Boolean
     fun snapshot(server: ServerAddress, token: String): LauncherSnapshot
 }
 
@@ -32,6 +33,20 @@ class HttpLauncherApi : LauncherApi, MaintenanceAuthorizer {
     override fun snapshot(server: ServerAddress, token: String): LauncherSnapshot {
         require(LauncherProtocol.validToken(token))
         return LauncherProtocol.snapshot(request(server, "/api/launcher/snapshot?version=2", token, null))
+    }
+
+    override fun buddySetup(server: ServerAddress, token: String, kind: String?, name: String?): Boolean {
+        require(LauncherProtocol.validToken(token))
+        val body = if (kind == null) null else {
+            require(kind in setOf("fox", "rabbit", "bear") && name != null && name.trim().length in 1..80)
+            JSONObject().put("kind", kind).put("name", name.trim()).toString()
+        }
+        val raw = request(server, "/api/device/buddy-setup", token, body)
+        try {
+            val initialized = JSONObject(raw).get("initialized")
+            check(initialized is Boolean)
+            return initialized
+        } catch (_: Exception) { throw ProtocolFailure() }
     }
 
     internal fun request(server: ServerAddress, path: String, token: String?, body: String?, method: String = "POST"): String {

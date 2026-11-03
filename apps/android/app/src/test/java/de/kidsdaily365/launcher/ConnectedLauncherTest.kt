@@ -23,13 +23,48 @@ class ConnectedLauncherTest {
         override fun clear() { raw = null }
     }
     private class Api : LauncherApi {
+        var setupToken: String? = null
+        var initialized = false
+        override fun buddySetup(server: ServerAddress, token: String, kind: String?, name: String?): Boolean {
+            failure?.let { throw it }
+            check(token == setupToken)
+            if (kind != null && !initialized) {
+                data = data.copy(buddy = Buddy(kind, name!!, emptyList())); initialized = true
+            }
+            return initialized
+        }
         var data = snapshotFixture()
         var failure: Exception? = null
         var block: (() -> Unit)? = null
-        override fun pair(server: ServerAddress, code: String) = Pairing("a".repeat(43), data.device.id, 7776000)
+        override fun pair(server: ServerAddress, code: String) = Pairing("a".repeat(43), data.device.id, 7776000, setupToken)
         override fun snapshot(server: ServerAddress, token: String): LauncherSnapshot {
             block?.invoke(); failure?.let { throw it }; return data
         }
+    }
+
+    @Test fun `buddy capability survives restart offline retry and is removed after completion`() = runBlocking {
+        val store = Store(); val clock = Clock(); val api = Api().apply { setupToken = "b".repeat(43) }
+        var repo = ConnectedLauncher(api, store, clock, true, TestMaintenanceAccess())
+        assertTrue(repo.pair("http://10.0.2.2:3000", "fictional").buddySetupPending)
+        repo = ConnectedLauncher(api, store, clock, true, TestMaintenanceAccess())
+        assertTrue(repo.refresh().buddySetupPending)
+        api.failure = IOException()
+        try { repo.completeBuddy("bear", "Bruno"); fail() } catch (_: IOException) { }
+        assertTrue(repo.current().buddySetupPending)
+        api.failure = null
+        val done = repo.completeBuddy("bear", "Bruno")
+        assertFalse(done.buddySetupPending)
+        assertEquals("Bruno", done.snapshot?.buddy?.name)
+        assertFalse(store.raw!!.contains("b".repeat(43)))
+        assertFalse(ConnectedLauncher(api, store, clock, true, TestMaintenanceAccess()).current().buddySetupPending)
+    }
+
+    @Test fun `another device completing buddy setup dismisses the prompt without overwrite`() = runBlocking {
+        val api = Api().apply { setupToken = "b".repeat(43) }
+        val repo = ConnectedLauncher(api, Store(), Clock(), true, TestMaintenanceAccess())
+        repo.pair("http://10.0.2.2:3000", "fictional")
+        api.initialized = true
+        assertFalse(repo.refresh().buddySetupPending)
     }
 
     @Test fun `consumed code is retained if first snapshot fails then restart recovers`() = runBlocking {

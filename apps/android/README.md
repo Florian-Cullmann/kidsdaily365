@@ -22,10 +22,16 @@ GitHub Actions prüft beide Varianten und stellt nach erfolgreichem Android-Job 
 2. Im Eltern-Webbereich ein Kinderprofil anlegen und unter Geräte einen **Android**-Code für dieses Kind erstellen. Ein Wandgerätecode funktioniert hier nicht. Codes gelten zehn Minuten und sind einmalig.
 3. In der App die Serveradresse ohne Pfad und den Gerätecode eingeben. Kein Elternpasswort, kein erster Registrierungscode. Standard ist HTTPS mit gültigem Zertifikat; keine TLS-Ausnahmen oder HTTP-Weiterleitungen.
 4. Für lokale Entwicklung erlaubt **nur die Debug-App** zusätzlich HTTP mit einer privaten IPv4-/Loopback-Adresse. Im Standard-Android-Emulator etwa `http://10.0.2.2:3000`, auf dem Handy die LAN-IP des Servers. Eine öffentliche HTTP-Adresse oder ein Hostname über HTTP wird abgewiesen. Der Release-Build erlaubt ausschließlich HTTPS. HTTP-Debug-Kopplung nur mit Testdaten in einem vertrauenswürdigen Entwicklungsnetz verwenden.
-5. Buddy, Sterne und Freigaben werden im Vordergrund alle fünf Sekunden erneut gelesen. Fehlende Apps erscheinen deaktiviert mit „nicht installiert“; die App installiert nichts automatisch. Änderungen erfolgen ausschließlich im Eltern-Webbereich bzw. am Wandbildschirm.
+5. Buddy, Sterne und Freigaben werden im Vordergrund alle fünf Sekunden erneut gelesen. Fehlende Apps erscheinen deaktiviert mit „nicht installiert“; die App installiert nichts automatisch. Die einmalige Buddy-Auswahl erfolgt auf Android; weitere Änderungen erfolgen im Eltern-Webbereich bzw. am Wandbildschirm.
 6. Gerätezugang im Elternbereich widerrufen: Beim nächsten Abruf verschwinden Token und Kinder-Cache; die App verlangt einen neuen Code. „Verbindung trennen“ im Wartungsmodus löscht lokal dieselben Daten. Der getrennte lokale Elternzugang bleibt bei Trennung und Widerruf erhalten.
 
 Außerhalb des LAN braucht das Telefon einen erreichbaren HTTPS-Zugang/VPN. Es gibt keinen Cloud-Relay und keinen Offline-Widerruf ohne Serverkontakt.
+
+## Buddy selbst auswählen
+
+Neue Kinderprofile werden ausschließlich im Dashboard angelegt. Nach der Android-Kopplung wählt das Kind Fuchs, Hase oder Bär, gibt einen Namen (1–80 Zeichen) ein und bestätigt mit „Das ist mein Buddy!“. Dafür ist eine Serververbindung nötig. Ein fehlgeschlagener Versuch lässt sich wiederholen; ein App-Neustart erhält die Berechtigung und zeigt die Einrichtung erneut. Bereits eingerichtete Buddys werden bei erneuter Kopplung nicht überschrieben. Bestehende Profile behalten bei der Migration ihren bisherigen Buddy.
+
+Die Kopplung liefert nur bei ausstehender Einrichtung zusätzlich `buddySetupToken`. Dieses getrennte Zufallstoken wird verschlüsselt neben der Geräteverbindung gespeichert; serverseitig liegt nur sein Hash am gekoppelten Gerät. Es gilt nur für dessen aktives Kinderprofil und nur solange die Gerätefreigabe gültig ist. `GET /api/device/buddy-setup` meldet den Abschluss; `POST` akzeptiert ausschließlich `{kind, name}` und setzt den Buddy atomar genau einmal. Wiederholungen nach Abschluss ändern nichts. Weder normale Launcher-Tokens noch Wand- oder Elternsessions werden dort akzeptiert; umgekehrt gewährt das Einrichtungstoken keine Launcher-, Aufgaben-, Punkte-, Kauf- oder Verwaltungsrechte. Nach Abschluss entfernt die App das Token. Parallel gekoppelte Geräte übernehmen die erste bestätigte Auswahl.
 
 ## Elternzugang und Offline-Wartung
 

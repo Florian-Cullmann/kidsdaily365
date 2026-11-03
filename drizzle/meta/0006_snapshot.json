@@ -1,5 +1,5 @@
 {
-  "id": "3ff9f7c3-e71d-4489-91bb-4dbc851799ce",
+  "id": "94dd56c3-b24b-4741-bb39-c2acbcfd1eb9",
   "prevId": "fe602eca-8d54-4a55-b69b-15de3a7fc703",
   "version": "7",
   "dialect": "postgresql",
@@ -408,135 +408,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.child_messages": {
-      "name": "child_messages",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "familyId": {
-          "name": "familyId",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "childId": {
-          "name": "childId",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "sender": {
-          "name": "sender",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "senderId": {
-          "name": "senderId",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "requestId": {
-          "name": "requestId",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "body": {
-          "name": "body",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "readAt": {
-          "name": "readAt",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "messages_conversation": {
-          "name": "messages_conversation",
-          "columns": [
-            {
-              "expression": "familyId",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "childId",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "createdAt",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "child_messages_childId_familyId_children_id_familyId_fk": {
-          "name": "child_messages_childId_familyId_children_id_familyId_fk",
-          "tableFrom": "child_messages",
-          "tableTo": "children",
-          "columnsFrom": [
-            "childId",
-            "familyId"
-          ],
-          "columnsTo": [
-            "id",
-            "familyId"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "message_request_identity": {
-          "name": "message_request_identity",
-          "nullsNotDistinct": false,
-          "columns": [
-            "familyId",
-            "childId",
-            "senderId",
-            "requestId"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "message_body_length": {
-          "name": "message_body_length",
-          "value": "length(\"child_messages\".\"body\") between 1 and 2000"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.children": {
       "name": "children",
       "schema": "",
@@ -587,6 +458,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'Fino'"
+        },
+        "buddyInitialized": {
+          "name": "buddyInitialized",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
         },
         "active": {
           "name": "active",
@@ -922,159 +800,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.device_management": {
-      "name": "device_management",
-      "schema": "",
-      "columns": {
-        "deviceId": {
-          "name": "deviceId",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "familyId": {
-          "name": "familyId",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "childId": {
-          "name": "childId",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "enrollmentHash": {
-          "name": "enrollmentHash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "enrollmentExpiresAt": {
-          "name": "enrollmentExpiresAt",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "tokenHash": {
-          "name": "tokenHash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "revision": {
-          "name": "revision",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "locked": {
-          "name": "locked",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "acknowledgedRevision": {
-          "name": "acknowledgedRevision",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": -1
-        },
-        "appliedLocked": {
-          "name": "appliedLocked",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "lastSeenAt": {
-          "name": "lastSeenAt",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "ready": {
-          "name": "ready",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "usagePermission": {
-          "name": "usagePermission",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "usageSince": {
-          "name": "usageSince",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "usageThrough": {
-          "name": "usageThrough",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "error": {
-          "name": "error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "device_management_deviceId_familyId_devices_id_familyId_fk": {
-          "name": "device_management_deviceId_familyId_devices_id_familyId_fk",
-          "tableFrom": "device_management",
-          "tableTo": "devices",
-          "columnsFrom": [
-            "deviceId",
-            "familyId"
-          ],
-          "columnsTo": [
-            "id",
-            "familyId"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "device_management_childId_familyId_children_id_familyId_fk": {
-          "name": "device_management_childId_familyId_children_id_familyId_fk",
-          "tableFrom": "device_management",
-          "tableTo": "children",
-          "columnsFrom": [
-            "childId",
-            "familyId"
-          ],
-          "columnsTo": [
-            "id",
-            "familyId"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "device_management_tokenHash_unique": {
-          "name": "device_management_tokenHash_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "tokenHash"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.device_pairing_codes": {
       "name": "device_pairing_codes",
       "schema": "",
@@ -1180,121 +905,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.device_usage_events": {
-      "name": "device_usage_events",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "deviceId": {
-          "name": "deviceId",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "familyId": {
-          "name": "familyId",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "eventKey": {
-          "name": "eventKey",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "at": {
-          "name": "at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "packageName": {
-          "name": "packageName",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "label": {
-          "name": "label",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "usage_device_time": {
-          "name": "usage_device_time",
-          "columns": [
-            {
-              "expression": "familyId",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "deviceId",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "device_usage_events_deviceId_familyId_devices_id_familyId_fk": {
-          "name": "device_usage_events_deviceId_familyId_devices_id_familyId_fk",
-          "tableFrom": "device_usage_events",
-          "tableTo": "devices",
-          "columnsFrom": [
-            "deviceId",
-            "familyId"
-          ],
-          "columnsTo": [
-            "id",
-            "familyId"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "usage_device_event": {
-          "name": "usage_device_event",
-          "nullsNotDistinct": false,
-          "columns": [
-            "deviceId",
-            "eventKey"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.devices": {
       "name": "devices",
       "schema": "",
@@ -1336,6 +946,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "buddySetupTokenHash": {
+          "name": "buddySetupTokenHash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "expiresAt": {
           "name": "expiresAt",
@@ -1395,6 +1011,13 @@
           "nullsNotDistinct": false,
           "columns": [
             "tokenHash"
+          ]
+        },
+        "devices_buddySetupTokenHash_unique": {
+          "name": "devices_buddySetupTokenHash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "buddySetupTokenHash"
           ]
         },
         "device_family_identity": {
