@@ -1,24 +1,39 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { appointmentLocalInput, appointmentCandidates, appointmentInstant, appointmentRange } from "@/domain/appointment-time";
 import type { Resource, RoutineStep } from "@/domain/management";
 import type { ManagementData } from "@/server/management";
 
 export type EditableRecord = Record<string, unknown> & { id: string };
 const taskIcons = [["sun", "🥣 Frühstück"], ["toothbrush", "🪥 Zähne"], ["backpack", "🎒 Rucksack"], ["book", "📚 Lernen & Lesen"], ["moon", "🌙 Ruhezeit"], ["heart", "💛 Allgemein"]];
 const weekLabels = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
-function localInput(iso: unknown) {
-  if (typeof iso !== "string") return "";
-  const date = new Date(iso);
-  if (!Number.isFinite(date.getTime())) return "";
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+function AppointmentTimeField({ name, label, original, timeZone, required = false }: {
+  name: string; label: string; original: unknown; timeZone: string; required?: boolean;
+}) {
+  const [local, setLocal] = useState(() => appointmentLocalInput(original, timeZone));
+  const candidates = appointmentCandidates(local, timeZone);
+  const originalMinute = typeof original === "string" && Number.isFinite(Date.parse(original))
+    ? new Date(original).toISOString().slice(0, 16) : "";
+  const initial = candidates.find((iso) => iso.slice(0, 16) === originalMinute) ?? candidates[0] ?? "";
+  return <div>
+    <label>{label}<input name={name} type="datetime-local" value={local} onChange={(event) => setLocal(event.target.value)} required={required} aria-describedby={`${name}-help`} /></label>
+    {candidates.length > 1 ? <label>Welche Uhrzeit für {label}?
+      <select key={local} name={`${name}Instant`} defaultValue={initial}>
+        {candidates.map((iso, index) => <option key={iso} value={iso}>{index === 0 ? "Erstes" : "Zweites"} Mal ({new Intl.DateTimeFormat("de-DE", { timeZone, timeZoneName: "longOffset" }).formatToParts(new Date(iso)).find((part) => part.type === "timeZoneName")?.value})</option>)}
+      </select><span id={`${name}-help`} className="field-help">Diese Uhrzeit kommt bei der Zeitumstellung zweimal vor. Bitte prüfe die Auswahl.</span>
+    </label> : <>
+      <input type="hidden" name={`${name}Instant`} value={candidates[0] ?? ""} />
+      <span id={`${name}-help`} className="field-help">{local && !candidates.length ? `Diese Uhrzeit existiert in ${timeZone} nicht. Bitte wähle eine andere Uhrzeit.` : ""}</span>
+    </>}
+  </div>;
 }
 
 export function ParentRecordForm({ resource, data, record, busy, onSave, onCancel }: {
   resource: Resource; data: ManagementData; record: EditableRecord | null; busy: boolean;
   onSave: (input: unknown) => Promise<void>; onCancel: () => void;
 }) {
+  const [timeError, setTimeError] = useState("");
   const [steps, setSteps] = useState<RoutineStep[]>(() => (record?.steps as RoutineStep[] | undefined) ?? [{ title: "", description: "", icon: "heart", points: 5 }]);
   const [openStep, setOpenStep] = useState<number | null>(record ? null : 0);
   function updateStep(index: number, patch: Partial<RoutineStep>) {
@@ -35,6 +50,7 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onCance
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setTimeError("");
     const form = new FormData(event.currentTarget);
     const field = (key: string) => String(form.get(key) ?? "").trim();
     const active = form.get("active") === "on";
@@ -43,7 +59,16 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onCance
     else if (isTask) {
       const fields = { childId: field("childId"), title: field("title"), description: field("description"), icon: field("icon") || "heart", section: field("section"), scheduledTime: field("scheduledTime") || null, points: Number(field("points")), sortOrder: Number(field("sortOrder")) };
       input = resource === "routines" ? { childId: fields.childId, title: fields.title, section: fields.section, scheduledTime: fields.scheduledTime, sortOrder: fields.sortOrder, steps, active, weekdays: form.getAll("weekdays").map(Number) } : { ...fields, date: field("date") };
-    } else if (resource === "appointments") input = { childId: field("childId"), title: field("title"), icon: field("icon"), startsAt: new Date(field("startsAt")).toISOString(), endsAt: field("endsAt") ? new Date(field("endsAt")).toISOString() : null, active };
+    } else if (resource === "appointments") {
+      try {
+        const startsAt = appointmentInstant(field("startsAt"), data.family.timezone, field("startsAtInstant"), record?.startsAt);
+        const endsAt = field("endsAt") ? appointmentInstant(field("endsAt"), data.family.timezone, field("endsAtInstant"), record?.endsAt) : null;
+        input = { childId: field("childId"), title: field("title"), icon: field("icon"), ...appointmentRange(startsAt, endsAt), active };
+      } catch (error) {
+        setTimeError(error instanceof Error ? error.message : "Bitte prüfe die Uhrzeiten.");
+        return;
+      }
+    }
     else if (resource === "rewards") input = { title: field("title"), cost: Number(field("cost")), active };
     else input = { childId: field("childId"), label: field("label"), packageName: field("packageName"), active };
     await onSave(input);
@@ -103,10 +128,11 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onCance
         <button type="button" className="parent-secondary" disabled={steps.length >= 50} onClick={() => { setOpenStep(steps.length); setSteps((items) => [...items, { title: "", description: "", icon: "heart", points: 5 }]); }}>Aufgabe hinzufügen</button>
       </div>}
       {resource === "appointments" && <>
-        <label>Beginn<input name="startsAt" type="datetime-local" defaultValue={localInput(record?.startsAt)} required /></label>
-        <label>Ende (optional)<input name="endsAt" type="datetime-local" defaultValue={localInput(record?.endsAt)} /></label>
+        <p className="field-help wide-field">Alle Uhrzeiten gelten in eurer Familienzeitzone: <strong>{data.family.timezone}</strong> – auch auf Reisen.</p>
+        <AppointmentTimeField name="startsAt" label="Beginn" original={record?.startsAt} timeZone={data.family.timezone} required />
+        <AppointmentTimeField name="endsAt" label="Ende (optional)" original={record?.endsAt} timeZone={data.family.timezone} />
         <label>Bildsymbol<select name="icon" defaultValue={text("icon", "calendar")}><option value="calendar">📅 Termin</option><option value="tooth">🦷 Zahnarzt</option><option value="ball">⚽ Sport</option><option value="heart">💛 Allgemein</option></select></label>
-        <p className="field-help wide-field">Uhrzeiten beim Anlegen gelten in der Zeitzone dieses Geräts. Die Kinderansicht zeigt Termine in eurer Familienzeitzone ({data.family.timezone}).</p>
+        {timeError && <p role="alert" className="field-help wide-field">{timeError}</p>}
       </>}
       {resource === "rewards" && <label>Benötigte Sterne<input name="cost" type="number" defaultValue={value("cost", 50)} min={1} max={1_000_000} required /></label>}
       {resource === "apps" && <>
