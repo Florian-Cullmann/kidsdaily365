@@ -85,7 +85,7 @@ export async function saveRecord(parent: ParentActor, resource: Resource, input:
         return (await db().insert(dailyTasks).values({ ...data, familyId }).returning({ id: dailyTasks.id }))[0];
       }
       case "appointments": {
-        if (id) return editAppointment(parent, id, input);
+        if (id) return editAppointment(parent, id, managementSchemas.appointments.parse(input));
         const parsed = managementSchemas.appointments.parse(input);
         await checkChild(parent, parsed.childId);
         const data = { ...parsed, startsAt: new Date(parsed.startsAt), endsAt: parsed.endsAt ? new Date(parsed.endsAt) : null };

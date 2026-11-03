@@ -45,6 +45,8 @@ it("atomically creates once under retries and rejects changed payloads and inval
 it("preserves individual shifts/cancellations on replay and keeps sibling/household boundaries", async () => {
   const input = schedule(), series = await createAppointmentSeries(parent, input);
   const before = await occurrences(series.id);
+  await expect(saveRecord(parent, "appointments", null, before[0].id)).rejects.toThrow();
+  expect((await occurrences(series.id))[0].active).toBe(true);
   const update = { childId, title: "Verschoben", icon: "calendar", startsAt: "2026-01-14T16:00:00Z", endsAt: null, active: true };
   await saveRecord(parent, "appointments", update, before[1].id);
   await archiveRecord(parent, "appointments", before[2].id);
