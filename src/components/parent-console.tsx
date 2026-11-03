@@ -7,6 +7,7 @@ import type { ParentActor } from "@/server/auth/parent";
 import type { ManagementData } from "@/server/management";
 import type { Resource } from "@/domain/management";
 import { ParentRecordForm, type EditableRecord } from "./parent-record-form";
+import { ParentSetupChecklist } from "./parent-setup-checklist";
 import { BuddyWardrobe } from "./buddy-wardrobe";
 import { ProfilePicture } from "./profile-picture";
 import { ProfileImageEditor } from "./profile-image-editor";
@@ -125,7 +126,11 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
       <div className="parent-feedback" aria-live="polite">{notice && <p className="parent-success"><Check size={19} />{notice}</p>}<p className="parent-error" role="alert">{error}</p></div>
 
       {tab === "overview" && <>
-        {!activeChildren && <section className="parent-panel"><h2>{data.children.length ? "Keine aktiven Kinderprofile vorhanden." : "Noch keine Kinderprofile vorhanden."}</h2><p>Lege ein Kinderprofil an, um Aufgaben und Termine zuzuordnen.</p><button className="parent-primary" onClick={() => createRecord("children")}>Kind hinzufügen</button></section>}
+        <ParentSetupChecklist data={data} busy={busy}
+          onChild={() => activeChildren ? navigate("children") : createRecord("children")}
+          onRoutine={(complete) => complete ? navigate("routines") : createRecord("routines")}
+          onWall={() => { setDeviceKind("wall"); navigate("devices"); }}
+          onRefresh={() => action(refresh)} />
         <div className="parent-overview-grid">{[
           { title: "Kinderprofile", text: `${activeChildren} ${activeChildren === 1 ? "aktives Profil" : "aktive Profile"}${activeChildren ? ` · ${data.children.filter((child) => child.active).map((child) => child.name).join(", ")}` : ""}`, view: "children" as Tab, icon: Users },
           { title: "Routinen", text: `${data.routines.filter((routine) => routine.active).length} aktive Routinen`, view: "routines" as Tab, icon: BookOpen },

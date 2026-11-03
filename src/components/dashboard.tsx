@@ -93,7 +93,7 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
     } catch { setError("Vollbild bitte über die Taste F11 aktivieren."); }
   }
 
-  if (!plans.length) return <main className="center-page"><div className="setup-card"><h1>Hier ist Platz für eure Pläne.</h1><p>Noch kein Kinderprofil vorhanden. Bitte zuerst die Einrichtung auf dem Server abschließen.</p></div></main>;
+  if (!plans.length) return <main className="center-page"><div className="setup-card"><h1>Hier ist Platz für eure Pläne.</h1><p>Hier fehlt noch ein aktives Kinderprofil. Bitte deine Eltern, im Elternbereich unter „Kinderprofile“ ein Profil anzulegen oder wieder zu aktivieren.</p></div></main>;
 
   if (!plan) return <main className="profile-screen forest-world">
     <div className="brand profile-brand"><span className="brand-mark"><House size={27} /></span><span>kidsdaily<span className="brand-number">365</span></span></div>

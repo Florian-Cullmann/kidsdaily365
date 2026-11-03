@@ -292,3 +292,23 @@ progress::-moz-progress-bar { background: #efb832; border-radius: 20px; }
 .routine-group { display: grid; gap: 10px; }
 
 .profile-photo { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+
+
+.setup-checklist-heading { display: flex; align-items: start; justify-content: space-between; gap: 24px; }
+.setup-checklist-heading p { max-width: 680px; }
+.setup-checklist button { min-height: 48px; flex-shrink: 0; }
+.setup-checklist ol { padding: 0; margin: 20px 0; list-style: none; }
+.setup-checklist li { display: flex; align-items: center; gap: 18px; padding: 18px 0; border-top: 1px solid #eeeaf3; }
+.setup-step-marker { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%; background: #f0edf6; color: #725b94; font-weight: 700; }
+.setup-step-marker.is-done { background: #e8f3eb; color: #396d4b; }
+.setup-step-text { flex: 1; }
+.setup-step-text h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 0; font-size: 17px; }
+.setup-step-text h3 span { color: #70677d; font-size: 13px; font-weight: 500; }
+.setup-step-text p { margin: 5px 0 0; font-size: 14px; line-height: 1.5; }
+.setup-checklist .setup-optional { margin-bottom: 0; font-size: 14px; line-height: 1.6; }
+@media (max-width: 800px) {
+  .setup-checklist-heading { flex-direction: column; gap: 10px; }
+  .setup-checklist li { flex-wrap: wrap; }
+  .setup-step-text { min-width: calc(100% - 60px); }
+  .setup-checklist li button { margin-left: 58px; }
+}
