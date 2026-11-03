@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CalendarDays, Check, ChevronRight, Heart, House, Maximize, Star, Users } from "lucide-react";
-import { completeDemoTask, localDate, type DayPlan, type TaskIcon } from "@/domain/plan";
+import { CalendarDays, Check, ChevronRight, Heart, House, Maximize, Pause, Star, Users } from "lucide-react";
+import { completeDemoTask, localDate, taskProgress, type DayPlan, type TaskIcon } from "@/domain/plan";
 import { ProfilePicture } from "./profile-picture";
 import { Buddy } from "./buddy";
 import Link from "next/link";
@@ -105,11 +105,11 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
     <div className="profile-footer"><p>{demo ? "Zum Ausprobieren · Dein Fortschritt wird nicht gespeichert" : "Jeder hat seinen eigenen Tag. Und seinen eigenen Buddy."}</p><Link className="parent-entry-link" href="/eltern">Elternbereich</Link></div>
   </main>;
 
-  const done = plan.tasks.filter((task) => task.completed).length;
+  const progress = taskProgress(plan.tasks);
   const groups = Array.from(new Set(plan.tasks.map((task) => task.routineId ?? task.id))).map((id) => ({
     id, tasks: plan.tasks.filter((task) => (task.routineId ?? task.id) === id),
   }));
-  const next = plan.tasks.find((task) => !task.completed);
+  const next = plan.tasks.find((task) => !task.completed && !task.paused);
   const nextAppointment = plan.appointments[0];
   const goal = plan.rewards.find((reward) => reward.cost > plan.balance) ?? plan.rewards[0];
   const dateLabel = new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "numeric", month: "long", timeZone: plan.timezone }).format(new Date(`${plan.date}T12:00:00Z`));
@@ -122,15 +122,15 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
 
     <main className={`play-space view-${view}`}>
       <section className="day-paper" aria-label={view === "day" ? "Deine Aufgaben heute" : view === "appointments" ? "Deine Termine" : "Deine Belohnungen"}>
-        <div className="paper-heading"><h2>{view === "day" ? "Heute" : view === "appointments" ? "Deine Termine" : "Deine Wünsche"}</h2>{view === "day" && <span className="done-badge"><Star size={24} fill="currentColor" /><span>{done} von {plan.tasks.length} geschafft</span></span>}</div>
+        <div className="paper-heading"><h2>{view === "day" ? "Heute" : view === "appointments" ? "Deine Termine" : "Deine Wünsche"}</h2>{view === "day" && <span className="done-badge"><Star size={24} fill="currentColor" /><span>{progress.label}</span></span>}</div>
 
         {view === "day" && <div className="tasks-scroll">
           {groups.map((group) => <section key={group.id} className="routine-group" aria-label={group.tasks[0].routineTitle ?? "Einzelaufgabe"}>
-          {group.tasks[0].routineTitle && <div className="routine-heading"><h3>{group.tasks[0].routineTitle}</h3><span>{group.tasks.filter((task) => task.completed).length} von {group.tasks.length} geschafft</span></div>}
-          {group.tasks.map((task) => <button key={task.id} className={`task-row ${task.completed ? "is-done" : ""} ${next?.id === task.id ? "is-next" : ""}`} disabled={task.completed || !!busy} aria-label={`${task.title}${task.time ? `, ${task.time} Uhr` : ""}, ${task.points} Sterne${task.completed ? ", erledigt" : ", abhaken"}`} onClick={() => complete(task.id)}>
+          {group.tasks[0].routineTitle && <div className="routine-heading"><h3>{group.tasks[0].routineTitle}</h3><span>{taskProgress(group.tasks).label}</span></div>}
+          {group.tasks.map((task) => <button key={task.id} className={`task-row ${task.completed ? "is-done" : task.paused ? "is-paused" : ""} ${next?.id === task.id ? "is-next" : ""}`} disabled={task.completed || task.paused || !!busy} aria-label={`${task.title}${task.time ? `, ${task.time} Uhr` : ""}, ${task.points} Sterne${task.completed ? ", erledigt" : task.paused ? ", heute Pause" : ", abhaken"}`} onClick={() => complete(task.id)}>
             <span className="task-picture" aria-hidden="true">{taskPictures[task.icon]}</span>
-            <span className="task-words"><strong>{task.title}</strong><span>{task.completed ? "Geschafft!" : task.time ? `${task.time} Uhr` : "In deinem Tempo"}<span className="row-stars"><Star size={15} fill="currentColor" />{task.completed ? "" : "+"}{task.points}</span></span></span>
-            <span className="check-circle" aria-hidden="true">{busy === task.id ? <span className="saving-dots">•••</span> : task.completed ? <Check size={30} strokeWidth={3.5} /> : null}</span>
+            <span className="task-words"><strong>{task.title}</strong><span>{task.completed ? "Geschafft!" : task.paused ? "Heute Pause · Zeit für dich" : task.time ? `${task.time} Uhr` : "In deinem Tempo"}{!task.paused && <span className="row-stars"><Star size={15} fill="currentColor" />{task.completed ? "" : "+"}{task.points}</span>}</span></span>
+            <span className="check-circle" aria-hidden="true">{busy === task.id ? <span className="saving-dots">•••</span> : task.completed ? <Check size={30} strokeWidth={3.5} /> : task.paused ? <Pause size={24} /> : null}</span>
           </button>)}</section>)}
           {!plan.tasks.length && <div className="empty-state"><span aria-hidden="true">🌈</span><h3>Heute ist Platz für dich.</h3><p>Gerade stehen keine Aufgaben an.</p></div>}
         </div>}

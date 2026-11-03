@@ -184,3 +184,27 @@
 .wardrobe-accessory { min-width: 200px; padding: 24px; border-radius: 24px; background: #fff8e8; text-align: center; }
 .wardrobe-star { font-size: 50px; color: #bf861f; }
 .wardrobe-accessory h3 { margin: 8px 0; }
+
+/* Routine exceptions are separate from editing or archiving the template. */
+.routine-pause-panel{border-color:#d8e4df;background:#fcfefa;margin-bottom:26px}
+.routine-pause-header{display:flex;align-items:center;gap:16px}
+.routine-pause-icon{display:grid;place-items:center;width:54px;height:54px;flex-shrink:0;border-radius:17px;background:#e7eee3;color:#5a785d}
+.routine-pause-eyebrow{font-size:11px;letter-spacing:1.4px;font-weight:700;color:#738372}
+.routine-pause-header h2{margin:5px 0}.routine-pause-header p{margin:0;color:#7c877a;font-size:13px}
+.pause-close{margin-left:auto;align-self:flex-start;display:grid;place-items:center;min-width:44px;min-height:44px;border:1px solid #dde5d8;background:white;border-radius:12px;color:#677663}
+.routine-pause-intro{max-width:850px;font-size:14px;line-height:1.7;color:#73806d;margin:24px 0}
+.routine-pause-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:30px;border-top:1px solid #e4eadd;padding-top:20px}
+.routine-pause-columns h3{font-size:17px;margin:0 0 20px}.routine-pause-columns h3>span{background:#e8eee2;font-size:12px;padding:4px 8px;border-radius:12px;margin-left:5px}
+.routine-pause-form label{display:grid;gap:8px;font-size:13px;font-weight:600;color:#5e6e5b}
+.routine-pause-form input{width:100%;min-width:0;min-height:46px;padding:10px 12px;border:1px solid #d8e1d1;border-radius:10px;background:white;color:#35452f;font:inherit}
+.pause-dates{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.routine-pause-form>.parent-primary{margin-top:20px;background:#637e59}
+.routine-pause-entry{display:flex;align-items:flex-start;gap:12px;padding:16px;background:#f0f5eb;border:1px solid #e0e7d8;border-radius:15px;margin-bottom:12px;color:#657d5b}
+.routine-pause-entry>div{min-width:0}.routine-pause-entry strong{display:block;font-size:14px;line-height:1.5;color:#45583e}.routine-pause-entry p{font-size:13px;overflow-wrap:anywhere;margin:6px 0}
+.pause-state{font-size:10px;text-transform:uppercase;font-weight:700;letter-spacing:1px;display:block;margin-bottom:6px}
+.routine-pause-entry button{min-height:44px;padding:8px 0;border:0;background:none;text-decoration:underline;text-underline-offset:4px;color:#657451;font-size:12px}
+.pause-empty{border:1px dashed #d8e2d1;border-radius:16px;text-align:center;padding:30px 15px;color:#96a18a;font-size:13px}.pause-empty p{margin:12px 0 5px}.pause-empty span{font-size:12px}
+.pause-overlap-note{font-size:12px;line-height:1.65;color:#838d7a}
+.routine-pause-badge{display:inline-block;border-radius:20px;background:#edf2e5;color:#627953;font-size:11px;padding:6px 10px;margin-top:6px;margin-right:7px}
+@media(max-width:850px){.routine-pause-columns{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:450px){.pause-dates{grid-template-columns:minmax(0,1fr)}.routine-pause-header{gap:10px}.routine-pause-icon{width:42px;height:42px}}
