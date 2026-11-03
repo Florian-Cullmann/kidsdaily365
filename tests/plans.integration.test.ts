@@ -51,6 +51,31 @@ afterAll(async () => {
 });
 
 describe("persisted daily plans", () => {
+  it("returns all relevant appointments, including ongoing and local-day reminders, isolated by child and family", async () => {
+    const at = new Date("2026-10-25T00:30:00Z");
+    const rows = [
+      { title: "Overnight", startsAt: new Date("2026-10-24T21:00:00Z"), endsAt: new Date("2026-10-25T02:30:00Z") },
+      { title: "Reminder", startsAt: new Date("2026-10-24T22:00:00Z") },
+      { title: "Ended", startsAt: new Date("2026-10-24T23:00:00Z"), endsAt: at },
+      { title: "Old reminder", startsAt: new Date("2026-10-24T21:59:59Z") },
+      ...[1, 2, 3, 4].map((hour) => ({ title: `Future ${hour}`, startsAt: new Date(`2026-10-26T0${hour}:00:00Z`) })),
+    ];
+    await db().insert(appointments).values([
+      ...rows.map((row) => ({ ...row, familyId, childId: firstChild })),
+      { familyId, childId: secondChild, title: "Sibling", startsAt: at },
+      { familyId: otherFamilyId, childId: foreignChild, title: "Foreign", startsAt: at },
+      { familyId, childId: firstChild, title: "Archived", startsAt: at, active: false },
+    ]);
+    const plans = await getDayPlans(familyId, at);
+    const own = plans.find((plan) => plan.child.id === firstChild)!.appointments;
+    expect(own.map((item) => item.title)).toEqual(["Overnight", "Reminder", "Future 1", "Future 2", "Future 3", "Future 4"]);
+    expect(own[0].endsAt).toBe("2026-10-25T02:30:00.000Z");
+    expect(own[1].endsAt).toBeNull();
+    expect(plans.find((plan) => plan.child.id === secondChild)!.appointments.map((item) => item.title)).toEqual(["Sibling"]);
+    const nextDay = await getDayPlans(familyId, new Date("2026-10-25T23:00:00Z"));
+    expect(nextDay.find((plan) => plan.child.id === firstChild)!.appointments.map((item) => item.title)).toEqual(["Future 1", "Future 2", "Future 3", "Future 4"]);
+  });
+
   it("snapshots ordered groups, preserves history through edits, and awards each step only once", async () => {
     const parent = { id: randomUUID(), familyId, name: "Test", email: "test@example.test" };
     const steps = ["Frühstücken", "Zähne putzen", "Rucksack packen"].map((title, i) => ({ title, description: "", icon: "heart" as const, points: i + 1 }));
