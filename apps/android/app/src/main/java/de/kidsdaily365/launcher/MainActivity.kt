@@ -17,6 +17,7 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.GridLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -48,12 +49,13 @@ class MainActivity : Activity() {
     private var active = false
     private var lastSnapshot: LauncherSnapshot? = null
     private var lastRendered: LauncherView? = null
+    private lateinit var modeStatus: TextView
     private lateinit var connectionStatus: TextView
     private lateinit var greeting: TextView
     private lateinit var stars: TextView
     private lateinit var buddyName: TextView
     private lateinit var buddyImage: BuddyView
-    private lateinit var apps: LinearLayout
+    private lateinit var apps: GridLayout
     private lateinit var address: EditText
     private lateinit var code: EditText
     private lateinit var pairButton: Button
@@ -63,10 +65,10 @@ class MainActivity : Activity() {
         content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(24), dp(20), dp(24), dp(24))
+            setPadding(dp(20), dp(16), dp(20), dp(24))
         }
         setContentView(ScrollView(this).apply {
-            setBackgroundColor(Color.rgb(246, 243, 251))
+            background = GardenBackground()
             addView(content)
             setOnApplyWindowInsetsListener { view, insets ->
                 val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime())
@@ -140,16 +142,17 @@ class MainActivity : Activity() {
             policy.enabled && policy.owner -> "Verwalteter Kindermodus"
             else -> getString(R.string.unmanaged)
         }
-        if (layoutKind == nextKind && lastRendered == state && (content.getChildAt(0) as? TextView)?.text == mode) return
+        if (layoutKind == nextKind && lastRendered == state && modeStatus.text == mode) return
         lastRendered = state
         if (content.childCount == 0 || layoutKind != nextKind) {
             content.removeAllViews()
             layoutKind = nextKind
             lastSnapshot = null
-            content.addView(text(mode, 14f, Color.rgb(126, 65, 77)))
             when (nextKind) { 1 -> buildHome(); 0 -> buildPairing(); else -> buildDisconnected() }
+            modeStatus = text(mode, 12f, Color.rgb(126, 65, 77))
+            content.addView(modeStatus)
         }
-        (content.getChildAt(0) as? TextView)?.text = mode
+        modeStatus.text = mode
         val sync = state.receivedAt?.let { getString(R.string.last_sync, DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it))) }.orEmpty()
         connectionStatus.text = listOf(state.status, sync).filter { it.isNotEmpty() }.joinToString("\n")
         val snapshot = state.snapshot
@@ -162,7 +165,9 @@ class MainActivity : Activity() {
             buddyImage.contentDescription = snapshot?.let { getString(R.string.buddy_description, it.buddy.name) }
             if (snapshot != lastSnapshot || apps.childCount == 0) {
                 apps.removeAllViews()
-                if (snapshot?.policy?.allowedApps.isNullOrEmpty()) apps.addView(text(getString(R.string.no_apps), 18f))
+                if (snapshot?.policy?.allowedApps.isNullOrEmpty()) apps.addView(text(getString(R.string.no_apps), 18f), GridLayout.LayoutParams().apply {
+                    width = 0; columnSpec = GridLayout.spec(0, apps.columnCount, 1f)
+                })
                 snapshot?.policy?.allowedApps?.forEachIndexed { index, app ->
                     val installed = packageManager.getLaunchIntentForPackage(app.packageName) != null
                     apps.addView(appCard(app.packageName, app.label, installed, index) {
@@ -201,7 +206,8 @@ class MainActivity : Activity() {
         stars = text("☆", 16f, Color.rgb(112, 76, 13)).apply {
             setTypeface(typeface, Typeface.BOLD)
             setPadding(dp(14), dp(8), dp(14), dp(8))
-            background = rounded(Color.rgb(255, 237, 178))
+            background = softSurface(0xFFFFF3BF.toInt(), 0xFFFFE4A0.toInt())
+            elevation = dp(2).toFloat()
         }
         welcome.addView(stars, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         greeting = text("", 28f).apply {
@@ -219,52 +225,97 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_HORIZONTAL
         }
         buddyImage = BuddyView(this)
-        buddy.addView(buddyImage, LinearLayout.LayoutParams(dp(112), dp(112)))
-        buddyName = text("", 16f).apply { setPadding(0, 0, 0, dp(8)) }
-        buddy.addView(buddyName, LinearLayout.LayoutParams(dp(112), LinearLayout.LayoutParams.WRAP_CONTENT))
+        buddy.addView(buddyImage, LinearLayout.LayoutParams(dp(136), dp(136)))
+        buddyName = text("", 18f).apply {
+            setTypeface(typeface, Typeface.BOLD)
+            background = softSurface(0xFFF6E6FC.toInt(), 0xFFE3C7F1.toInt())
+            elevation = dp(3).toFloat()
+        }
+        buddy.addView(buddyName, LinearLayout.LayoutParams(dp(136), LinearLayout.LayoutParams.WRAP_CONTENT))
         header.addView(buddy)
         content.addView(header, fullWidth())
-        val garden = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(16), dp(16), dp(16))
-            background = rounded(Color.WHITE)
+        content.addView(text(getString(R.string.your_apps), 18f).apply {
+            gravity = Gravity.START
+            setTypeface(typeface, Typeface.BOLD)
+        }, fullWidth())
+        apps = GridLayout(this).apply {
+            // Large system text gets a single column to preserve readable labels.
+            columnCount = if (resources.configuration.fontScale > 1.2f || resources.configuration.screenWidthDp < 340) 1 else 2
+            alignmentMode = GridLayout.ALIGN_BOUNDS
+            useDefaultMargins = false
         }
-        garden.addView(text(getString(R.string.your_apps), 24f).apply {
-            gravity = Gravity.START; setTypeface(typeface, Typeface.BOLD)
+        content.addView(apps, fullWidth())
+        content.addView(button("Elternzugang") { parentPanel.open() }.apply {
+            backgroundTintList = null
+            background = RippleDrawable(ColorStateList.valueOf(0x2236284E),
+                softSurface(0xFFF6E6FC.toInt(), 0xFFE3C7F1.toInt()), null)
+            setTextColor(Color.rgb(76, 44, 93))
+            setTypeface(typeface, Typeface.BOLD)
+            elevation = dp(3).toFloat()
         })
-        garden.addView(text("Was möchtest du entdecken?", 16f).apply {
-            gravity = Gravity.START; setPadding(dp(8), 0, dp(8), dp(12))
+        connectionStatus = text("", 12f).apply {
+            background = softSurface(0xEFFFFFFF.toInt(), 0xDDEAF0D5.toInt())
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+        content.addView(connectionStatus, fullWidth())
+        content.addView(button(getString(R.string.retry)) { startPolling() }.apply {
+            backgroundTintList = null
+            background = RippleDrawable(ColorStateList.valueOf(0x2236284E), rounded(Color.TRANSPARENT), null)
+            textSize = 14f
+            minHeight = dp(48)
+            elevation = 0f
+            stateListAnimator = null
         })
-        apps = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        garden.addView(apps, fullWidth())
-        content.addView(garden, fullWidth())
-        connectionStatus = text("", 14f); content.addView(connectionStatus)
-        content.addView(button(getString(R.string.retry)) { startPolling() })
-        content.addView(button("Elternzugang") { parentPanel.open() })
-        addEmergencyButton()
+    }
+
+    private fun softSurface(top: Int, bottom: Int) = GradientDrawable(
+        GradientDrawable.Orientation.TL_BR, intArrayOf(top, bottom)
+    ).apply {
+        cornerRadius = dp(28).toFloat()
+        setStroke(dp(1), 0xCCFFFFFF.toInt())
     }
 
     private fun appCard(packageName: String, label: String, installed: Boolean, index: Int, action: () -> Unit): Button {
-        val colors = intArrayOf(0xFFE4F2E8.toInt(), 0xFFECE6FA.toInt(), 0xFFFFEBD7.toInt(), 0xFFE1EFFB.toInt())
+        val colors = arrayOf(
+            0xFFF4E5FF.toInt() to 0xFFE3C8F4.toInt(),
+            0xFFFFEADF.toInt() to 0xFFFFCFC2.toInt(),
+            0xFFE6F4E9.toInt() to 0xFFC8E7DF.toInt(),
+            0xFFE4F2FF.toInt() to 0xFFBEDDF8.toInt()
+        )
         return button(if (installed) label else getString(R.string.not_installed, label), action).apply {
             tag = installed
-            gravity = Gravity.CENTER_VERTICAL or Gravity.START
-            minHeight = dp(96)
-            setPadding(dp(18), dp(18), dp(18), dp(18))
-            setTypeface(typeface, Typeface.BOLD)
+            layoutParams = GridLayout.LayoutParams().apply {
+                width = 0
+                height = GridLayout.LayoutParams.WRAP_CONTENT
+                columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+                setGravity(Gravity.FILL)
+                setMargins(dp(5), dp(5), dp(5), dp(9))
+            }
+            gravity = Gravity.CENTER
+            minWidth = 0
+            minHeight = dp(158)
+            textSize = 20f
+            setPadding(dp(10), dp(18), dp(10), dp(18))
+            typeface = Typeface.create("sans-serif-rounded", Typeface.BOLD)
             setTextColor(ColorStateList(
                 arrayOf(intArrayOf(android.R.attr.state_enabled), intArrayOf()),
-                intArrayOf(Color.rgb(54, 40, 78), Color.rgb(104, 99, 113))
+                intArrayOf(Color.rgb(67, 37, 80), Color.rgb(106, 87, 113))
             ))
             backgroundTintList = null
-            background = RippleDrawable(ColorStateList.valueOf(0x2236284E), rounded(colors[index % colors.size]), null)
-            compoundDrawablePadding = dp(16)
+            val (top, bottom) = colors[index % colors.size]
+            background = RippleDrawable(ColorStateList.valueOf(0x2236284E), softSurface(top, bottom), null)
+            stateListAnimator = null
+            outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
+            elevation = dp(5).toFloat()
+            setOutlineAmbientShadowColor(0xFF906D9E.toInt())
+            setOutlineSpotShadowColor(0xFF906D9E.toInt())
+            compoundDrawablePadding = dp(12)
             val icon = try { packageManager.getApplicationIcon(packageName) }
                 catch (_: android.content.pm.PackageManager.NameNotFoundException) {
-                    packageManager.defaultActivityIcon
+                    requireNotNull(getDrawable(R.drawable.ic_app_placeholder))
                 }
-            icon.setBounds(0, 0, dp(44), dp(44))
-            setCompoundDrawablesRelative(icon, null, null, null)
+            icon.setBounds(0, 0, dp(64), dp(64))
+            setCompoundDrawablesRelative(null, icon, null, null)
         }
     }
 
@@ -274,19 +325,6 @@ class MainActivity : Activity() {
         content.addView(text("Ein Elternteil kann den Zugang öffnen und dieses Handy neu koppeln. Der Eltern-Code funktioniert auch ohne Server.", 18f))
         connectionStatus = text("", 16f); content.addView(connectionStatus)
         content.addView(button("Elternzugang") { parentPanel.open() })
-        addEmergencyButton()
-    }
-
-    private fun addEmergencyButton() {
-        // Android's emergency-only dialer action; never grant a general phone app to Lock Task.
-        val intent = android.content.Intent("com.android.phone.EmergencyDialer.DIAL")
-        val handler = packageManager.resolveActivity(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY) ?: return
-        if (handler.activityInfo.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM == 0) return
-        intent.setPackage(handler.activityInfo.packageName)
-        content.addView(button("Notruf") {
-            try { startActivity(intent) }
-            catch (_: Exception) { Toast.makeText(this, "Notruf über das Power-Menü öffnen.", Toast.LENGTH_LONG).show() }
-        })
     }
 
     private fun buildPairing() {
@@ -327,7 +365,6 @@ class MainActivity : Activity() {
         }; content.addView(pairButton)
         connectionStatus = text("", 16f); content.addView(connectionStatus)
         if (parentStatus?.target != null) content.addView(button("Elternzugang") { parentPanel.open() })
-        addEmergencyButton()
         if (BuildConfig.DEBUG) content.addView(text(getString(R.string.debug_http), 14f))
     }
 
