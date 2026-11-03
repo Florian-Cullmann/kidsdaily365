@@ -118,3 +118,17 @@ Screenshots mit ausschließlich fiktiven Daten: [Elterneditor](proof/routine-edi
 5. Vollständigen PostgreSQL-Dump der separaten Testdatenbank in eine leere `*_test`-Datenbank zurückspielen. Bildversionen und SHA-256-Prüfsummen der `child_images.data`-Spalte müssen übereinstimmen. Die Unraid-Anleitung enthält den produktiven Backup-Weg.
 
 Automatisierte Bildtests prüfen echte Dekodierung, Größenlimits, Ausschnitt, EXIF-Ausrichtung und entfernte Metadaten. Die Datenbanktests prüfen Ersetzen/Entfernen, Rechte, Profiltrennung und unabhängigen Punktestand. Keine echten Kinderfotos in Tests oder Nachweisen verwenden.
+
+
+## Automatischer Abgleich am Wandbildschirm (#26)
+
+Mit zwei getrennten Browser-Sitzungen und zwei gültigen Wandfreigaben testen; Elternverwaltung in einer dritten Sitzung öffnen. Ausschließlich fiktive Profile verwenden.
+
+1. Dasselbe Kind auf beiden Wandbildschirmen auswählen. Auf A eine Aufgabe abschließen; B übernimmt innerhalb des nächsten Zehn-Sekunden-Abrufs Abschluss und Sterne, ohne eine eigene Erfolgsmeldung zu erzeugen.
+2. Über die Elternverwaltung Profil/Buddy, Profilbild oder Termin ändern. Auswahl, geöffnete Termine-/Sterneansicht und Scrollposition des Wandbildschirms bleiben bei der Aktualisierung erhalten. Routinenänderungen schreiben bestehende Tageskopien weiterhin nicht um.
+3. Verbindung auf B unterbrechen. Letzter Stand und letzter erfolgreicher Abgleich bleiben sichtbar; Aufgaben sind gesperrt. Wieder verbinden: Abgleich ohne Neuladen, keine automatisch nachgesendeten Abschlüsse. Bei verloren gegangener Abschlussantwort entscheidet der nächste Serverabgleich über den tatsächlich gespeicherten Zustand.
+4. Ausgewähltes Profil archivieren: B kehrt zur aktuellen Profilauswahl zurück. Wandfreigabe widerrufen: B entfernt die geschützten Inhalte und zeigt die Kopplung. Ein Widerruf kann erst bei erreichbarem Server erkannt werden.
+5. Tageswechsel in der Familienzeitzone sowohl mit ausgewähltem Kind als auch mit offener Profilauswahl prüfen. Offline werden alte Aufgaben nicht als heutige Aufgaben angeboten; nach erfolgreichem Abruf erscheint der neue Plan. Die Geräteuhr muss richtig eingestellt sein; der Server prüft das gültige Aufgabendatum zusätzlich bei jedem Abschluss.
+6. Versteckte Seite wieder öffnen oder Browser fokussieren: unmittelbarer Abgleich. Bei leerem Haushalt führt ein neu angelegtes Profil ohne Seitenreload zur Profilauswahl. Demo-Modus erzeugt keine Wand-API-Aufrufe.
+
+`tests/wall-sync.test.ts` prüft kontrolliert verspätete/abgebrochene Antworten, parallele Abrufe, Abschlussabgleich, Timeout, Familien-Mitternacht und Widerruf. Die Integrationstests für `/api/wall/snapshot` prüfen echte Wand-/Android-/Elternberechtigungen, Haushaltsgrenzen, Ablauf, Widerruf und unveränderte Tageskopien. Die Antworten sind ausdrücklich `private, no-store`.

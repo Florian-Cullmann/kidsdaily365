@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CalendarDays, Check, ChevronRight, Heart, House, Maximize, Star, Users } from "lucide-react";
 import { completeDemoTask, localDate, type DayPlan, type TaskIcon } from "@/domain/plan";
 import { ProfilePicture } from "./profile-picture";
 import { Buddy } from "./buddy";
 import Link from "next/link";
+import { WallSync } from "@/client/wall-sync";
+import { PairDevice } from "./pair-device";
 
 type View = "day" | "appointments" | "rewards";
 const taskPictures: Record<TaskIcon, string> = {
@@ -19,19 +21,28 @@ function appointmentTime(startsAt: string, timezone: string) {
 }
 
 function appointmentDay(startsAt: string, plan: DayPlan) {
-  if (localDate(new Date(startsAt), plan.timezone) === plan.date) return "Heute";
+  if (localDate(new Date(startsAt), plan.timezone) === localDate(new Date(), plan.timezone)) return "Heute";
   return new Intl.DateTimeFormat("de-DE", { weekday: "short", day: "numeric", month: "short", timeZone: plan.timezone }).format(new Date(startsAt));
 }
 
-export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; demo: boolean }) {
-  const [plans, setPlans] = useState(initialPlans);
+export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { initialPlans: DayPlan[]; demo: boolean; initialSyncedAt?: string | null }) {
+  const [demoPlans, setDemoPlans] = useState(initialPlans);
+  const [sync] = useState(() => new WallSync(initialPlans, initialSyncedAt));
+  const live = useSyncExternalStore(sync.subscribe, sync.getSnapshot, sync.getSnapshot);
+  const plans = demo ? demoPlans : live.plans;
   const [childId, setChildId] = useState<string | null>(null);
   const [view, setView] = useState<View>("day");
-  const [busy, setBusy] = useState<string | null>(null);
+  const busy = demo ? null : live.busyTaskId;
   const [notice, setNotice] = useState<{ text: string } | null>(null);
   const noticeContext = useRef(0);
   const [error, setError] = useState("");
-  const pending = useRef(false);
+  const [previousPlans, setPreviousPlans] = useState(plans);
+  if (previousPlans !== plans) {
+    setPreviousPlans(plans);
+    if (childId && !plans.some((item) => item.child.id === childId)) {
+      setChildId(null); setView("day"); setNotice(null); setError("");
+    }
+  }
   const plan = plans.find((item) => item.child.id === childId);
 
   useEffect(() => {
@@ -41,14 +52,21 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
   }, [notice]);
 
   useEffect(() => {
-    if (!plan) return;
-    const checkDay = () => {
-      if (localDate(new Date(), plan.timezone) !== plan.date && !pending.current) window.location.reload();
+    if (demo) return;
+    sync.start();
+    const refresh = () => { void sync.refresh(); };
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    window.addEventListener("offline", sync.offline);
+    return () => {
+      sync.stop();
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      window.removeEventListener("offline", sync.offline);
     };
-    const timer = setInterval(checkDay, 60_000);
-    document.addEventListener("visibilitychange", checkDay);
-    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", checkDay); };
-  }, [plan]);
+  }, [demo, sync]);
 
   function chooseProfile(id: string) {
     noticeContext.current += 1;
@@ -62,28 +80,20 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
   }
 
   async function complete(taskId: string) {
-    if (pending.current || !plan) return;
+    if (busy || !plan) return;
     const context = noticeContext.current;
-    pending.current = true; setBusy(taskId); setError(""); setNotice(null);
-    try {
-      if (demo) {
-        const updated = completeDemoTask(plan, taskId);
-        setPlans((previous) => previous.map((item) => item.child.id === plan.child.id ? updated : item));
-        const points = updated.balance - plan.balance;
-        setNotice({ text: points ? `Geschafft! ${points} neue Sterne für dich.` : "Das hast du geschafft!" });
-      } else {
-        const response = await fetch(`/api/tasks/${taskId}/complete`, { method: "POST" });
-        const data = await response.json();
-        if (!response.ok) {
-          setError(typeof data.error === "string" ? data.error : "Das Speichern hat nicht geklappt. Bitte erneut versuchen.");
-          return;
-        }
-        setPlans((previous) => previous.map((item) => item.child.id === data.childId ? data.plan : item));
-        if (context === noticeContext.current) setNotice({ text: data.awarded ? `Geschafft! ${data.awarded} neue Sterne für dich.` : "Das hast du geschafft!" });
-      }
-    } catch {
-      setError("Der Server ist gerade nicht erreichbar. Deine Aufgabe bleibt offen. Bitte erneut versuchen.");
-    } finally { pending.current = false; setBusy(null); }
+    setError(""); setNotice(null);
+    if (demo) {
+      const updated = completeDemoTask(plan, taskId);
+      setDemoPlans((previous) => previous.map((item) => item.child.id === plan.child.id ? updated : item));
+      const points = updated.balance - plan.balance;
+      setNotice({ text: points ? `Geschafft! ${points} neue Sterne für dich.` : "Das hast du geschafft!" });
+      return;
+    }
+    const result = await sync.complete(taskId);
+    if (!result || context !== noticeContext.current) return;
+    if ("error" in result) setError(result.error);
+    else if (!sync.getSnapshot().dayChanged) setNotice({ text: result.awarded ? `Geschafft! ${result.awarded} neue Sterne für dich.` : "Das hast du geschafft!" });
   }
 
   async function fullscreen() {
@@ -93,10 +103,19 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
     } catch { setError("Vollbild bitte über die Taste F11 aktivieren."); }
   }
 
-  if (!plans.length) return <main className="center-page"><div className="setup-card"><h1>Hier ist Platz für eure Pläne.</h1><p>Noch kein Kinderprofil vorhanden. Bitte zuerst die Einrichtung auf dem Server abschließen.</p></div></main>;
+  if (!demo && live.phase === "revoked") return <PairDevice revoked />;
+
+  const syncStatus = !demo && <div className={`wall-sync-status ${live.phase === "offline" ? "is-offline" : ""}`}>
+    <div><span role="status">{live.phase === "offline" ? "Verbindung unterbrochen · gespeicherter Stand" : live.dayChanged ? "Neuer Tag · Tagesplan wird geladen" : "Mit dem Server verbunden"}</span>
+    {live.syncedAt && <small>Letzter Abgleich: {new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: plans[0]?.timezone ?? "UTC" }).format(new Date(live.syncedAt))}</small>}</div>
+    {(live.phase === "offline" || live.dayChanged) && <button disabled={!!busy} onClick={() => void sync.refresh()}>Erneut versuchen</button>}
+  </div>;
+
+  if (!plans.length) return <main className="center-page"><div className="setup-card">{syncStatus}<h1>Hier ist Platz für eure Pläne.</h1><p>Noch kein Kinderprofil vorhanden. Bitte zuerst die Einrichtung auf dem Server abschließen.</p></div></main>;
 
   if (!plan) return <main className="profile-screen forest-world">
     <div className="brand profile-brand"><span className="brand-mark"><House size={27} /></span><span>kidsdaily<span className="brand-number">365</span></span></div>
+    {syncStatus}
     <div className="profile-welcome"><span className="welcome-tag">Dein kleiner Alltagsbegleiter</span><h1>Wer ist heute dabei?</h1><p>Tippe auf dein Bild. Dein Buddy freut sich auf dich!</p></div>
     <div className="profile-grid">{plans.map((item, index) => <button key={item.child.id} className={`profile-tile tile-${index % 3}`} onClick={() => chooseProfile(item.child.id)}>
       <span className="profile-art"><ProfilePicture imageUrl={item.child.imageUrl} buddyKind={item.child.buddyKind} equipped={item.child.equippedAccessories} /><span className="profile-initial">{item.child.avatar}</span></span>
@@ -116,18 +135,20 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
 
   return <div className="child-world forest-world" data-calm={plan.child.reducedMotion}>
     <header className="child-header">
-      <div><p className="date-label">{dateLabel}</p><h1>Hallo {plan.child.name}! <span className="hello-sun" aria-hidden="true">☀️</span></h1><p className="hello-caption">{view === "day" ? "Ein kleiner Schritt nach dem anderen." : view === "appointments" ? "Das hast du als Nächstes vor." : "Hier wohnen deine gesammelten Sterne."}</p></div>
+      <div><p className="date-label">{!demo && live.dayChanged ? `Letzter Plan: ${dateLabel}` : dateLabel}</p><h1>Hallo {plan.child.name}! <span className="hello-sun" aria-hidden="true">☀️</span></h1><p className="hello-caption">{view === "day" ? "Ein kleiner Schritt nach dem anderen." : view === "appointments" ? "Das hast du als Nächstes vor." : "Hier wohnen deine gesammelten Sterne."}</p></div>
       <div className="header-actions">{demo && <span className="demo-badge">Demo · ohne Speicherung</span>}<button className="fullscreen-button" onClick={fullscreen}><Maximize size={25} /><span>Vollbild</span></button></div>
     </header>
 
+    {syncStatus}
     <main className={`play-space view-${view}`}>
       <section className="day-paper" aria-label={view === "day" ? "Deine Aufgaben heute" : view === "appointments" ? "Deine Termine" : "Deine Belohnungen"}>
-        <div className="paper-heading"><h2>{view === "day" ? "Heute" : view === "appointments" ? "Deine Termine" : "Deine Wünsche"}</h2>{view === "day" && <span className="done-badge"><Star size={24} fill="currentColor" /><span>{done} von {plan.tasks.length} geschafft</span></span>}</div>
+        <div className="paper-heading"><h2>{view === "day" ? (!demo && live.dayChanged ? "Neuer Tagesplan" : "Heute") : view === "appointments" ? "Deine Termine" : "Deine Wünsche"}</h2>{view === "day" && (demo || !live.dayChanged) && <span className="done-badge"><Star size={24} fill="currentColor" /><span>{done} von {plan.tasks.length} geschafft</span></span>}</div>
 
-        {view === "day" && <div className="tasks-scroll">
+        {view === "day" && !demo && live.dayChanged && <div className="empty-state"><span aria-hidden="true">🌤️</span><h3>Ein neuer Tag beginnt.</h3><p>{live.phase === "offline" ? "Verbinde den Bildschirm mit dem Server, um die heutigen Aufgaben zu laden." : "Deine heutigen Aufgaben werden geladen."}</p></div>}
+        {view === "day" && (demo || !live.dayChanged) && <div className="tasks-scroll">
           {groups.map((group) => <section key={group.id} className="routine-group" aria-label={group.tasks[0].routineTitle ?? "Einzelaufgabe"}>
           {group.tasks[0].routineTitle && <div className="routine-heading"><h3>{group.tasks[0].routineTitle}</h3><span>{group.tasks.filter((task) => task.completed).length} von {group.tasks.length} geschafft</span></div>}
-          {group.tasks.map((task) => <button key={task.id} className={`task-row ${task.completed ? "is-done" : ""} ${next?.id === task.id ? "is-next" : ""}`} disabled={task.completed || !!busy} aria-label={`${task.title}${task.time ? `, ${task.time} Uhr` : ""}, ${task.points} Sterne${task.completed ? ", erledigt" : ", abhaken"}`} onClick={() => complete(task.id)}>
+          {group.tasks.map((task) => <button key={task.id} className={`task-row ${task.completed ? "is-done" : ""} ${next?.id === task.id ? "is-next" : ""}`} disabled={task.completed || !!busy || (!demo && live.phase !== "connected")} aria-label={`${task.title}${task.time ? `, ${task.time} Uhr` : ""}, ${task.points} Sterne${task.completed ? ", erledigt" : ", abhaken"}`} onClick={() => complete(task.id)}>
             <span className="task-picture" aria-hidden="true">{taskPictures[task.icon]}</span>
             <span className="task-words"><strong>{task.title}</strong><span>{task.completed ? "Geschafft!" : task.time ? `${task.time} Uhr` : "In deinem Tempo"}<span className="row-stars"><Star size={15} fill="currentColor" />{task.completed ? "" : "+"}{task.points}</span></span></span>
             <span className="check-circle" aria-hidden="true">{busy === task.id ? <span className="saving-dots">•••</span> : task.completed ? <Check size={30} strokeWidth={3.5} /> : null}</span>
@@ -151,7 +172,7 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
       </aside>
     </main>
 
-    <div className="message-area"><div className={`success-message ${notice ? "has-message" : ""}`} aria-live="polite" role="status">{notice && <><Star size={23} fill="currentColor" />{notice.text}</>}</div>{error && <div className="error-message" role="alert"><p>{error}</p><button onClick={() => window.location.reload()}>Neu laden</button></div>}</div>
+    <div className="message-area"><div className={`success-message ${notice ? "has-message" : ""}`} aria-live="polite" role="status">{notice && <><Star size={23} fill="currentColor" />{notice.text}</>}</div>{error && <div className="error-message" role="alert"><p>{error}</p><button onClick={() => { if (demo) window.location.reload(); else void sync.refresh(); }}>{demo ? "Neu laden" : "Erneut abgleichen"}</button></div>}</div>
     <nav className="touch-dock" aria-label="Deine Bereiche">
       <button aria-pressed={view === "day"} className={view === "day" ? "active" : ""} onClick={() => openView("day")}><House size={29} /><span>Mein Tag</span></button>
       <button aria-pressed={view === "appointments"} className={view === "appointments" ? "active" : ""} onClick={() => openView("appointments")}><CalendarDays size={29} /><span>Termine</span></button>
