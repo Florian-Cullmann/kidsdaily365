@@ -37,6 +37,21 @@ export const sections: { id: DaySection; label: string; caption: string }[] = [
   { id: "evening", label: "Mein Abend", caption: "Den Tag entspannt beenden" },
 ];
 
+// Preserve the plan's order within each section and routine, including completed tasks.
+export function groupTasksBySection(tasks: Task[]) {
+  return sections.flatMap((section) => {
+    const groups = new Map<string, { id: string; tasks: Task[] }>();
+    for (const task of tasks) {
+      if (task.section !== section.id) continue;
+      const id = task.routineId ? `routine:${task.routineId}` : `task:${task.id}`;
+      const group = groups.get(id);
+      if (group) group.tasks.push(task);
+      else groups.set(id, { id, tasks: [task] });
+    }
+    return groups.size ? [{ ...section, groups: [...groups.values()] }] : [];
+  });
+}
+
 export function localDate(now: Date, timezone: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { demoPlans } from "@/domain/demo";
-import { completeDemoTask, localDate } from "@/domain/plan";
+import { completeDemoTask, groupTasksBySection, localDate, type Task } from "@/domain/plan";
 
 describe("family day boundaries", () => {
   it("uses the family timezone rather than the server date", () => {
@@ -27,5 +27,35 @@ describe("independent child progress", () => {
   it("cannot complete another child's task", () => {
     const [first, second] = demoPlans();
     expect(completeDemoTask(first, second.tasks[0].id)).toBe(first);
+  });
+});
+
+describe("visible day sections", () => {
+  const task = (id: string, section: Task["section"], extra: Partial<Task> = {}): Task => ({
+    id, section, title: id, description: "", icon: "heart", time: null, points: 5, completed: false, ...extra,
+  });
+
+  it("orders sections and keeps every task once, with routine steps in plan order", () => {
+    const tasks = [
+      task("evening", "evening"),
+      task("step-2", "morning", { routineId: "routine", completed: true }),
+      task("routine", "morning"),
+      task("afternoon", "afternoon"),
+      task("step-1", "morning", { routineId: "routine", completed: true }),
+      task("later-step", "evening", { routineId: "routine" }),
+    ];
+    const result = groupTasksBySection(tasks);
+    expect(result.map((section) => section.label)).toEqual(["Mein Morgen", "Mein Nachmittag", "Mein Abend"]);
+    expect(result.map((section) => section.groups.map((group) => group.tasks.map((item) => item.id))))
+      .toEqual([[["step-2", "step-1"], ["routine"]], [["afternoon"]], [["evening"], ["later-step"]]]);
+    expect(result.flatMap((section) => section.groups.flatMap((group) => group.tasks))).toHaveLength(tasks.length);
+    expect(result[0].groups[0].tasks.every((item) => item.completed)).toBe(true);
+  });
+
+  it("omits empty sections but keeps completed and untimed tasks", () => {
+    const completed = task("done", "afternoon", { completed: true });
+    expect(groupTasksBySection([completed]).map((section) => section.id)).toEqual(["afternoon"]);
+    expect(groupTasksBySection([completed])[0].groups[0].tasks).toEqual([completed]);
+    expect(groupTasksBySection([])).toEqual([]);
   });
 });
