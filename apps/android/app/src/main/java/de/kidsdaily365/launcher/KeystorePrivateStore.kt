@@ -13,7 +13,7 @@ import javax.crypto.spec.GCMParameterSpec
 
 /** AES-GCM authenticated storage. The key is non-exportable; ciphertext is excluded from backups. */
 class KeystorePrivateStore(context: Context, name: String = "connection") : PrivateStore {
-    init { require(name in setOf("connection", "maintenance")) }
+    init { require(name in setOf("connection", "maintenance", "management")) }
     private val file = AtomicFile(File(context.noBackupFilesDir, "launcher-$name.v1"))
     private val alias = "kidsdaily.launcher.$name.v1"
     private val aad = (if (name == "connection") "kidsdaily-launcher-storage-v1" else "kidsdaily-maintenance-storage-v1").toByteArray(Charsets.UTF_8)
@@ -31,8 +31,8 @@ class KeystorePrivateStore(context: Context, name: String = "connection") : Priv
 
     override fun read(): String? {
         if (!file.baseFile.exists()) return null
-        val bytes = file.openRead().use { it.readNBytes(131_073) }
-        check(bytes.size in 29..131_072 && bytes[0] == 1.toByte())
+        val bytes = file.openRead().use { it.readNBytes(524_289) }
+        check(bytes.size in 29..524_288 && bytes[0] == 1.toByte())
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, key(false), GCMParameterSpec(128, bytes.copyOfRange(1, 13)))
         cipher.updateAAD(aad)
@@ -45,7 +45,7 @@ class KeystorePrivateStore(context: Context, name: String = "connection") : Priv
         cipher.updateAAD(aad)
         check(cipher.iv.size == 12)
         val bytes = byteArrayOf(1) + cipher.iv + cipher.doFinal(value.toByteArray(Charsets.UTF_8))
-        check(bytes.size <= 131_072)
+        check(bytes.size <= 524_288)
         val output = file.startWrite()
         try { output.write(bytes); file.finishWrite(output) }
         catch (e: Exception) { file.failWrite(output); throw e }

@@ -221,3 +221,35 @@ export const allowedApps = pgTable("allowed_apps", {
   foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
   unique("one_app_per_child").on(table.childId, table.packageName),
 ]);
+
+// Explicit parent-issued management capability; never accepted by launcher/wall APIs.
+export const deviceManagement = pgTable("device_management", {
+  deviceId: uuid().primaryKey(), familyId: uuid().notNull(), childId: uuid().notNull(),
+  enrollmentHash: text(), enrollmentExpiresAt: timestamp({ withTimezone: true }), tokenHash: text().unique(),
+  revision: integer().notNull().default(0), locked: boolean().notNull().default(false),
+  acknowledgedRevision: integer().notNull().default(-1), appliedLocked: boolean(),
+  lastSeenAt: timestamp({ withTimezone: true }), ready: boolean().notNull().default(false),
+  usagePermission: boolean().notNull().default(false), usageSince: timestamp({ withTimezone: true }),
+  usageThrough: timestamp({ withTimezone: true }), error: text(),
+}, (t) => [
+  foreignKey({ columns: [t.deviceId, t.familyId], foreignColumns: [devices.id, devices.familyId] }).onDelete("cascade"),
+  foreignKey({ columns: [t.childId, t.familyId], foreignColumns: [children.id, children.familyId] }).onDelete("cascade"),
+]);
+export const deviceUsageEvents = pgTable("device_usage_events", {
+  id: uuid().primaryKey().defaultRandom(), deviceId: uuid().notNull(), familyId: uuid().notNull(),
+  eventKey: text().notNull(), at: timestamp({ withTimezone: true }).notNull(),
+  kind: text().notNull(), packageName: text().notNull(), label: text().notNull(),
+}, (t) => [
+  foreignKey({ columns: [t.deviceId, t.familyId], foreignColumns: [devices.id, devices.familyId] }).onDelete("cascade"),
+  unique("usage_device_event").on(t.deviceId, t.eventKey), index("usage_device_time").on(t.familyId, t.deviceId, t.at),
+]);
+export const childMessages = pgTable("child_messages", {
+  id: uuid().primaryKey().defaultRandom(), familyId: uuid().notNull(), childId: uuid().notNull(),
+  sender: text().notNull(), senderId: uuid().notNull(), requestId: uuid().notNull(), body: text().notNull(),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(), readAt: timestamp({ withTimezone: true }),
+}, (t) => [
+  foreignKey({ columns: [t.childId, t.familyId], foreignColumns: [children.id, children.familyId] }).onDelete("cascade"),
+  unique("message_request_identity").on(t.familyId, t.childId, t.senderId, t.requestId),
+  index("messages_conversation").on(t.familyId, t.childId, t.createdAt),
+  check("message_body_length", sql`length(${t.body}) between 1 and 2000`),
+]);

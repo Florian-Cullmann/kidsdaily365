@@ -131,6 +131,17 @@ class ParentPanel(private val activity: Activity, private val scope: CoroutineSc
                     policy.deactivate(activity); dismiss(); changed()
                 } } }.show()
         }
+        button("Gerät freigeben", content) { scope.launch { attempt(remaining) {
+            (activity.application as LauncherApplication).management.localRelease(); dismiss(); changed()
+        } } }
+        button("Dashboard verbinden", content) {
+            val form = box(); val note = label("Unter Geräte → Verwalten einen Verwaltungscode erstellen und hier eingeben.")
+            form.addView(note); val code = input("Verwaltungscode"); form.addView(code)
+            button("Verbinden", form) { val value = code.text.toString(); code.text.clear(); scope.launch { attempt(note) {
+                (activity.application as LauncherApplication).management.enroll(value); actions()
+            } } }
+            show("Dashboard verbinden", form)
+        }
         button("Eltern-Code ändern", content) { scope.launch { attempt(remaining) { maintenance.requireOpen(); setup(true) } } }
         button("Systemeinstellungen öffnen", content) { scope.launch { attempt(remaining) {
             maintenance.requireOpen(); policy.openSettings(activity)
@@ -145,7 +156,7 @@ class ParentPanel(private val activity: Activity, private val scope: CoroutineSc
                 .setMessage("Buddy und Gerätezugang werden entfernt. Der lokale Eltern-Code bleibt erhalten. Eine neue Kopplung braucht einen neuen Android-Gerätecode.")
                 .setNegativeButton("Abbrechen", null)
                 .setPositiveButton("Trennen") { _, _ -> scope.launch { attempt(remaining) {
-                    repository.reset(); dismiss(); changed()
+                    (activity.application as LauncherApplication).management.disconnect(); repository.reset(); dismiss(); changed()
                 } } }.show()
         }
         button("Zurück zum Kindermodus", content) { dismiss(); changed() }

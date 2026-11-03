@@ -124,6 +124,7 @@ class MainActivity : Activity() {
         polling?.cancel()
         polling = scope.launch {
             safely {
+                app.management.initialize()
                 parentStatus = maintenance.status()
                 maintenance.rememberTarget(repository.maintenanceTarget())
                 var tick = 0
@@ -132,12 +133,14 @@ class MainActivity : Activity() {
                         else repository.current()
                     if (!policy.enabled && view.paired && tick % 5 == 0) view = repository.refresh()
                     if (policy.enabled) {
-                        val valid = view.canLaunch && policy.error == null && android.os.SystemClock.elapsedRealtime() < view.validUntilElapsed &&
+                        val valid = view.canLaunch && !app.management.locked && policy.error == null && android.os.SystemClock.elapsedRealtime() < view.validUntilElapsed &&
                             System.currentTimeMillis() < view.tokenExpiresAt
                         view = view.copy(canLaunch = valid, status = if (view.canLaunch && !valid)
                             "Freigaben müssen bestätigt werden. Apps bleiben gesperrt." else view.status)
                     }
                     parentStatus = maintenance.status()
+                    if (app.management.locked) view = view.copy(canLaunch = false, status = "Zeit für eine Pause · Nachrichten und Elternzugang bleiben erreichbar")
+                    view = view.copy(status = view.status + if (app.management.unread > 0) " · ${app.management.unread} neue Nachrichten" else "")
                     render(view)
                     tick++
                     delay(1_000)
@@ -170,7 +173,7 @@ class MainActivity : Activity() {
         connectionStatus.text = listOf(state.status, sync).filter { it.isNotEmpty() }.joinToString("\n")
         val snapshot = state.snapshot
         if (nextKind == 1) {
-            greeting.text = snapshot?.let { getString(R.string.greeting, it.child.name) } ?: getString(R.string.loading)
+            greeting.text = if (app.management.locked) "Zeit für eine Pause" else snapshot?.let { getString(R.string.greeting, it.child.name) } ?: getString(R.string.loading)
             stars.text = snapshot?.let { "★ ${it.stars}" } ?: "☆"
             stars.contentDescription = snapshot?.let { resources.getQuantityString(R.plurals.stars, if (it.stars == 1L) 1 else 2, it.stars) }
             buddyName.text = snapshot?.buddy?.name.orEmpty()
@@ -186,7 +189,7 @@ class MainActivity : Activity() {
                     apps.addView(appCard(app.packageName, app.label, installed, index) {
                         operation = scope.launch {
                             safely {
-                                if (!repository.mayLaunch(app.packageName)) {
+                                if (this@MainActivity.app.management.locked || !repository.mayLaunch(app.packageName)) {
                                     Toast.makeText(this@MainActivity, R.string.refresh_required, Toast.LENGTH_LONG).show()
                                     render(repository.current())
                                     return@safely
@@ -200,7 +203,10 @@ class MainActivity : Activity() {
                         }
                     })
                 }
-                if (!snapshot?.policy?.allowedApps.isNullOrEmpty()) {
+                apps.addView(appCard(packageName, "Nachrichten", true, 2) {
+                    startActivity(android.content.Intent(this, MessagesActivity::class.java))
+                }.apply { tag = "messages" })
+                if (apps.childCount > 0) {
                     // Keep a partially filled last row aligned like a phone home screen.
                     while (apps.childCount % apps.columnCount != 0) {
                         apps.addView(android.widget.Space(this), launcherCell())
@@ -211,7 +217,8 @@ class MainActivity : Activity() {
             for (i in 0 until apps.childCount) {
                 val child = apps.getChildAt(i)
                 if (child is Button) {
-                    child.isEnabled = state.canLaunch && child.tag == true
+                    if (child.tag == "messages") child.text = if (app.management.unread > 0) "Nachrichten (${app.management.unread})" else "Nachrichten"
+                    child.isEnabled = child.tag == "messages" || (state.canLaunch && child.tag == true)
                     child.alpha = if (child.isEnabled) 1f else 0.6f
                 }
             }
@@ -388,7 +395,7 @@ class MainActivity : Activity() {
             stateListAnimator = null
             elevation = 0f
             compoundDrawablePadding = dp(8)
-            val icon = try { packageManager.getApplicationIcon(packageName) }
+            val icon = try { if (packageName == this@MainActivity.packageName) requireNotNull(getDrawable(R.drawable.ic_messages)) else packageManager.getApplicationIcon(packageName) }
                 catch (_: android.content.pm.PackageManager.NameNotFoundException) {
                     requireNotNull(getDrawable(R.drawable.ic_app_placeholder))
                 }
