@@ -2,6 +2,8 @@
 
 Die native Kotlin-App zeigt Buddy und Live-Sterne eines fest zugeordneten Kindes und öffnet freigegebene installierte Apps. Aufgabenabschluss, Elternverwaltung und Käufe sind nicht vorhanden. Eine normale Installation bleibt **ungeschützt**. Auf ausdrücklich provisionierten Device-Owner-Geräten können Eltern den verwalteten Kindermodus aktivieren: Multi-App Lock Task, Kamera-/Systemleisten-Sperren und Wiederherstellung beim Boot. Die physische Abnahme auf Xiaomi/LineageOS und Xiaomi/HyperOS aus [Issue #2](https://github.com/Florian-Cullmann/kidsdaily365/issues/2) ist noch offen.
 
+Die Kinderansicht zeigt den Sternestand als kompakte Pill oben links und den Buddy oben rechts. Eine ruhige Pastelllandschaft rahmt „Deine Apps“ mit kompakten App-Icons auf sanften Farbflächen und Namen darunter ein. Das Launcher-Raster nutzt drei Spalten, auf schmalen Displays oder bei vergrößerter Schrift zwei bzw. eine Spalte. Fehlende Apps bleiben mit Ersatzsymbol, Status und reduzierter Deckkraft deaktiviert. Lange Namen dürfen umbrechen; die Ansicht ist scrollbar. Der Entwicklungsvorschau-Hinweis erscheint nicht mehr auf der Oberfläche; tatsächliche Policy-Fehler bleiben sichtbar. Für die WLAN-Kinderhandys gibt es keinen eigenen Notruf-Button. Elternwartung und systemseitige Sicherheitswege bleiben erhalten.
+
 ## Bauen und prüfen
 
 JDK 17 und Android SDK 36; Android Studio kann diesen Ordner öffnen. SDK-Pfad über `ANDROID_HOME` oder eine ignorierte `local.properties` setzen.

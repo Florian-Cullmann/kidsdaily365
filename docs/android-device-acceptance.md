@@ -17,7 +17,7 @@ Stand: 2026-11-03. Implementierung und Emulatorprüfung sind getrennt von der no
 - Ohne Elternfreigabe kann die Verwaltung nicht abgeschaltet werden. Nach Token-Widerruf funktioniert die lokale Elternfreigabe weiter; Systemeinstellungen lassen sich bewusst öffnen. Neu erzeugter Controller ohne gespeicherte Wartungsfreigabe stellt die Einschränkungen wieder her.
 - Direkter Start der Systemeinstellungen im Kindermodus wird von Android mit „App is not available“ blockiert (tatsächlicher Screenshot). Die erlaubte Test-Uhr und die ausdrücklich geöffneten Systemeinstellungen wurden visuell geprüft.
 - Debugging-Sperre trennt ADB tatsächlich. Testberichte gelangen über einen lokalen Emulator-Host-Kanal zum Runner; der Produktionscode enthält keinen Debugging-Bypass.
-- Kaltstart des AVD mit erhaltenen Gerätedaten und beendetem Fixture-Server: KidsDaily startet wieder im verwalteten Modus mit gesperrten App-Starts; Elternzugang und Notruf bleiben sichtbar. Der Emulator wurde mit `-no-snapshot-load` gestartet, damit die Gerätedaten erhalten bleiben.
+- Kaltstart des AVD mit erhaltenen Gerätedaten und beendetem Fixture-Server: KidsDaily startet wieder im verwalteten Modus mit gesperrten App-Starts; Elternzugang und der damals vorhandene Notruf-Button blieben sichtbar. Der eigene Notruf-Button wurde mit Issue #20 für die WLAN-Kinderhandys entfernt; System-Sicherheitswege bleiben erhalten. Der Emulator wurde mit `-no-snapshot-load` gestartet, damit die Gerätedaten erhalten bleiben.
 - 28 JVM-Tests, Debug-/Release-Build und Lint erfolgreich. Ein bereits bestehender `BuddyView`-DrawAllocation-Hinweis bleibt bestehen. Web: 26 Tests und Produktionsbuild erfolgreich; 27 PostgreSQL-Integrationstests auf frisch migrierter `kidsdaily_issue2_test` erfolgreich.
 
 ## Physische Abnahme: noch offen
@@ -36,7 +36,7 @@ Für jeden Lauf ausfüllen: Datum, prüfende Person, Modell, Hersteller, Android
 | Kaltstart / Reboot | KidsDaily als Home, lokale Einschränkungen wiederhergestellt; Apps erst nach gültiger Online-Bestätigung | offen | offen |
 | App-Absturz / Prozessneustart | Verwalteter Home/Service wird wiederhergestellt; keine gespeicherte offene Elternsitzung | offen | offen |
 | Offline / langsamer Server | Letzte validierte Freigabe bleibt bis zum Ablauf; Netzwerkfehler öffnen keine zusätzlichen Apps | offen | offen |
-| Fristablauf bei laufender App | Laufende nicht mehr zulässige App endet; nur KidsDaily plus Eltern-/Notrufweg | offen | offen |
+| Fristablauf bei laufender App | Laufende nicht mehr zulässige App endet; nur KidsDaily plus Elternzugang und System-Sicherheitswege | offen | offen |
 | Widerruf / Tokenablauf | Beim Serverkontakt bzw. lokalen Ablauf Freigaben entzogen, Kindertoken und Cache gelöscht | offen | offen |
 | Entzug einer einzelnen laufenden App | Betroffener Lock Task endet; verbleibende erlaubte Apps funktionieren weiter | offen | offen |
 | Installieren / Deinstallieren / Nutzerwechsel | Im Kindermodus gesperrt, keine Selbst-Deinstallation oder freie App-Kontrolle | offen | offen |
