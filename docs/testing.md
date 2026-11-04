@@ -119,6 +119,13 @@ Screenshots mit ausschließlich fiktiven Daten: [Elterneditor](proof/routine-edi
 
 Automatisierte Bildtests prüfen echte Dekodierung, Größenlimits, Ausschnitt, EXIF-Ausrichtung und entfernte Metadaten. Die Datenbanktests prüfen Ersetzen/Entfernen, Rechte, Profiltrennung und unabhängigen Punktestand. Keine echten Kinderfotos in Tests oder Nachweisen verwenden.
 
+## Routinen für Geschwister kopieren
+
+Unter **Routinen → Routine kopieren** erscheint ein unabhängiger Entwurf mit Quellkind und aktivem Zielkind. Titel, Schritte (einschließlich Erklärung, Symbol und Sternen), Schrittfolge, Tagesabschnitt, Uhrzeit, Sortierung und Wochentage sind vor dem Speichern änderbar. Die Kopie startet aktiv; bei Bedarf im Entwurf deaktivieren. Abbrechen schreibt nichts.
+
+Der angezeigte erste Wirksamkeitstag richtet sich nach dem heutigen Familientag und den gewählten Wochentagen. Neue Routinen werden beim nächsten Tagesplanabruf für einen passenden Tag übernommen, gegebenenfalls bereits heute. Speichern selbst erzeugt keine Tagesaufgaben. Bestehende Tageskopien der Quelle bleiben unverändert; Verlauf, Abschlüsse, verdiente Sterne und Pausen werden nicht kopiert. Die Pausenfunktion aus #28 ist noch separat in Arbeit.
+
+Mit fiktiven Geschwisterprofilen eine Routine mit drei unterschiedlichen Schritten kopieren, im Entwurf Reihenfolge und Titel ändern, anschließend Quelle und Kopie getrennt bearbeiten. Auch Abbrechen und einen erneuten Speicherversuch nach verlorener Antwort prüfen: Pro Entwurf entsteht höchstens eine Kopie. Bei geändertem Inhalt nach bereits erfolgreichem Speichern wird ein Konflikt gemeldet; dann die gespeicherte Kopie bearbeiten. Automatische Integrationstests prüfen parallele Wiederholungen, unveränderte Historie, fremde Haushalte, archivierte Ziele und den Ausschluss von Gerätezugängen.
 
 ## Automatischer Abgleich am Wandbildschirm (#26)
 
