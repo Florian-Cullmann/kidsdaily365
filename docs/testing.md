@@ -118,3 +118,15 @@ Screenshots mit ausschließlich fiktiven Daten: [Elterneditor](proof/routine-edi
 5. Vollständigen PostgreSQL-Dump der separaten Testdatenbank in eine leere `*_test`-Datenbank zurückspielen. Bildversionen und SHA-256-Prüfsummen der `child_images.data`-Spalte müssen übereinstimmen. Die Unraid-Anleitung enthält den produktiven Backup-Weg.
 
 Automatisierte Bildtests prüfen echte Dekodierung, Größenlimits, Ausschnitt, EXIF-Ausrichtung und entfernte Metadaten. Die Datenbanktests prüfen Ersetzen/Entfernen, Rechte, Profiltrennung und unabhängigen Punktestand. Keine echten Kinderfotos in Tests oder Nachweisen verwenden.
+
+### Terminanzeige am Wandbildschirm
+
+Laufende Termine bleiben bis zur exklusiven Endzeit sichtbar und tragen „Jetzt“.
+Ohne Endzeit bleibt ein Termin bis zum Ende seines Starttags in der Familienzeitzone
+sichtbar (nach Beginn „Heute“, keine behauptete laufende Dauer). Die Terminliste
+enthält alle relevanten aktiven Termine des Kindes und lässt sich bei Bedarf scrollen.
+Die Ansicht prüft Zeitgrenzen alle 15 Sekunden und bei Rückkehr zum Browser;
+Änderungen durch andere Geräte benötigen bis zur Umsetzung von #26 weiterhin Neuladen.
+Prüfe mehr als drei Termine, einen laufenden Termin über Mitternacht, einen Termin
+ohne Ende sowie das automatische Verschwinden nach Ablauf. Sommerzeit und
+Profil-/Haushaltsgrenzen werden zusätzlich durch die automatischen Tests abgedeckt.
