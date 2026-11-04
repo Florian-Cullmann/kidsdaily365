@@ -45,3 +45,15 @@ export const pairingSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("wall"), label: name, childId: z.null().default(null) }).strict(),
   z.object({ kind: z.literal("android"), label: name, childId: uuid }).strict(),
 ]);
+
+export const copyRoutineSchema = z.object({ requestId: uuid, routine: managementSchemas.routines }).strict();
+
+// New templates are materialized on the next plan read, including today.
+export function firstRoutineDate(today: string, weekdays: number[]): string | null {
+  const date = new Date(`${today}T12:00:00Z`);
+  for (let offset = 0; offset < 7; offset++) {
+    if (weekdays.includes(date.getUTCDay() || 7)) return date.toISOString().slice(0, 10);
+    date.setUTCDate(date.getUTCDate() + 1);
+  }
+  return null;
+}

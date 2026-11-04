@@ -129,3 +129,36 @@ Automatisierte Bildtests prüfen echte Dekodierung, Größenlimits, Ausschnitt, 
 - `tests/week-preview.integration.test.ts` prüft unveränderte Tageskopien und leeres Punktejournal nach Vorschauabrufen gegen PostgreSQL. Die Lesetransaktion selbst ist `READ ONLY`, mit konsistentem Snapshot.
 - Kompatibilität mit #28: Bis dessen additive Migration auf `main` liegt, erkennt ein lesender Adapter die vorhandene Tabelle `routine_pauses`; er verwendet ausschließlich deren inklusive Datumsbereiche, `revokedAt` und den gespeicherten `daily_tasks.pausedBy`-Verweis. Kein eigenes Pausenmodell und keine Migration in #33. Pausierte Schritte heißen „Pausiert · nicht fällig“, erledigte Schritte bleiben erledigt. Nach Integration von #28 kann der Adapter auf die gemeinsamen Drizzle-Typen umgestellt werden.
 - Der zusätzliche Pausen-Integrationstest läuft, sobald die #28-Migration in der disposable Testdatenbank vorhanden ist; ohne diese Tabelle wird ausschließlich dieser Test übersprungen. Beide Datenbankstände prüfen. Die Migration aus #28 ausschließlich in einer disposable `*_test`-Datenbank separat anwenden, niemals außerhalb des normalen Migrationsablaufs auf deployed Daten.
+
+## Routinen für Geschwister kopieren
+
+Unter **Routinen → Routine kopieren** erscheint ein unabhängiger Entwurf mit Quellkind und aktivem Zielkind. Titel, Schritte (einschließlich Erklärung, Symbol und Sternen), Schrittfolge, Tagesabschnitt, Uhrzeit, Sortierung und Wochentage sind vor dem Speichern änderbar. Die Kopie startet aktiv; bei Bedarf im Entwurf deaktivieren. Abbrechen schreibt nichts.
+
+Der angezeigte erste Wirksamkeitstag richtet sich nach dem heutigen Familientag und den gewählten Wochentagen. Neue Routinen werden beim nächsten Tagesplanabruf für einen passenden Tag übernommen, gegebenenfalls bereits heute. Speichern selbst erzeugt keine Tagesaufgaben. Bestehende Tageskopien der Quelle bleiben unverändert; Verlauf, Abschlüsse, verdiente Sterne und Pausen werden nicht kopiert. Die Pausenfunktion aus #28 ist noch separat in Arbeit.
+
+Mit fiktiven Geschwisterprofilen eine Routine mit drei unterschiedlichen Schritten kopieren, im Entwurf Reihenfolge und Titel ändern, anschließend Quelle und Kopie getrennt bearbeiten. Auch Abbrechen und einen erneuten Speicherversuch nach verlorener Antwort prüfen: Pro Entwurf entsteht höchstens eine Kopie. Bei geändertem Inhalt nach bereits erfolgreichem Speichern wird ein Konflikt gemeldet; dann die gespeicherte Kopie bearbeiten. Automatische Integrationstests prüfen parallele Wiederholungen, unveränderte Historie, fremde Haushalte, archivierte Ziele und den Ausschluss von Gerätezugängen.
+
+## Automatischer Abgleich am Wandbildschirm (#26)
+
+Mit zwei getrennten Browser-Sitzungen und zwei gültigen Wandfreigaben testen; Elternverwaltung in einer dritten Sitzung öffnen. Ausschließlich fiktive Profile verwenden.
+
+1. Dasselbe Kind auf beiden Wandbildschirmen auswählen. Auf A eine Aufgabe abschließen; B übernimmt innerhalb des nächsten Zehn-Sekunden-Abrufs Abschluss und Sterne, ohne eine eigene Erfolgsmeldung zu erzeugen.
+2. Über die Elternverwaltung Profil/Buddy, Profilbild oder Termin ändern. Auswahl, geöffnete Termine-/Sterneansicht und Scrollposition des Wandbildschirms bleiben bei der Aktualisierung erhalten. Routinenänderungen schreiben bestehende Tageskopien weiterhin nicht um.
+3. Verbindung auf B unterbrechen. Der letzte Stand bleibt sichtbar; Aufgaben sind gesperrt. Unten rechts steht „Sync fehlgeschlagen“. Ein Klick zeigt während des erneuten Abrufs „Versuche Sync...“, bei Erfolg „Letzter Sync: dd.mm.YYYY HH:ii“ in Familienzeit. Wieder verbinden: Abgleich ohne Neuladen, keine automatisch nachgesendeten Abschlüsse. Bei verloren gegangener Abschlussantwort entscheidet der nächste Serverabgleich über den tatsächlich gespeicherten Zustand.
+4. Ausgewähltes Profil archivieren: B kehrt zur aktuellen Profilauswahl zurück. Wandfreigabe widerrufen: B entfernt die geschützten Inhalte und zeigt die Kopplung. Ein Widerruf kann erst bei erreichbarem Server erkannt werden.
+5. Tageswechsel in der Familienzeitzone sowohl mit ausgewähltem Kind als auch mit offener Profilauswahl prüfen. Offline werden alte Aufgaben nicht als heutige Aufgaben angeboten; nach erfolgreichem Abruf erscheint der neue Plan. Die Geräteuhr muss richtig eingestellt sein; der Server prüft das gültige Aufgabendatum zusätzlich bei jedem Abschluss.
+6. Versteckte Seite wieder öffnen oder Browser fokussieren: unmittelbarer Abgleich. Bei leerem Haushalt führt ein neu angelegtes Profil ohne Seitenreload zur Profilauswahl. Demo-Modus erzeugt keine Wand-API-Aufrufe.
+
+`tests/wall-sync.test.ts` prüft kontrolliert verspätete/abgebrochene Antworten, parallele Abrufe, Abschlussabgleich, Timeout, Familien-Mitternacht und Widerruf. Die Integrationstests für `/api/wall/snapshot` prüfen echte Wand-/Android-/Elternberechtigungen, Haushaltsgrenzen, Ablauf, Widerruf und unveränderte Tageskopien. Die Antworten sind ausdrücklich `private, no-store`.
+
+### Terminanzeige am Wandbildschirm
+
+Laufende Termine bleiben bis zur exklusiven Endzeit sichtbar und tragen „Jetzt“.
+Ohne Endzeit bleibt ein Termin bis zum Ende seines Starttags in der Familienzeitzone
+sichtbar (nach Beginn „Heute“, keine behauptete laufende Dauer). Die Terminliste
+enthält alle relevanten aktiven Termine des Kindes und lässt sich bei Bedarf scrollen.
+Die Ansicht prüft Zeitgrenzen alle 15 Sekunden und bei Rückkehr zum Browser;
+Änderungen durch andere Geräte übernimmt der automatische Abgleich (siehe #26 oben).
+Prüfe mehr als drei Termine, einen laufenden Termin über Mitternacht, einen Termin
+ohne Ende sowie das automatische Verschwinden nach Ablauf. Sommerzeit und
+Profil-/Haushaltsgrenzen werden zusätzlich durch die automatischen Tests abgedeckt.
