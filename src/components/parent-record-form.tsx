@@ -17,11 +17,11 @@ function AppointmentTimeField({ name, label, original, timeZone, required = fals
     ? new Date(original).toISOString().slice(0, 16) : "";
   const initial = candidates.find((iso) => iso.slice(0, 16) === originalMinute) ?? candidates[0] ?? "";
   return <div>
-    <label>{label}<input name={name} type="datetime-local" value={local} onChange={(event) => setLocal(event.target.value)} required={required} aria-describedby={`${name}-help`} /></label>
+    <label>{label}<input name={name} type="datetime-local" value={local} onChange={(event) => setLocal(event.target.value)} required={required} aria-describedby={candidates.length > 1 ? undefined : `${name}-help`} /></label>
     {candidates.length > 1 ? <label>Welche Uhrzeit für {label}?
       <select key={local} name={`${name}Instant`} defaultValue={initial}>
         {candidates.map((iso, index) => <option key={iso} value={iso}>{index === 0 ? "Erstes" : "Zweites"} Mal ({new Intl.DateTimeFormat("de-DE", { timeZone, timeZoneName: "longOffset" }).formatToParts(new Date(iso)).find((part) => part.type === "timeZoneName")?.value})</option>)}
-      </select><span id={`${name}-help`} className="field-help">Diese Uhrzeit kommt bei der Zeitumstellung zweimal vor. Bitte prüfe die Auswahl.</span>
+      </select>
     </label> : <>
       <input type="hidden" name={`${name}Instant`} value={candidates[0] ?? ""} />
       <span id={`${name}-help`} className="field-help">{local && !candidates.length ? `Diese Uhrzeit existiert in ${timeZone} nicht. Bitte wähle eine andere Uhrzeit.` : ""}</span>
@@ -128,7 +128,6 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onCance
         <button type="button" className="parent-secondary" disabled={steps.length >= 50} onClick={() => { setOpenStep(steps.length); setSteps((items) => [...items, { title: "", description: "", icon: "heart", points: 5 }]); }}>Aufgabe hinzufügen</button>
       </div>}
       {resource === "appointments" && <>
-        <p className="field-help wide-field">Alle Uhrzeiten gelten in eurer Familienzeitzone: <strong>{data.family.timezone}</strong> – auch auf Reisen.</p>
         <AppointmentTimeField name="startsAt" label="Beginn" original={record?.startsAt} timeZone={data.family.timezone} required />
         <AppointmentTimeField name="endsAt" label="Ende (optional)" original={record?.endsAt} timeZone={data.family.timezone} />
         <label>Bildsymbol<select name="icon" defaultValue={text("icon", "calendar")}><option value="calendar">📅 Termin</option><option value="tooth">🦷 Zahnarzt</option><option value="ball">⚽ Sport</option><option value="heart">💛 Allgemein</option></select></label>
