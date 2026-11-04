@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { BookOpen, CalendarDays, Check, ClipboardList, Gift, House, LayoutGrid, LogOut, MonitorSmartphone, Plus, Settings, ShieldCheck, Smartphone, Users } from "lucide-react";
 import type { ParentActor } from "@/server/auth/parent";
 import type { ManagementData } from "@/server/management";
 import type { Resource } from "@/domain/management";
-import { ParentRecordForm, type EditableRecord } from "./parent-record-form";
+import { ParentRecordForm, type EditableRecord, type RecordDraft } from "./parent-record-form";
+import { UnsavedRecordDialog } from "./unsaved-record-dialog";
 import { RoutinePauses } from "./routine-pauses";
 import { BuddyWardrobe } from "./buddy-wardrobe";
 import { ProfilePicture } from "./profile-picture";
@@ -51,8 +52,32 @@ async function request(url: string, method = "GET", body?: unknown) {
 export function ParentConsole({ parent, initialData, initialTab = "overview" }: { parent: ParentActor; initialData: ManagementData; initialTab?: Tab }) {
   const router = useRouter();
   const pending = useRef(false);
+  const draftRef = useRef<RecordDraft | null>(null);
+  const [leaveAction, setLeaveAction] = useState<(() => void) | null>(null);
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (!draftRef.current?.isDirty()) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, []);
+  function leave(run: () => void) {
+    if (pending.current) return;
+    if (draftRef.current?.isDirty()) setLeaveAction(() => run);
+    else { setFormVersion((version) => version + 1); run(); }
+  }
+  function clearDraft() {
+    draftRef.current = null;
+    setLeaveAction(null);
+    setFormOpen(false);
+    setEditing(null);
+    setCopySource(null);
+  }
   const [data, setData] = useState(initialData);
   const [tab, setTab] = useState<Tab>(initialTab);
+  const [formVersion, setFormVersion] = useState(0);
   const [pauseRoutineId, setPauseRoutineId] = useState<string | null>(null);
   const pauseRoutine = data.routines.find(routine => routine.id === pauseRoutineId);
   const [copySource, setCopySource] = useState<{ id: string; childName: string; requestId: string } | null>(null);
@@ -73,18 +98,21 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
 
   function navigate(id: Tab) { setCopySource(null); setPauseRoutineId(null); setBuddyChildId(null); setImageChildId(null); setTab(id); setFormOpen(false); setEditing(null); setError(""); setNotice(""); setIssuedCode(null); }
   function createRecord(resource: Resource) {
-    navigate(resource); setEditing(null); setFormOpen(true);
+    leave(() => { navigate(resource); setEditing(null); setFormOpen(true); });
   }
   function copyRecord(record: EditableRecord) {
-    // getRandomValues also works on a household LAN served over HTTP.
-    const bytes = crypto.getRandomValues(new Uint8Array(16));
-    bytes[6] = (bytes[6] & 15) | 64;
-    bytes[8] = (bytes[8] & 63) | 128;
-    const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-    const requestId = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-    setCopySource({ id: record.id, childName: childName(record.childId), requestId });
-    setEditing({ ...record, childId: data.children.find((child) => child.active && child.id !== record.childId)?.id ?? data.children.find((child) => child.active)?.id, active: true });
-    setFormOpen(true); setError(""); setNotice("");
+    leave(() => {
+      setPauseRoutineId(null);
+      // getRandomValues also works on a household LAN served over HTTP.
+      const bytes = crypto.getRandomValues(new Uint8Array(16));
+      bytes[6] = (bytes[6] & 15) | 64;
+      bytes[8] = (bytes[8] & 63) | 128;
+      const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+      const requestId = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+      setCopySource({ id: record.id, childName: childName(record.childId), requestId });
+      setEditing({ ...record, childId: data.children.find((child) => child.active && child.id !== record.childId)?.id ?? data.children.find((child) => child.active)?.id, active: true });
+      setFormOpen(true); setError(""); setNotice("");
+    });
   }
   async function action(run: () => Promise<void>) {
     if (pending.current) return;
@@ -92,7 +120,7 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
     setBusy(true); setError(""); setNotice("");
     try { await run(); }
     catch (cause) {
-      if (cause instanceof SessionExpired) { router.replace("/login"); router.refresh(); }
+      if (cause instanceof SessionExpired) { clearDraft(); router.replace("/login"); router.refresh(); }
       setError(cause instanceof Error && !(cause instanceof TypeError) ? cause.message : "Der Server ist gerade nicht erreichbar.");
     }
     finally { pending.current = false; setBusy(false); }
@@ -102,7 +130,8 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
     await action(async () => {
       if (copySource) await request(`/api/parent/routines/${copySource.id}/copy`, "POST", { requestId: copySource.requestId, routine: input });
       else await request(`/api/parent/records/${tab}${editing ? `/${editing.id}` : ""}`, editing ? "PUT" : "POST", input);
-      await refresh(); setFormOpen(false); setEditing(null); setCopySource(null); setNotice("Gespeichert.");
+      clearDraft(); setNotice("Gespeichert.");
+      await refresh();
     });
   }
   async function archive(record: EditableRecord) {
@@ -132,12 +161,12 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
 
   const childName = (id: unknown) => data.children.find((child) => child.id === id)?.name ?? "";
   return <div className="parent-app">
-    <aside className="parent-sidebar"><Link href="/" className="brand"><span className="brand-mark"><House size={24} /></span><span>kidsdaily<span className="brand-number">365</span></span></Link><span className="parent-sidebar-caption">ELTERNBEREICH</span>
-      <nav aria-label="Elternverwaltung"><Link className="parent-secondary" href="/eltern/verlauf">Tagesverlauf & Sterne</Link><Link href="/eltern/woche"><CalendarDays size={20} /><span>Wochenvorschau</span></Link>{tabs.map((item) => <button key={item.id} disabled={busy} className={tab === item.id ? "active" : ""} aria-current={tab === item.id ? "page" : undefined} onClick={() => navigate(item.id)}><item.icon size={20} /><span>{item.label}</span></button>)}</nav>
-      <div className="parent-sidebar-bottom"><Link href="/">Zum Kinderbildschirm</Link><button disabled={busy} onClick={() => action(async () => { await request("/api/auth/logout", "POST"); router.replace("/login"); router.refresh(); })}><LogOut size={18} /> Abmelden</button></div>
+    <aside className="parent-sidebar"><Link onNavigate={(event) => { event.preventDefault(); leave(() => router.push("/")); }} href="/" className="brand"><span className="brand-mark"><House size={24} /></span><span>kidsdaily<span className="brand-number">365</span></span></Link><span className="parent-sidebar-caption">ELTERNBEREICH</span>
+      <nav aria-label="Elternverwaltung"><Link onNavigate={(event) => { event.preventDefault(); leave(() => router.push("/eltern/verlauf")); }} className="parent-secondary" href="/eltern/verlauf">Tagesverlauf & Sterne</Link><Link onNavigate={(event) => { event.preventDefault(); leave(() => router.push("/eltern/woche")); }} href="/eltern/woche"><CalendarDays size={20} /><span>Wochenvorschau</span></Link>{tabs.map((item) => <button key={item.id} disabled={busy} className={tab === item.id ? "active" : ""} aria-current={tab === item.id ? "page" : undefined} onClick={() => leave(() => navigate(item.id))}><item.icon size={20} /><span>{item.label}</span></button>)}</nav>
+      <div className="parent-sidebar-bottom"><Link onNavigate={(event) => { event.preventDefault(); leave(() => router.push("/")); }} href="/">Zum Kinderbildschirm</Link><button disabled={busy} onClick={() => action(async () => { await request("/api/auth/logout", "POST"); clearDraft(); router.replace("/login"); router.refresh(); })}><LogOut size={18} /> Abmelden</button></div>
     </aside>
     <main className="parent-main"><header className="parent-topbar"><span>{data.family.name}</span><span><ShieldCheck size={17} /> Angemeldet als {parent.name}</span></header>
-      <div className="parent-title"><div><h1>{selected.label}</h1><p>{descriptions[tab]}</p></div>{isResource && !formOpen && <button className="parent-primary" onClick={() => { setBuddyChildId(null); setImageChildId(null); setEditing(null); setFormOpen(true); setError(""); }}><Plus size={20} />{tab === "children" ? "Kind hinzufügen" : "Neu anlegen"}</button>}</div>
+      <div className="parent-title"><div><h1>{selected.label}</h1><p>{descriptions[tab]}</p></div>{isResource && <button disabled={busy} className="parent-primary" onClick={() => createRecord(tab as Resource)}><Plus size={20} />{tab === "children" ? "Kind hinzufügen" : "Neu anlegen"}</button>}</div>
       <div className="parent-feedback" aria-live="polite">{notice && <p className="parent-success"><Check size={19} />{notice}</p>}<p className="parent-error" role="alert">{error}</p></div>
 
       {tab === "overview" && <>
@@ -164,11 +193,11 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
         })} />}
         {buddyChild && <BuddyWardrobe child={buddyChild} busy={busy} onClose={() => setBuddyChildId(null)} onAction={(accessoryId, command) => action(async () => { await request(`/api/parent/children/${buddyChild.id}/buddy`, "POST", { accessoryId, action: command }); await refresh(); setNotice("Buddy-Ausstattung gespeichert."); })} />}
         {imageChild && <ProfileImageEditor key={imageChild.id} child={imageChild} onCancel={() => setImageChildId(null)} onDone={async () => { await refresh(); setImageChildId(null); setNotice("Profilbild aktualisiert."); }} />}
-        {formOpen && <ParentRecordForm key={`${tab}-${copySource?.requestId ?? editing?.id ?? "new"}`} copySource={copySource?.childName} resource={tab as Resource} data={data} record={editing} busy={busy} onSave={save} onCancel={() => setFormOpen(false)} />}
+        {formOpen && <ParentRecordForm key={`${tab}-${copySource?.requestId ?? editing?.id ?? "new"}-${formVersion}`} copySource={copySource?.childName} resource={tab as Resource} data={data} record={editing} busy={busy} draftRef={draftRef} onSave={save} onCancel={() => leave(clearDraft)} />}
         <div className="parent-records">{(data[tab as Resource] as unknown as EditableRecord[]).map((record) => <article key={record.id} className={`parent-record ${record.active === false ? "is-archived" : ""}`}>
           {tab === "children" && <div className="record-buddy"><ProfilePicture imageUrl={record.imageUrl as string | null} buddyKind={record.buddyKind as "fox" | "rabbit" | "bear"} equipped={record.equippedAccessories as string[]} /></div>}
           <div className="record-description"><h3>{String(record.name ?? record.title ?? record.label)}</h3><p>{tab === "children" ? (record.buddyInitialized === false ? "Buddy wählt das Kind auf Android" : `Buddy: ${record.buddyName}`) : tab === "apps" ? `${childName(record.childId)} · ${record.packageName}` : tab === "appointments" ? `${childName(record.childId)} · ${new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short", timeZone: data.family.timezone }).format(new Date(String(record.startsAt)))}` : tab === "routines" ? `${childName(record.childId)} · ${(record.steps as unknown[]).length} Schritte` : tab === "rewards" ? `${record.cost} Sterne` : `${childName(record.childId)} · ${record.points} Sterne${tab === "tasks" ? ` · ${record.date}` : ""}`}</p>{record.active === false && <span className="archive-label">Archiviert</span>}{tab === "routines" && data.pauses.some(pause => pause.routineId === record.id) && <span className="routine-pause-badge">{data.pauses.some(pause => pause.routineId === record.id && pause.startsOn <= data.today) ? "Heute pausiert" : "Pause geplant"}</span>}{tab === "tasks" && !!record.pausedBy && record.completed !== true && <span className="routine-pause-badge">Ausgesetzt · Routine-Pause</span>}{record.completed === true && <span className="archive-label">Erledigt · Verlauf geschützt</span>}</div>
-          <div className="record-actions">{tab === "routines" && <button disabled={busy} onClick={() => { setPauseRoutineId(record.id); setFormOpen(false); setError(""); setNotice(""); }}>Pausen verwalten</button>}{tab === "routines" && <button disabled={busy || !activeChildren} onClick={() => copyRecord(record)}>Routine kopieren</button>}{tab === "children" && record.active !== false && <button disabled={busy} onClick={() => { setBuddyChildId(record.id); setImageChildId(null); setFormOpen(false); setError(""); }}>Ausstattung</button>}{tab === "children" && record.active !== false && <button disabled={busy} onClick={() => { setBuddyChildId(null); setImageChildId(record.id); setFormOpen(false); setError(""); }}>Profilbild</button>}<button disabled={busy || record.completed === true} onClick={() => { setBuddyChildId(null); setImageChildId(null); setCopySource(null); setEditing(record); setFormOpen(true); setError(""); }}>Bearbeiten</button>{record.active !== false && record.completed !== true && <button className="quiet-danger" disabled={busy} onClick={() => archive(record)}>{tab === "tasks" ? "Aus Plan nehmen" : "Archivieren"}</button>}</div>
+          <div className="record-actions">{tab === "routines" && <button disabled={busy} onClick={() => leave(() => { setPauseRoutineId(record.id); setFormOpen(false); setError(""); setNotice(""); })}>Pausen verwalten</button>}{tab === "routines" && <button disabled={busy || !activeChildren} onClick={() => copyRecord(record)}>Routine kopieren</button>}{tab === "children" && record.active !== false && <button disabled={busy} onClick={() => leave(() => { setBuddyChildId(record.id); setImageChildId(null); setFormOpen(false); setError(""); })}>Ausstattung</button>}{tab === "children" && record.active !== false && <button disabled={busy} onClick={() => leave(() => { setBuddyChildId(null); setImageChildId(record.id); setFormOpen(false); setError(""); })}>Profilbild</button>}<button disabled={busy || record.completed === true} onClick={() => leave(() => { setBuddyChildId(null); setImageChildId(null); setCopySource(null); setEditing(record); setFormOpen(true); setError(""); })}>Bearbeiten</button>{record.active !== false && record.completed !== true && <button className="quiet-danger" disabled={busy} onClick={() => archive(record)}>{tab === "tasks" ? "Aus Plan nehmen" : "Archivieren"}</button>}</div>
         </article>)}{!formOpen && !data[tab as Resource].length && <div className="parent-empty"><selected.icon size={35} /><h3>{emptyMessages[tab as Resource]}</h3></div>}</div>
       </>}
 
@@ -184,5 +213,12 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
         <section className="parent-panel"><h2>Dein Passwort ändern</h2><p>Andere Sitzungen deines Kontos werden abgemeldet. Dein Zugang auf diesem Gerät bleibt bestehen.</p><form className="password-form" onSubmit={password}><label>Aktuelles Passwort<input name="currentPassword" type="password" autoComplete="current-password" required maxLength={256} /></label><label>Neues Passwort<input name="newPassword" type="password" autoComplete="new-password" required minLength={12} maxLength={256} /></label><label>Neues Passwort wiederholen<input name="confirmPassword" type="password" autoComplete="new-password" required minLength={12} maxLength={256} /></label><button className="parent-primary" disabled={busy}>Passwort ändern</button></form></section>
       </>}
     </main>
+    {leaveAction && <UnsavedRecordDialog onContinue={() => { setLeaveAction(null); draftRef.current?.focus(); }} onDiscard={() => {
+      if (pending.current) return;
+      const run = leaveAction;
+      clearDraft();
+      setFormVersion((version) => version + 1);
+      run();
+    }} />}
   </div>;
 }

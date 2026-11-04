@@ -9,5 +9,5 @@ export default async function Parents({ searchParams }: { searchParams: Promise<
   if (appMode() === "demo") redirect("/login");
   const parent = await currentParent();
   if (!parent) redirect("/login");
-  return <ParentConsole parent={parent} initialData={await getManagementData(parent)} initialTab={(await searchParams).tab === "devices" ? "devices" : "overview"} />;
+  return <ParentConsole key={`${parent.familyId}-${parent.id}`} parent={parent} initialData={await getManagementData(parent)} initialTab={(await searchParams).tab === "devices" ? "devices" : "overview"} />;
 }

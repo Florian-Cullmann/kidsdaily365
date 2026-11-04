@@ -119,6 +119,37 @@ Screenshots mit ausschließlich fiktiven Daten: [Elterneditor](proof/routine-edi
 
 Automatisierte Bildtests prüfen echte Dekodierung, Größenlimits, Ausschnitt, EXIF-Ausrichtung und entfernte Metadaten. Die Datenbanktests prüfen Ersetzen/Entfernen, Rechte, Profiltrennung und unabhängigen Punktestand. Keine echten Kinderfotos in Tests oder Nachweisen verwenden.
 
+## Ungespeicherte Elternformulare (#41)
+
+Kinderprofile, Routinen, Einzelaufgaben, Termine, Wünsche und App-Freigaben vergleichen
+alle Eingaben mit dem geöffneten Ausgangszustand. Schritte umsortieren, hinzufügen und
+entfernen zählt ebenfalls; vollständiges Zurücksetzen macht den Entwurf wieder unverändert.
+Tab-Wechsel, anderer Datensatz, Neuanlage, Abbrechen, Ausstattung/Profilbild und die
+Links zum Kinderbildschirm fragen vor dem Verwerfen nach. „Weiter bearbeiten“ und
+Escape erhalten die Eingaben und führen zum zuletzt bearbeiteten Feld zurück.
+
+- Unberührtes Formular verlassen: keine Rückfrage. Geänderte Routine mit mehreren
+  Schritten über jede der genannten Aktionen verlassen: beide Entscheidungen testen.
+- Im Dialog mit Tab/Shift+Tab navigieren; Fokus bleibt im Dialog. Enter aktiviert
+  den fokussierten Knopf. Touch-Ziele sind mindestens 48 Pixel hoch.
+- Während des Speicherns sind weitere Speicher-/Verwerfaktionen gesperrt.
+  Validierungs-/Netzwerkfehler erhalten den Entwurf. Nach bestätigtem Schreiben ist
+  er gespeichert, auch wenn das anschließende Aktualisieren der Liste fehlschlägt.
+- Reload/Tab schließen: bei Änderungen nativer Browserhinweis, sofern unterstützt.
+  Browser bestimmen Text und Anzeige und benötigen meist vorherige Interaktion.
+  Insbesondere mobile App-Wechsel, erzwungenes Schließen und Browserabstürze können
+  ohne Hinweis erfolgen. Es gibt keine automatische Speicherung oder Wiederherstellung.
+- Abmeldung und erkannter Sitzungsablauf haben Vorrang und löschen den Entwurf ohne
+  Rückfrage. Ein anderer Elternteil/Haushalt erhält eine neue Konsoleninstanz.
+
+`tests/parent-drafts.test.tsx` prüft diese Abläufe mit fiktiven Daten und simuliertem
+Transport; die native Dialog-Fokusfalle und der Browserhinweis brauchen zusätzlich
+Browserprüfung. Das ist kein Nachweis serverseitiger Berechtigungen.
+
+Kopierentwürfe (#34) öffnen über `leave` mit eigenem Formularschlüssel und vorbelegten
+Startwerten als Vergleichsbasis. Auch „Routine kopieren“ und „Pausen verwalten“
+fragen vor dem Verwerfen geänderter Eingaben nach.
+
 ## Lesende Wochenvorschau (#33)
 
 - Unter Elternbereich → Wochenvorschau Kind und Datum wählen. Vorherige/nächste Woche und Rückkehr zur aktuellen Woche prüfen; eine Woche läuft von Montag bis Sonntag in Familienzeit.

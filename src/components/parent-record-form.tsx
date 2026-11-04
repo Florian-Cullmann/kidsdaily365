@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useLayoutEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { firstRoutineDate, type Resource, type RoutineStep } from "@/domain/management";
 import { appointmentLocalInput, appointmentCandidates, appointmentInstant, appointmentRange } from "@/domain/appointment-time";
 import type { ManagementData } from "@/server/management";
@@ -29,16 +29,48 @@ function AppointmentTimeField({ name, label, original, timeZone, required = fals
   </div>;
 }
 
-export function ParentRecordForm({ resource, data, record, copySource, busy, onSave, onCancel }: {
+export type RecordDraft = { isDirty: () => boolean; focus: () => void };
+
+// Read raw controls, including unnamed routine steps and disabled fields during save.
+// Also compare unchecked checkboxes and the invalid-number-input flag.
+function snapshot(form: HTMLFormElement) {
+  return JSON.stringify(Array.from(form.querySelectorAll("input, select, textarea")).map((element) => {
+    const control = element as HTMLInputElement;
+    return [control.name, control.type, control.value, control.checked ?? null, control.validity.badInput];
+  }));
+}
+
+export function ParentRecordForm({ resource, data, record, copySource, busy, draftRef, onSave, onCancel }: {
   copySource?: string; resource: Resource; data: ManagementData; record: EditableRecord | null; busy: boolean;
+  draftRef: RefObject<RecordDraft | null>;
   onSave: (input: unknown) => Promise<void>; onCancel: () => void;
 }) {
+  const formRef = useRef<HTMLFormElement>(null);
+  const lastFocus = useRef<HTMLElement | null>(null);
   const [weekdays, setWeekdays] = useState<number[]>(() => record?.weekdays as number[] ?? [1, 2, 3, 4, 5, 6, 7]);
   const [enabled, setEnabled] = useState(record?.active !== false);
   const firstDate = firstRoutineDate(data.today, weekdays);
   const [timeError, setTimeError] = useState("");
   const [steps, setSteps] = useState<RoutineStep[]>(() => (record?.steps as RoutineStep[] | undefined) ?? [{ title: "", description: "", icon: "heart", points: 5 }]);
   const [openStep, setOpenStep] = useState<number | null>(record ? null : 0);
+  useLayoutEffect(() => {
+    const form = formRef.current!;
+    const baseline = snapshot(form);
+    const draft = {
+      isDirty: () => snapshot(form) !== baseline,
+      focus: () => {
+        const target = lastFocus.current?.isConnected ? lastFocus.current : form.querySelector<HTMLElement>("input, select, textarea");
+        const detail = target?.closest("details");
+        if (detail) {
+          setOpenStep(Array.from(form.querySelectorAll("details")).indexOf(detail));
+          detail.open = true;
+        }
+        target?.focus();
+      },
+    };
+    draftRef.current = draft;
+    return () => { if (draftRef.current === draft) draftRef.current = null; };
+  }, [draftRef]);
   function updateStep(index: number, patch: Partial<RoutineStep>) {
     setSteps((items) => items.map((item, i) => i === index ? { ...item, ...patch } : item));
   }
@@ -53,6 +85,7 @@ export function ParentRecordForm({ resource, data, record, copySource, busy, onS
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy) return;
     setTimeError("");
     const form = new FormData(event.currentTarget);
     const field = (key: string) => String(form.get(key) ?? "").trim();
@@ -77,7 +110,7 @@ export function ParentRecordForm({ resource, data, record, copySource, busy, onS
     await onSave(input);
   }
 
-  return <form className="record-form" onSubmit={submit}>
+  return <form ref={formRef} className="record-form" onSubmit={submit} onFocusCapture={(event) => { if (event.target.matches("input, select, textarea")) lastFocus.current = event.target; }}>
     <div className="record-form-heading"><h3>{copySource ? "Routine kopieren" : record ? "Eintrag bearbeiten" : "Neuen Eintrag anlegen"}</h3></div>
     {copySource && <div className="parent-callout"><p>Quelle: {copySource} · {String(record?.title)}</p><p>{enabled && firstDate ? `Im Tagesplan ab ${new Intl.DateTimeFormat("de-DE", { dateStyle: "long", timeZone: "UTC" }).format(new Date(`${firstDate}T12:00:00Z`))}.` : enabled ? "Bitte einen Wiederholungstag wählen." : "Nicht im Tagesplan: Routine ist inaktiv."}</p></div>}
     <fieldset disabled={busy} className="record-fields">
