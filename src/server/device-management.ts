@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, desc, eq, gt, isNull, inArray, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "./db/client";
-import { children, devices, deviceManagement as management, deviceUsageEvents as usage, childMessages as messages, families } from "./db/schema";
+import { allowedApps, children, devices, deviceManagement as management, deviceUsageEvents as usage, childMessages as messages, families } from "./db/schema";
 import type { ParentActor } from "./auth/parent";
 import { digestToken, newToken } from "./auth/secrets";
 import { liveConfig } from "./config";
@@ -68,26 +68,39 @@ export async function syncManagement(actor: ManagementActor, input: unknown) {
   const data = syncInput.parse(input), now = new Date();
   const oldest = new Date(now.getTime() - 30 * 86400000);
   for (const event of data.events) if (new Date(event.at) < oldest || Date.parse(event.at) > now.getTime() + 60000) throw new ApiError("Nutzungszeitpunkt außerhalb des gültigen Zeitraums.", 400);
+  if (data.appStatuses?.some(app => Date.parse(app.checkedAt) < now.getTime() - 60000 || Date.parse(app.checkedAt) > now.getTime() + 60000)) throw new ApiError("App-Prüfzeit außerhalb des gültigen Zeitraums.", 400);
+  if (data.appStatuses && new Set(data.appStatuses.map(app => app.packageName)).size !== data.appStatuses.length) throw new ApiError("Doppelte App-Statusmeldung.", 400);
   return db().transaction(async tx => {
+    // Revalidate even when a token was revoked after request authentication.
+    const [device] = await tx.select().from(devices).where(and(eq(devices.id, actor.deviceId), eq(devices.familyId, actor.familyId), eq(devices.childId, actor.childId), isNull(devices.revokedAt), gt(devices.expiresAt, now))).for("update");
+    if (!device) throw new ApiError("Gerätezugang beendet.", 401);
     const [current] = await tx.select().from(management).where(and(eq(management.deviceId, actor.deviceId), eq(management.familyId, actor.familyId), eq(management.tokenHash, actor.tokenHash!))).for("update");
     if (!current) throw new ApiError("Zugang geändert.", 401);
+    const apps = await tx.select({ packageName: allowedApps.packageName }).from(allowedApps).where(and(eq(allowedApps.familyId, actor.familyId), eq(allowedApps.childId, actor.childId), eq(allowedApps.active, true))).orderBy(asc(allowedApps.packageName)).limit(200);
+    const permitted = new Set(apps.map(app => app.packageName));
+    // Discard reports racing a removed approval; never persist an inventory.
+    const appStatuses = (data.appStatuses ?? current.appStatuses).filter(app => permitted.has(app.packageName)).map(app => {
+      const previous = current.appStatuses.find(old => old.packageName === app.packageName);
+      return previous && Date.parse(previous.checkedAt) > Date.parse(app.checkedAt) ? previous : app;
+    });
     // Compare-and-set: an offline local release only cancels the command it actually observed.
     const release = data.localRelease && data.revision === current.revision && current.locked;
     const revision = current.revision + (release ? 1 : 0), locked = release ? false : current.locked;
     const acknowledged = (data.revision === revision || release) && data.appliedLocked === locked && !data.error;
-    await tx.update(management).set({ revision, locked, lastSeenAt: now, ready: data.ready, usagePermission: data.usagePermission,
+    await tx.update(management).set({ appStatuses, revision, locked, lastSeenAt: now, ready: data.ready, usagePermission: data.usagePermission,
       ...(acknowledged ? { acknowledgedRevision: revision, appliedLocked: data.appliedLocked } : {}),
       usageSince: current.usageSince ?? (data.usageSince ? new Date(data.usageSince) : null),
       usageThrough: data.usageThrough ? new Date(Math.max(current.usageThrough?.getTime() ?? 0, Math.min(Date.parse(data.usageThrough), now.getTime()))) : current.usageThrough, error: data.error,
     }).where(and(eq(management.deviceId, actor.deviceId), eq(management.familyId, actor.familyId)));
     if (data.events.length) await tx.insert(usage).values(data.events.map(e => ({ deviceId: actor.deviceId, familyId: actor.familyId, eventKey: e.key, at: new Date(e.at), kind: e.kind, packageName: e.packageName, label: e.label }))).onConflictDoNothing();
     await tx.delete(usage).where(and(eq(usage.familyId, actor.familyId), eq(usage.deviceId, actor.deviceId), lt(usage.at, oldest)));
-    return { schemaVersion: 1, revision, locked };
+    return { schemaVersion: 1, revision, locked, appStatusVersion: 1, appStatusPackages: apps.map(app => app.packageName) };
   });
 }
 export async function getDeviceManagement(parent: ParentActor, id: string, days = 1) {
   const { device, child } = await managedDevice(parent, id);
   const [state] = await db().select().from(management).where(and(eq(management.deviceId, id), eq(management.familyId, parent.familyId)));
+  const apps = await db().select({ packageName: allowedApps.packageName, label: allowedApps.label }).from(allowedApps).where(and(eq(allowedApps.familyId, parent.familyId), eq(allowedApps.childId, child.id), eq(allowedApps.active, true))).orderBy(asc(allowedApps.label));
   const [family] = await db().select().from(families).where(eq(families.id, parent.familyId));
   const now = Date.now(), timezone = family.timezone;
   await db().delete(usage).where(and(eq(usage.familyId, parent.familyId), eq(usage.deviceId, id), lt(usage.at, new Date(now - 30 * 86400000))));
@@ -97,7 +110,10 @@ export async function getDeviceManagement(parent: ParentActor, id: string, days 
   const events = await db().select().from(usage).where(and(eq(usage.familyId, parent.familyId), eq(usage.deviceId, id), gt(usage.at, new Date(start - 86400000)))).orderBy(asc(usage.at)).limit(20001);
   const through = Math.min(now, state?.usageThrough?.getTime() ?? start, events.length > 20000 ? events[19999].at.getTime() : now);
   const stats = summarizeUsage(events.slice(0, 20000).map(e => ({ ...e, at: e.at.toISOString() })), start, through, timezone);
-  return { periodStart: new Date(start).toISOString(), device: { id, label: device.label }, child: { id: child.id, name: child.name }, timezone,
+  return { apps: apps.map(app => {
+    const report = state?.appStatuses.find(item => item.packageName === app.packageName);
+    return { ...app, status: report?.status ?? "unknown", checkedAt: report?.checkedAt ?? null };
+  }), periodStart: new Date(start).toISOString(), device: { id, label: device.label }, child: { id: child.id, name: child.name }, timezone,
     state: state ? { revision: state.revision, locked: state.locked, acknowledgedRevision: state.acknowledgedRevision, appliedLocked: state.appliedLocked,
       ready: state.ready, connected: !!state.tokenHash, lastSeenAt: state.lastSeenAt?.toISOString() ?? null, usagePermission: state.usagePermission,
       usageSince: state.usageSince?.toISOString() ?? null, usageThrough: state.usageThrough?.toISOString() ?? null, error: state.error } : null,

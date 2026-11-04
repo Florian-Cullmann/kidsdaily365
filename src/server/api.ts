@@ -24,8 +24,8 @@ export function rateLimit(key: string, limit = 10) {
   if (++window.count > limit) throw new ApiError("Zu viele Versuche. Bitte in einer Minute erneut versuchen.", 429);
 }
 
-export async function inputJson(request: Request) {
-  try { return await boundedJson(request, 16_384); }
+export async function inputJson(request: Request, maxBytes = 16_384) {
+  try { return await boundedJson(request, maxBytes); }
   catch { throw new ApiError("Bitte gültige Eingaben senden.", 400); }
 }
 

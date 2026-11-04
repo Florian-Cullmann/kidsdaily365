@@ -2,3 +2,6 @@
 
 .device-manager .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .dm-main-column,.dm-columns>.dm-panel{min-width:0}@media(max-width:900px){.dm-columns{grid-template-columns:minmax(0,1fr)}}@media(max-width:540px){.dm-section-head{flex-wrap:wrap}.dm-lock>div{min-width:0}}
+
+.dm-approved-app { display:flex; justify-content:space-between; gap:1rem; padding:1rem 0; border-bottom:1px solid #e5e7eb; flex-wrap:wrap; }
+.dm-approved-app small { display:block; margin-top:.35rem; overflow-wrap:anywhere; color:#64748b; }
