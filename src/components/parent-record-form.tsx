@@ -18,7 +18,7 @@ function AppointmentTimeField({ name, label, original, timeZone, required = fals
   const initial = candidates.find((iso) => iso.slice(0, 16) === originalMinute) ?? candidates[0] ?? "";
   return <div>
     <label>{label}<input name={name} type="datetime-local" value={local} onChange={(event) => setLocal(event.target.value)} required={required} aria-describedby={candidates.length > 1 ? undefined : `${name}-help`} /></label>
-    {candidates.length > 1 ? <label>Welche Uhrzeit für {label}?
+    {candidates.length > 1 ? <label className="appointment-occurrence">Welche Uhrzeit für {label}?
       <select key={local} name={`${name}Instant`} defaultValue={initial}>
         {candidates.map((iso, index) => <option key={iso} value={iso}>{index === 0 ? "Erstes" : "Zweites"} Mal ({new Intl.DateTimeFormat("de-DE", { timeZone, timeZoneName: "longOffset" }).formatToParts(new Date(iso)).find((part) => part.type === "timeZoneName")?.value})</option>)}
       </select>
