@@ -111,17 +111,17 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
     {(live.phase === "offline" || live.dayChanged) && <button disabled={!!busy} onClick={() => void sync.refresh()}>Erneut versuchen</button>}
   </div>;
 
-  if (!plans.length) return <main className="center-page"><div className="setup-card">{syncStatus}<h1>Hier ist Platz für eure Pläne.</h1><p>Noch kein Kinderprofil vorhanden. Bitte zuerst die Einrichtung auf dem Server abschließen.</p></div></main>;
+  if (!plans.length) return <main className="center-page"><div className="setup-card"><h1>Hier ist Platz für eure Pläne.</h1><p>Noch kein Kinderprofil vorhanden. Bitte zuerst die Einrichtung auf dem Server abschließen.</p></div>{syncStatus}</main>;
 
   if (!plan) return <main className="profile-screen forest-world">
     <div className="brand profile-brand"><span className="brand-mark"><House size={27} /></span><span>kidsdaily<span className="brand-number">365</span></span></div>
-    {syncStatus}
     <div className="profile-welcome"><span className="welcome-tag">Dein kleiner Alltagsbegleiter</span><h1>Wer ist heute dabei?</h1><p>Tippe auf dein Bild. Dein Buddy freut sich auf dich!</p></div>
     <div className="profile-grid">{plans.map((item, index) => <button key={item.child.id} className={`profile-tile tile-${index % 3}`} onClick={() => chooseProfile(item.child.id)}>
       <span className="profile-art"><ProfilePicture imageUrl={item.child.imageUrl} buddyKind={item.child.buddyKind} equipped={item.child.equippedAccessories} /><span className="profile-initial">{item.child.avatar}</span></span>
       <strong>{item.child.name}</strong><span>mit {item.child.buddyName}</span>
     </button>)}</div>
     <div className="profile-footer"><p>{demo ? "Zum Ausprobieren · Dein Fortschritt wird nicht gespeichert" : "Jeder hat seinen eigenen Tag. Und seinen eigenen Buddy."}</p><Link className="parent-entry-link" href="/eltern">Elternbereich</Link></div>
+    {syncStatus}
   </main>;
 
   const done = plan.tasks.filter((task) => task.completed).length;
@@ -139,7 +139,6 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
       <div className="header-actions">{demo && <span className="demo-badge">Demo · ohne Speicherung</span>}<button className="fullscreen-button" onClick={fullscreen}><Maximize size={25} /><span>Vollbild</span></button></div>
     </header>
 
-    {syncStatus}
     <main className={`play-space view-${view}`}>
       <section className="day-paper" aria-label={view === "day" ? "Deine Aufgaben heute" : view === "appointments" ? "Deine Termine" : "Deine Belohnungen"}>
         <div className="paper-heading"><h2>{view === "day" ? (!demo && live.dayChanged ? "Neuer Tagesplan" : "Heute") : view === "appointments" ? "Deine Termine" : "Deine Wünsche"}</h2>{view === "day" && (demo || !live.dayChanged) && <span className="done-badge"><Star size={24} fill="currentColor" /><span>{done} von {plan.tasks.length} geschafft</span></span>}</div>
@@ -180,5 +179,6 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
       <span className="dock-divider" />
       <button className="switch-profile" disabled={!!busy} onClick={() => { noticeContext.current += 1; setChildId(null); setNotice(null); setError(""); }}><Users size={28} /><span>Wer ist dran?</span></button>
     </nav>
+    {syncStatus}
   </div>;
 }
