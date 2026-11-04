@@ -57,6 +57,20 @@
       "when": 1793749164088,
       "tag": "0007_device_management",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793750146406,
+      "tag": "0008_polite_cassandra_nova",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793750164495,
+      "tag": "0009_flat_giant_girl",
+      "breakpoints": true
     }
   ]
 }

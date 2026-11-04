@@ -1,4 +1,5 @@
 "use client";
+import { RewardHistory } from "./reward-history";
 
 import { useEffect, useRef, useState } from "react";
 import { CalendarDays, Check, ChevronRight, Heart, House, Maximize, Star, Users } from "lucide-react";
@@ -32,6 +33,9 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
   const noticeContext = useRef(0);
   const [error, setError] = useState("");
   const pending = useRef(false);
+  const mutationVersion = useRef(0);
+  const [confirmReward, setConfirmReward] = useState<string | null>(null);
+  const rewardKeys = useRef(new Map<string, string>());
   const plan = plans.find((item) => item.child.id === childId);
 
   useEffect(() => {
@@ -50,9 +54,26 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
     return () => { clearInterval(timer); document.removeEventListener("visibilitychange", checkDay); };
   }, [plan]);
 
+  useEffect(() => {
+    if (demo || !childId) return;
+    let cancelled = false;
+    async function refreshRewards() {
+      if (pending.current || document.visibilityState === "hidden") return;
+      const version = mutationVersion.current;
+      try {
+        const response = await fetch(`/api/children/${childId}/reward-requests`, { cache: "no-store" });
+        const data = await response.json();
+        if (!cancelled && version === mutationVersion.current && !pending.current && response.ok && data.plan) setPlans((previous) => previous.map((item) => item.child.id === childId ? data.plan : item));
+      } catch { /* Keep the last confirmed state; mutations always require the server. */ }
+    }
+    const timer = setInterval(refreshRewards, 15_000);
+    document.addEventListener("visibilitychange", refreshRewards);
+    return () => { cancelled = true; clearInterval(timer); document.removeEventListener("visibilitychange", refreshRewards); };
+  }, [childId, demo]);
+
   function chooseProfile(id: string) {
     noticeContext.current += 1;
-    setChildId(id); setView("day"); setNotice(null); setError("");
+    setConfirmReward(null); setChildId(id); setView("day"); setNotice(null); setError("");
   }
 
   function openView(nextView: View) {
@@ -64,6 +85,7 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
   async function complete(taskId: string) {
     if (pending.current || !plan) return;
     const context = noticeContext.current;
+    mutationVersion.current += 1;
     pending.current = true; setBusy(taskId); setError(""); setNotice(null);
     try {
       if (demo) {
@@ -84,6 +106,27 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
     } catch {
       setError("Der Server ist gerade nicht erreichbar. Deine Aufgabe bleibt offen. Bitte erneut versuchen.");
     } finally { pending.current = false; setBusy(null); }
+  }
+
+  async function askReward(rewardId: string) {
+    if (pending.current || !plan || demo) return;
+    mutationVersion.current += 1;
+    pending.current = true; setBusy(rewardId); setError("");
+    const context = noticeContext.current;
+    const key = `${plan.child.id}:${rewardId}`;
+    try {
+      // Retain this ID across failures and reloads, including a lost response after a decision.
+      const storageKey = `reward-request:${key}`;
+      const requestId = rewardKeys.current.get(key) ?? sessionStorage.getItem(storageKey) ?? crypto.randomUUID();
+      rewardKeys.current.set(key, requestId); sessionStorage.setItem(storageKey, requestId);
+      const response = await fetch(`/api/children/${plan.child.id}/reward-requests`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId, rewardId }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Die Anfrage konnte nicht gespeichert werden.");
+      setPlans((previous) => previous.map((item) => item.child.id === plan.child.id ? data.plan : item));
+      sessionStorage.removeItem(storageKey); rewardKeys.current.delete(key);
+      if (context === noticeContext.current) { setConfirmReward(null); setNotice({ text: "Deine Anfrage ist gespeichert. Den Stand siehst du im Verlauf." }); }
+    } catch (cause) { if (context === noticeContext.current) setError(cause instanceof Error && !(cause instanceof TypeError) ? cause.message : "Der Server ist gerade nicht erreichbar. Bitte erneut versuchen; deine Anfrage wird nicht doppelt gespeichert."); }
+    finally { pending.current = false; setBusy(null); }
   }
 
   async function fullscreen() {
@@ -137,7 +180,7 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
 
         {view === "appointments" && <div className="detail-scroll">{plan.appointments.length ? plan.appointments.map((item) => <article className="appointment-row" key={item.id}><span className="detail-picture" aria-hidden="true">{appointmentPictures[item.icon]}</span><div><span className="appointment-date">{appointmentDay(item.startsAt, plan)}</span><h3>{item.title}</h3></div><time dateTime={item.startsAt}>{appointmentTime(item.startsAt, plan.timezone)}</time></article>) : <div className="empty-state"><span aria-hidden="true">🌻</span><h3>Gerade ist nichts geplant.</h3><p>Ein bisschen Zeit für dich.</p></div>}</div>}
 
-        {view === "rewards" && <div className="detail-scroll"><p className="wishes-intro">Plant zusammen etwas, worauf du dich freust.</p>{plan.rewards.length ? plan.rewards.map((reward, index) => <article className="wish-card" key={reward.id}><span className="detail-picture" aria-hidden="true">{rewardPictures[index % rewardPictures.length]}</span><div><h3>{reward.title}</h3><p>{plan.balance >= reward.cost ? "Du hast genug Sterne!" : `Noch ${reward.cost - plan.balance} Sterne`}</p><progress value={Math.min(plan.balance, reward.cost)} max={reward.cost} aria-label={`Fortschritt für ${reward.title}`} /><span className="wish-count">{plan.balance} / {reward.cost} Sterne</span></div></article>) : <div className="empty-state"><span aria-hidden="true">🎁</span><h3>Was wünschst du dir?</h3><p>Hier ist Platz für eure gemeinsamen Ideen.</p></div>}<p className="wishes-note">Das Einlösen kommt später dazu.</p></div>}
+        {view === "rewards" && <div className="detail-scroll"><p className="wishes-intro">Plant zusammen etwas, worauf du dich freust.</p>{plan.rewards.length ? plan.rewards.map((reward, index) => <article className="wish-card" key={reward.id}><span className="detail-picture" aria-hidden="true">{rewardPictures[index % rewardPictures.length]}</span><div><h3>{reward.title}</h3><p>{plan.balance >= reward.cost ? "Du hast genug Sterne!" : `Noch ${reward.cost - plan.balance} Sterne`}</p><progress value={Math.min(plan.balance, reward.cost)} max={reward.cost} aria-label={`Fortschritt für ${reward.title}`} /><span className="wish-count">{plan.balance} / {reward.cost} Sterne</span>{plan.rewardRequests?.some((item) => item.rewardId === reward.id && item.status === "pending") ? <p>Bei deinen Eltern angefragt</p> : <button className="reward-action" disabled={!!busy || demo || plan.balance < reward.cost} onClick={() => setConfirmReward(reward.id)}>Einlösen anfragen · {reward.cost} Sterne</button>}{confirmReward === reward.id && <div className="reward-confirm" role="group" aria-label="Anfrage bestätigen"><p>„{reward.title}“ für {reward.cost} Sterne anfragen? Erst wenn deine Eltern bestätigen, werden die Sterne abgezogen.</p><button className="reward-action" disabled={!!busy} onClick={() => askReward(reward.id)}>Ja, bei meinen Eltern anfragen</button><button className="reward-action" disabled={!!busy} onClick={() => setConfirmReward(null)}>Zurück</button></div>}</div></article>) : <div className="empty-state"><span aria-hidden="true">🎁</span><h3>Was wünschst du dir?</h3><p>Hier ist Platz für eure gemeinsamen Ideen.</p></div>}<p className="wishes-note">{plan.balance} Sterne verfügbar · {plan.earnedTotal ?? plan.balance} insgesamt verdient{demo ? " · Anfragen sind nur am gekoppelten Wandbildschirm möglich." : ""}</p><RewardHistory items={plan.rewardRequests ?? []} timezone={plan.timezone} /></div>}
 
         <div className="paper-footer"><Heart size={19} /><span>Pausen gehören auch dazu.</span></div>
       </section>

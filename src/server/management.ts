@@ -1,4 +1,5 @@
 import "server-only";
+import { rewardHistory } from "./rewards";
 import { profileImageUrl } from "@/domain/profile-image";
 import { and, asc, desc, eq, gte, isNull, sql } from "drizzle-orm";
 import { managementSchemas, type Resource } from "@/domain/management";
@@ -36,6 +37,8 @@ export async function getManagementData(parent: ParentActor) {
     children: kids.map((child) => ({ ...child, equippedAccessories: equipment.filter((item) => item.childId === child.id).map((item) => item.accessoryId), ownedAccessories: ownership.filter((item) => item.childId === child.id).map((item) => item.accessoryId), imageUrl: imageUrls.get(child.id) ?? null })), routines: routines.map((routine) => ({ ...routine, steps: routine.steps ?? [{ title: routine.title, description: routine.description, icon: routine.icon, points: routine.points }] })), tasks: tasks.map(({ task, completed }) => ({ ...task, completed })),
     appointments: dates.map((item) => ({ ...item, startsAt: item.startsAt.toISOString(), endsAt: item.endsAt?.toISOString() ?? null })),
     rewards: goals, apps,
+    rewardRequests: await rewardHistory(familyId),
+    wallets: await db().select({ childId: pointEntries.childId, balance: sql`sum(${pointEntries.amount})`.mapWith(Number), earnedTotal: sql`sum(greatest(${pointEntries.amount}, 0))`.mapWith(Number) }).from(pointEntries).where(eq(pointEntries.familyId, familyId)).groupBy(pointEntries.childId),
     devices: deviceRows.map((item) => ({ ...item, expiresAt: item.expiresAt.toISOString(), revokedAt: item.revokedAt?.toISOString() ?? null })),
     parents: adults,
   };
