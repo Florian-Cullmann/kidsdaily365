@@ -4,7 +4,7 @@ import { and, asc, desc, eq, gte, isNull, sql } from "drizzle-orm";
 import { managementSchemas, type Resource } from "@/domain/management";
 import { localDate } from "@/domain/plan";
 import { db } from "./db/client";
-import { buddyOwnership, buddyEquipment, allowedApps, appointments, childImages, children, dailyTasks, devices, families, parents, pointEntries, rewards, taskTemplates } from "./db/schema";
+import { buddyOwnership, buddyEquipment, allowedApps, appointments, childImages, children, dailyTasks, devices, families, parents, pointEntries, rewards, routinePauses, taskTemplates } from "./db/schema";
 import { ApiError } from "./errors";
 import type { ParentActor } from "./auth/parent";
 import { isUniqueViolation } from "./auth/parent";
@@ -20,7 +20,7 @@ export async function getManagementData(parent: ParentActor, childId = "") {
   const childScope = (column: typeof dailyTasks.childId | typeof appointments.childId | typeof taskTemplates.childId | typeof allowedApps.childId) =>
     invalidChild ? sql`false` : filterChild ? eq(column, filterChild.id) : undefined;
   const today = localDate(new Date(), family.timezone);
-  const [routines, tasks, dates, goals, apps, deviceRows, adults, images, equipment, ownership] = await Promise.all([
+  const [routines, tasks, dates, goals, apps, deviceRows, adults, images, equipment, ownership, pauses] = await Promise.all([
     db().select().from(taskTemplates).where(and(eq(taskTemplates.familyId, familyId), childScope(taskTemplates.childId))).orderBy(asc(taskTemplates.sortOrder)),
     db().select({ task: dailyTasks, completed: sql<boolean>`${pointEntries.id} is not null` }).from(dailyTasks)
       .leftJoin(pointEntries, eq(pointEntries.taskId, dailyTasks.id))
@@ -34,12 +34,15 @@ export async function getManagementData(parent: ParentActor, childId = "") {
     db().select({ childId: childImages.childId, version: childImages.version }).from(childImages).where(eq(childImages.familyId, familyId)),
     db().select().from(buddyEquipment).where(eq(buddyEquipment.familyId, familyId)),
     db().select().from(buddyOwnership).where(eq(buddyOwnership.familyId, familyId)),
+    db().select({ id: routinePauses.id, routineId: routinePauses.routineId, childId: routinePauses.childId,
+      startsOn: routinePauses.startsOn, endsOn: routinePauses.endsOn, reason: routinePauses.reason,
+    }).from(routinePauses).where(and(eq(routinePauses.familyId, familyId), isNull(routinePauses.revokedAt), gte(routinePauses.endsOn, today))).orderBy(asc(routinePauses.startsOn), asc(routinePauses.id)),
   ]);
   const imageUrls = new Map(images.map((image) => [image.childId, profileImageUrl(image.childId, image.version)]));
   return {
     childFilter: { id: childId, invalid: invalidChild },
     limited: { tasks: tasks.length > 1000, appointments: dates.length > 1000 },
-    family: { name: family.name, timezone: family.timezone }, today,
+    family: { name: family.name, timezone: family.timezone }, today, pauses,
     children: kids.map((child) => ({ ...child, equippedAccessories: equipment.filter((item) => item.childId === child.id).map((item) => item.accessoryId), ownedAccessories: ownership.filter((item) => item.childId === child.id).map((item) => item.accessoryId), imageUrl: imageUrls.get(child.id) ?? null })), routines: routines.map((routine) => ({ ...routine, steps: routine.steps ?? [{ title: routine.title, description: routine.description, icon: routine.icon, points: routine.points }] })), tasks: tasks.slice(0, 1000).map(({ task, completed }) => ({ ...task, completed })),
     appointments: dates.slice(0, 1000).map((item) => ({ ...item, startsAt: item.startsAt.toISOString(), endsAt: item.endsAt?.toISOString() ?? null })),
     rewards: goals, apps,

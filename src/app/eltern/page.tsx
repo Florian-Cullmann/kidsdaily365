@@ -12,5 +12,5 @@ export default async function Parents({ searchParams }: { searchParams: Promise<
   const query = await searchParams;
   const childId = Array.isArray(query.child) ? query.child[0] : query.child;
   const tab = Array.isArray(query.tab) ? query.tab[0] : query.tab;
-  return <ParentConsole parent={parent} initialData={await getManagementData(parent, childId)} initialTab={tab} />;
+  return <ParentConsole key={`${parent.familyId}-${parent.id}`} parent={parent} initialData={await getManagementData(parent, childId)} initialTab={tab} />;
 }
