@@ -1,6 +1,6 @@
 import "server-only";
 import { profileImageUrl } from "@/domain/profile-image";
-import { and, asc, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, gte, isNull, or, sql } from "drizzle-orm";
 import { localDate, type DayPlan } from "@/domain/plan";
 import { db } from "./db/client";
 import { buddyEquipment, appointments, childImages, children, dailyTasks, families, pointEntries, rewards, taskTemplates } from "./db/schema";
@@ -53,8 +53,8 @@ export async function getDayPlans(familyId: string, now = new Date()): Promise<D
     db().select({ childId: pointEntries.childId, balance: sql`sum(${pointEntries.amount})`.mapWith(Number) })
       .from(pointEntries).where(eq(pointEntries.familyId, familyId)).groupBy(pointEntries.childId),
     db().select().from(appointments).where(and(eq(appointments.familyId, familyId), eq(appointments.active, true), or(
-      gt(appointments.endsAt, now),
-      and(isNull(appointments.endsAt), sql`(${appointments.startsAt} at time zone ${timezone})::date >= ${date}::date`),
+      gte(appointments.startsAt, now), gt(appointments.endsAt, now),
+      and(isNull(appointments.endsAt), sql`(${appointments.startsAt} AT TIME ZONE ${timezone})::date = ${date}::date`),
     ))).orderBy(asc(appointments.startsAt)),
     db().select({ id: rewards.id, title: rewards.title, cost: rewards.cost }).from(rewards)
       .where(and(eq(rewards.familyId, familyId), eq(rewards.active, true))).orderBy(asc(rewards.cost)),

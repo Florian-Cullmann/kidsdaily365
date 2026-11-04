@@ -117,7 +117,7 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
   const childName = (id: unknown) => data.children.find((child) => child.id === id)?.name ?? "";
   return <div className="parent-app">
     <aside className="parent-sidebar"><Link href="/" className="brand"><span className="brand-mark"><House size={24} /></span><span>kidsdaily<span className="brand-number">365</span></span></Link><span className="parent-sidebar-caption">ELTERNBEREICH</span>
-      <nav aria-label="Elternverwaltung">{tabs.map((item) => <button key={item.id} disabled={busy} className={tab === item.id ? "active" : ""} aria-current={tab === item.id ? "page" : undefined} onClick={() => navigate(item.id)}><item.icon size={20} /><span>{item.label}</span></button>)}</nav>
+      <nav aria-label="Elternverwaltung"><Link className="parent-secondary" href="/eltern/verlauf">Tagesverlauf & Sterne</Link>{tabs.map((item) => <button key={item.id} disabled={busy} className={tab === item.id ? "active" : ""} aria-current={tab === item.id ? "page" : undefined} onClick={() => navigate(item.id)}><item.icon size={20} /><span>{item.label}</span></button>)}</nav>
       <div className="parent-sidebar-bottom"><Link href="/">Zum Kinderbildschirm</Link><button disabled={busy} onClick={() => action(async () => { await request("/api/auth/logout", "POST"); router.replace("/login"); router.refresh(); })}><LogOut size={18} /> Abmelden</button></div>
     </aside>
     <main className="parent-main"><header className="parent-topbar"><span>{data.family.name}</span><span><ShieldCheck size={17} /> Angemeldet als {parent.name}</span></header>
