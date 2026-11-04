@@ -151,6 +151,7 @@ progress::-moz-progress-bar { background: #efb832; border-radius: 20px; }
 .appointment-row > div { flex: 1; min-width: 0; }
 .appointment-date { font-size: 17px; color: #78648e; }
 .appointment-row h3 { font-size: 25px; margin-top: 7px; }
+.appointment-detail { font-size: 20px; line-height: 1.5; margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: #514364; }
 .appointment-row time { padding: 14px; border-radius: 17px; background: #e6dbf7; font-size: 25px; font-weight: 800; color: #654192; }
 .wishes-intro { font-size: 19px; color: #71657f; line-height: 1.5; margin: 0 4px 20px; }
 .wish-card { display: flex; align-items: center; gap: 22px; padding: 24px; margin-bottom: 16px; border: 2px solid #efdfbf; background: #fffcf2; border-radius: 25px; }

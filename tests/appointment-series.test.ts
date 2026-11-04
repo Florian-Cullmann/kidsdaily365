@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { previewSeries, resolveSeries, type SeriesInput } from "@/domain/appointment-series";
 import { appointmentLocalInput } from "@/domain/appointment-time";
 const zone = "Europe/Berlin";
-const base: SeriesInput = { requestId: "", childId: "", title: "Musik", icon: "calendar", startLocal: "2026-01-06T16:00", endLocal: "2026-01-06T17:00", until: "2027-01-06", choices: {} };
+const base: SeriesInput = { location: "", preparation: "", requestId: "", childId: "", title: "Musik", icon: "calendar", startLocal: "2026-01-06T16:00", endLocal: "2026-01-06T17:00", until: "2027-01-06", choices: {} };
 describe("weekly appointment expansion", () => {
   it("keeps family time across both DST transitions and includes at most 53 occurrences", () => {
     const result = resolveSeries(base, zone);

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { db } from "@/server/db/client";
@@ -124,4 +124,29 @@ it("enforces parent auth and origin on real routes with paired wall and Android 
   expect((await createRoute(post("/api/parent/appointment-series", schedule()))).status).toBe(201);
   expect((await previewRoute(new Request(`${origin}/api/parent/appointment-series/${series.id}`), context)).status).toBe(200);
   expect(await db().select().from(appointments).where(and(eq(appointments.familyId, familyId), eq(appointments.childId, foreignChild)))).toHaveLength(0);
+});
+
+it("copies details into every occurrence and isolates subsequent edits and clearing", async () => {
+  const input = { ...schedule(), location: " Sporthalle ", preparation: "Turnbeutel mitnehmen." };
+  const series = await createAppointmentSeries(parent, input);
+  const rows = await occurrences(series.id);
+  expect(rows).toHaveLength(4);
+  expect(rows.every((row) => row.location === "Sporthalle" && row.preparation === input.preparation)).toBe(true);
+  await saveRecord(parent, "appointments", { childId, title: rows[0].title, icon: rows[0].icon, startsAt: rows[0].startsAt.toISOString(), location: "", preparation: "" }, rows[0].id);
+  await createAppointmentSeries(parent, input);
+  const after = await occurrences(series.id);
+  expect(after[0]).toMatchObject({ location: "", preparation: "" });
+  expect(after.slice(1)).toEqual(rows.slice(1));
+  await expect(createAppointmentSeries(parent, { ...input, location: "Andere Halle" })).rejects.toMatchObject({ status: 409 });
+  await expect(createAppointmentSeries(parent, { ...schedule(), preparation: "x".repeat(301) })).rejects.toThrow();
+});
+
+
+it("accepts retries hashed by the pre-details series API", async () => {
+  const input = schedule();
+  const series = await createAppointmentSeries(parent, input);
+  const oldPayload = { startLocal: input.startLocal, endLocal: input.endLocal, until: input.until, requestId: input.requestId, childId, title: input.title, icon: input.icon, choices: {} };
+  const inputHash = createHash("sha256").update(JSON.stringify(oldPayload)).digest("hex");
+  await db().update(appointmentSeries).set({ inputHash }).where(eq(appointmentSeries.id, series.id));
+  expect(await createAppointmentSeries(parent, input)).toEqual(series);
 });

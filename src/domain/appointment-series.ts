@@ -1,12 +1,13 @@
 import { z } from "zod";
 import { appointmentCandidates, appointmentRange } from "./appointment-time";
+import { appointmentDetails } from "./management";
 
 const localTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
 export const seriesScheduleSchema = z.object({
   startLocal: localTime, endLocal: localTime.nullable(), until: z.iso.date(),
 });
 export const createSeriesSchema = seriesScheduleSchema.extend({
-  requestId: z.uuid(), childId: z.uuid(), title: z.string().trim().min(1).max(80),
+  ...appointmentDetails, requestId: z.uuid(), childId: z.uuid(), title: z.string().trim().min(1).max(80),
   icon: z.enum(["calendar", "tooth", "ball", "heart"]),
   choices: z.record(z.string().regex(/^(start|end):\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/), z.iso.datetime()).refine((value) => Object.keys(value).length <= 106).default({}),
 }).strict();

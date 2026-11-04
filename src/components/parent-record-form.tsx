@@ -68,14 +68,14 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onSaveS
       try {
         if (weekly && !record && onSaveSeries) {
           seriesRequestId.current ??= crypto.randomUUID();
-          const series = createSeriesSchema.parse({ ...seriesDraft, requestId: seriesRequestId.current, childId: field("childId"), title: field("title"), icon: field("icon") });
+          const series = createSeriesSchema.parse({ ...seriesDraft, requestId: seriesRequestId.current, childId: field("childId"), title: field("title"), location: field("location"), preparation: field("preparation"), icon: field("icon") });
           resolveSeries(series, data.family.timezone);
           await onSaveSeries(series);
           return;
         }
         const startsAt = appointmentInstant(field("startsAt"), data.family.timezone, field("startsAtInstant"), record?.startsAt);
         const endsAt = field("endsAt") ? appointmentInstant(field("endsAt"), data.family.timezone, field("endsAtInstant"), record?.endsAt) : null;
-        input = { childId: field("childId"), title: field("title"), icon: field("icon"), ...appointmentRange(startsAt, endsAt), active };
+        input = { childId: field("childId"), title: field("title"), location: field("location"), preparation: field("preparation"), icon: field("icon"), ...appointmentRange(startsAt, endsAt), active };
       } catch (error) {
         setTimeError(error instanceof Error ? error.message : "Bitte prüfe die Uhrzeiten.");
         return;
@@ -141,6 +141,8 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onSaveS
         <button type="button" className="parent-secondary" disabled={steps.length >= 50} onClick={() => { setOpenStep(steps.length); setSteps((items) => [...items, { title: "", description: "", icon: "heart", points: 5 }]); }}>Aufgabe hinzufügen</button>
       </div>}
       {resource === "appointments" && <>
+        <label className="wide-field">Ort (optional)<input name="location" defaultValue={text("location")} maxLength={160} placeholder="z. B. Sporthalle" /></label>
+        <label className="wide-field">Vorbereitungshinweis (optional)<textarea name="preparation" defaultValue={text("preparation")} maxLength={300} rows={3} placeholder="z. B. Turnbeutel und Trinkflasche mitnehmen" /></label>
         <p className="field-help wide-field">Alle Uhrzeiten gelten in eurer Familienzeitzone: <strong>{data.family.timezone}</strong> – auch auf Reisen.</p>
         {!record && onSaveSeries && <label className="wide-field">Wiederholung<select value={weekly ? "weekly" : "once"} onChange={(e) => { setWeekly(e.target.value === "weekly"); setTimeError(""); }}><option value="once">Einmaliger Termin</option><option value="weekly">Wöchentlich als Serie</option></select></label>}
         {weekly ? <AppointmentSeriesFields value={seriesDraft} onChange={setSeriesDraft} timezone={data.family.timezone} /> : <><AppointmentTimeField name="startsAt" label="Beginn" original={record?.startsAt} timeZone={data.family.timezone} required />

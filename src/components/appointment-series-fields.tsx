@@ -9,7 +9,7 @@ export function AppointmentSeriesFields({ value, onChange, timezone }: { value: 
     try {
       const items = previewSeries(value, timezone);
       let error = "";
-      try { resolveSeries({ ...value, requestId: "", childId: "", title: "", icon: "calendar" }, timezone); }
+      try { resolveSeries({ ...value, location: "", preparation: "", requestId: "", childId: "", title: "", icon: "calendar" }, timezone); }
       catch (cause) { error = cause instanceof Error ? cause.message : "Bitte die Uhrzeiten prüfen."; }
       return { items, error };
     } catch (cause) { return { items: [], error: cause instanceof Error ? cause.message : "Bitte die Datumsangaben prüfen." }; }

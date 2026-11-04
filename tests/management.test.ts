@@ -19,3 +19,17 @@ describe("management validation", () => {
     expect(managementSchemas.appointments.safeParse({ childId: "11111111-1111-4111-8111-111111111111", title: "Appointment", icon: "calendar", startsAt: "2026-11-01T16:00:00Z", endsAt: "2026-11-01T15:00:00Z" }).success).toBe(false);
   });
 });
+
+describe("appointment details", () => {
+  const input = { childId: "11111111-1111-4111-8111-111111111111", title: "Sport", icon: "ball", startsAt: "2026-11-01T16:00:00Z" };
+  it("accepts legacy requests, trims details and supports clearing", () => {
+    expect(managementSchemas.appointments.parse(input)).toMatchObject({ location: "", preparation: "" });
+    expect(managementSchemas.appointments.parse({ ...input, location: " Sporthalle ", preparation: "  " })).toMatchObject({ location: "Sporthalle", preparation: "" });
+  });
+  it("enforces both server-side length limits", () => {
+    expect(managementSchemas.appointments.safeParse({ ...input, location: "x".repeat(160), preparation: "x".repeat(300) }).success).toBe(true);
+    for (const extra of [{ location: "x".repeat(161) }, { preparation: "x".repeat(301) }, { location: null }]) {
+      expect(managementSchemas.appointments.safeParse({ ...input, ...extra }).success).toBe(false);
+    }
+  });
+});

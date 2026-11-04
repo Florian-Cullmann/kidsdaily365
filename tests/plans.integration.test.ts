@@ -128,3 +128,21 @@ describe("persisted daily plans", () => {
     expect(second.child.buddyName).toBe("Lumi");
   });
 });
+
+it("round-trips appointment details without crossing household or archived-profile boundaries", async () => {
+  const parent = { id: randomUUID(), familyId, name: "Test", email: "test@example.test" };
+  const input = { childId: firstChild, title: "Sport", icon: "ball", startsAt: "2026-11-01T16:00:00+01:00", location: " Sporthalle ", preparation: "Turnbeutel mitnehmen." };
+  const record = await saveRecord(parent, "appointments", input);
+  const read = async () => (await getDayPlans(familyId, now)).find((plan) => plan.child.id === firstChild)!.appointments.find((item) => item.id === record.id);
+  expect(await read()).toMatchObject({ location: "Sporthalle", preparation: input.preparation, startsAt: "2026-11-01T15:00:00.000Z" });
+  expect((await getDayPlans(otherFamilyId, now)).flatMap((plan) => plan.appointments)).toHaveLength(0);
+  await expect(saveRecord({ ...parent, familyId: otherFamilyId }, "appointments", { ...input, childId: foreignChild }, record.id)).rejects.toMatchObject({ status: 404 });
+  await expect(saveRecord(parent, "appointments", { ...input, childId: foreignChild })).rejects.toMatchObject({ status: 404 });
+  await saveRecord(parent, "appointments", { ...input, location: "Nebenhalle", preparation: "Wasser mitnehmen." }, record.id);
+  expect(await read()).toMatchObject({ location: "Nebenhalle", preparation: "Wasser mitnehmen." });
+  await saveRecord(parent, "appointments", { ...input, location: "", preparation: " " }, record.id);
+  expect(await read()).toMatchObject({ location: "", preparation: "" });
+  await db().update(children).set({ active: false }).where(eq(children.id, firstChild));
+  await expect(saveRecord(parent, "appointments", input, record.id)).rejects.toMatchObject({ status: 404 });
+  expect((await getDayPlans(familyId, now)).some((plan) => plan.child.id === firstChild)).toBe(false);
+});

@@ -13,7 +13,9 @@ type Transaction = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0
 
 export async function createAppointmentSeries(parent: ParentActor, input: unknown) {
   const data = createSeriesSchema.parse(input);
-  const inputHash = hash({ ...data, choices: Object.fromEntries(Object.entries(data.choices).sort(([a], [b]) => a.localeCompare(b))) });
+  // Keep retries of series created before optional details were introduced compatible.
+  const { location, preparation, ...legacyData } = data;
+  const inputHash = hash({ ...legacyData, ...(location ? { location } : {}), ...(preparation ? { preparation } : {}), choices: Object.fromEntries(Object.entries(data.choices).sort(([a], [b]) => a.localeCompare(b))) });
   return db().transaction(async (tx) => {
     // Serialize retries before checking the existing result, including lost responses.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`${parent.familyId}:${data.requestId}`}, 0))`);
@@ -31,7 +33,7 @@ export async function createAppointmentSeries(parent: ParentActor, input: unknow
     const [series] = await tx.insert(appointmentSeries).values({ familyId: parent.familyId, childId: data.childId, requestId: data.requestId, inputHash, timezone: family.timezone }).returning();
     await tx.insert(appointments).values(occurrences.map((item) => ({
       familyId: parent.familyId, childId: data.childId, seriesId: series.id, occurrenceIndex: item.index,
-      title: data.title, icon: data.icon, startsAt: new Date(item.startsAt), endsAt: item.endsAt ? new Date(item.endsAt) : null,
+      title: data.title, icon: data.icon, location: data.location, preparation: data.preparation, startsAt: new Date(item.startsAt), endsAt: item.endsAt ? new Date(item.endsAt) : null,
     })));
     return { id: series.id };
   });

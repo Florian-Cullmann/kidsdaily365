@@ -151,6 +151,8 @@ export const appointments = pgTable("appointments", {
   childId: uuid().notNull(),
   title: text().notNull(),
   icon: appointmentIcon().notNull().default("calendar"),
+  location: text().notNull().default(""),
+  preparation: text().notNull().default(""),
   startsAt: timestamp({ withTimezone: true }).notNull(),
   endsAt: timestamp({ withTimezone: true }),
   active: boolean().notNull().default(true),

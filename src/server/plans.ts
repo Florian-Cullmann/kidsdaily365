@@ -64,7 +64,7 @@ export async function getDayPlans(familyId: string, now = new Date()): Promise<D
     date, timezone,
     child: { id: child.id, name: child.name, avatar: child.avatar, equippedAccessories: equipment.filter((item) => item.childId === child.id).map((item) => item.accessoryId), imageUrl: imageUrls.get(child.id) ?? null, reducedMotion: child.reducedMotion, buddyKind: child.buddyKind, buddyName: child.buddyName },
     balance: balances.find((row) => row.childId === child.id)?.balance ?? 0,
-    appointments: upcoming.filter((item) => item.childId === child.id).slice(0, 3).map((item) => ({ id: item.id, title: item.title, startsAt: item.startsAt.toISOString(), icon: item.icon })),
+    appointments: upcoming.filter((item) => item.childId === child.id).slice(0, 3).map((item) => ({ id: item.id, title: item.title, location: item.location, preparation: item.preparation, startsAt: item.startsAt.toISOString(), icon: item.icon })),
     rewards: rewardOptions,
     tasks: tasks.filter(({ task }) => task.childId === child.id).map(({ task, completedAt }) => ({
       id: task.id, routineId: task.templateId, routineTitle: task.routineTitle, title: task.title, description: task.description, icon: task.icon,
