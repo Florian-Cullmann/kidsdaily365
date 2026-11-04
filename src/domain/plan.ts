@@ -7,7 +7,7 @@ export type ChildProfile = {
   id: string; name: string; avatar: string; reducedMotion: boolean;
   buddyKind: BuddyKind; buddyName: string;
 };
-export type Appointment = { id: string; title: string; startsAt: string; icon: "calendar" | "tooth" | "ball" | "heart" };
+export type Appointment = { id: string; title: string; startsAt: string; endsAt?: string | null; icon: "calendar" | "tooth" | "ball" | "heart" };
 export type Reward = { id: string; title: string; cost: number };
 export type Task = {
   routineId?: string | null;
