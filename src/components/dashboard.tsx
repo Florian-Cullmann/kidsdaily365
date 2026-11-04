@@ -129,6 +129,26 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
     finally { pending.current = false; setBusy(null); }
   }
 
+  async function saveGoal(rewardId: string | null) {
+    if (pending.current || !plan) return;
+    const context = noticeContext.current;
+    mutationVersion.current += 1;
+    pending.current = true; setBusy("savings-goal"); setError(""); setNotice(null);
+    try {
+      let updated = { ...plan, savingsGoalId: rewardId };
+      if (!demo) {
+        const response = await fetch(`/api/children/${plan.child.id}/savings-goal`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rewardId }) });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error ?? "Dein Sparziel konnte nicht gespeichert werden.");
+        updated = data.plan;
+      }
+      setPlans((previous) => previous.map((item) => item.child.id === plan.child.id ? updated : item));
+      if (context === noticeContext.current) setNotice({ text: rewardId ? "Dein Sparziel ist ausgewählt. Deine Sterne bleiben frei verfügbar." : "Dein Sparziel ist entfernt. Deine Sterne bleiben bei dir." });
+    } catch (cause) {
+      if (context === noticeContext.current) setError(cause instanceof Error && !(cause instanceof TypeError) ? cause.message : "Der Server ist gerade nicht erreichbar. Bitte versuche es erneut.");
+    } finally { pending.current = false; setBusy(null); }
+  }
+
   async function fullscreen() {
     try {
       if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
@@ -154,7 +174,8 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
   }));
   const next = plan.tasks.find((task) => !task.completed);
   const nextAppointment = plan.appointments[0];
-  const goal = plan.rewards.find((reward) => reward.cost > plan.balance) ?? plan.rewards[0];
+  const goal = plan.rewards.find((reward) => reward.id === plan.savingsGoalId);
+  const archivedGoal = !!plan.savingsGoalId && !goal;
   const dateLabel = new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "numeric", month: "long", timeZone: plan.timezone }).format(new Date(`${plan.date}T12:00:00Z`));
 
   return <div className="child-world forest-world" data-calm={plan.child.reducedMotion}>
@@ -180,7 +201,7 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
 
         {view === "appointments" && <div className="detail-scroll">{plan.appointments.length ? plan.appointments.map((item) => <article className="appointment-row" key={item.id}><span className="detail-picture" aria-hidden="true">{appointmentPictures[item.icon]}</span><div><span className="appointment-date">{appointmentDay(item.startsAt, plan)}</span><h3>{item.title}</h3></div><time dateTime={item.startsAt}>{appointmentTime(item.startsAt, plan.timezone)}</time></article>) : <div className="empty-state"><span aria-hidden="true">🌻</span><h3>Gerade ist nichts geplant.</h3><p>Ein bisschen Zeit für dich.</p></div>}</div>}
 
-        {view === "rewards" && <div className="detail-scroll"><p className="wishes-intro">Plant zusammen etwas, worauf du dich freust.</p>{plan.rewards.length ? plan.rewards.map((reward, index) => <article className="wish-card" key={reward.id}><span className="detail-picture" aria-hidden="true">{rewardPictures[index % rewardPictures.length]}</span><div><h3>{reward.title}</h3><p>{plan.balance >= reward.cost ? "Du hast genug Sterne!" : `Noch ${reward.cost - plan.balance} Sterne`}</p><progress value={Math.min(plan.balance, reward.cost)} max={reward.cost} aria-label={`Fortschritt für ${reward.title}`} /><span className="wish-count">{plan.balance} / {reward.cost} Sterne</span>{plan.rewardRequests?.some((item) => item.rewardId === reward.id && item.status === "pending") ? <p>Bei deinen Eltern angefragt</p> : <button className="reward-action" disabled={!!busy || demo || plan.balance < reward.cost} onClick={() => setConfirmReward(reward.id)}>Einlösen anfragen · {reward.cost} Sterne</button>}{confirmReward === reward.id && <div className="reward-confirm" role="group" aria-label="Anfrage bestätigen"><p>„{reward.title}“ für {reward.cost} Sterne anfragen? Erst wenn deine Eltern bestätigen, werden die Sterne abgezogen.</p><button className="reward-action" disabled={!!busy} onClick={() => askReward(reward.id)}>Ja, bei meinen Eltern anfragen</button><button className="reward-action" disabled={!!busy} onClick={() => setConfirmReward(null)}>Zurück</button></div>}</div></article>) : <div className="empty-state"><span aria-hidden="true">🎁</span><h3>Was wünschst du dir?</h3><p>Hier ist Platz für eure gemeinsamen Ideen.</p></div>}<p className="wishes-note">{plan.balance} Sterne verfügbar · {plan.earnedTotal ?? plan.balance} insgesamt verdient{demo ? " · Anfragen sind nur am gekoppelten Wandbildschirm möglich." : ""}</p><RewardHistory items={plan.rewardRequests ?? []} timezone={plan.timezone} /></div>}
+        {view === "rewards" && <div className="detail-scroll"><p className="wishes-intro">Plant zusammen etwas, worauf du dich freust. Wenn du magst, wähle einen Wunsch als dein Sparziel. Dabei bleiben alle Sterne frei verfügbar.</p>{archivedGoal && <div className="savings-fallback"><p>Dein bisheriges Sparziel ist nicht mehr verfügbar. Du kannst einen anderen Wunsch wählen oder ohne Sparziel weitermachen.</p><button className="reward-action" disabled={!!busy} onClick={() => saveGoal(null)}>Sparziel entfernen</button></div>}{plan.rewards.length ? plan.rewards.map((reward, index) => <article className="wish-card" key={reward.id}><span className="detail-picture" aria-hidden="true">{rewardPictures[index % rewardPictures.length]}</span><div><h3>{reward.title}</h3><p>{plan.balance >= reward.cost ? "Du hast genug Sterne!" : `Noch ${reward.cost - plan.balance} Sterne`}</p><progress value={Math.min(plan.balance, reward.cost)} max={reward.cost} aria-label={`Fortschritt für ${reward.title}`} /><span className="wish-count">{plan.balance} / {reward.cost} Sterne</span><button className="reward-action savings-action" aria-pressed={plan.savingsGoalId === reward.id} disabled={!!busy} onClick={() => saveGoal(plan.savingsGoalId === reward.id ? null : reward.id)}>{plan.savingsGoalId === reward.id ? "Sparziel entfernen" : "Als Sparziel wählen"}</button>{plan.rewardRequests?.some((item) => item.rewardId === reward.id && item.status === "pending") ? <p>Bei deinen Eltern angefragt</p> : <button className="reward-action" disabled={!!busy || demo || plan.balance < reward.cost} onClick={() => setConfirmReward(reward.id)}>Einlösen anfragen · {reward.cost} Sterne</button>}{confirmReward === reward.id && <div className="reward-confirm" role="group" aria-label="Anfrage bestätigen"><p>„{reward.title}“ für {reward.cost} Sterne anfragen? Erst wenn deine Eltern bestätigen, werden die Sterne abgezogen.</p><button className="reward-action" disabled={!!busy} onClick={() => askReward(reward.id)}>Ja, bei meinen Eltern anfragen</button><button className="reward-action" disabled={!!busy} onClick={() => setConfirmReward(null)}>Zurück</button></div>}</div></article>) : <div className="empty-state"><span aria-hidden="true">🎁</span><h3>Was wünschst du dir?</h3><p>Hier ist Platz für eure gemeinsamen Ideen.</p></div>}<p className="wishes-note">{plan.balance} Sterne verfügbar · {plan.earnedTotal ?? plan.balance} insgesamt verdient{demo ? " · Anfragen sind nur am gekoppelten Wandbildschirm möglich." : ""}</p><RewardHistory items={plan.rewardRequests ?? []} timezone={plan.timezone} /></div>}
 
         <div className="paper-footer"><Heart size={19} /><span>Pausen gehören auch dazu.</span></div>
       </section>
@@ -190,7 +211,7 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
           <button className="star-treasure" onClick={() => openView("rewards")} aria-label={`${plan.balance} Sterne gesammelt. Deine Wünsche ansehen.`}><span aria-hidden="true">⭐</span><div><strong>{plan.balance}</strong><span>deine Sterne</span></div><ChevronRight size={27} /></button>
         </div>
         <button className="peek-card appointment-peek" onClick={() => openView("appointments")}><span className="peek-picture" aria-hidden="true">📅</span><span className="peek-copy"><span>Dein nächster Termin</span><strong>{nextAppointment?.title ?? "Gerade nichts geplant"}</strong>{nextAppointment && <span>{appointmentDay(nextAppointment.startsAt, plan)} · {appointmentTime(nextAppointment.startsAt, plan.timezone)} Uhr</span>}</span><ChevronRight size={25} /></button>
-        <button className="peek-card reward-peek" onClick={() => openView("rewards")}><span className="peek-picture" aria-hidden="true">🎁</span><span className="peek-copy"><span>Darauf kannst du dich freuen</span><strong>{goal?.title ?? "Dein nächster Wunsch"}</strong>{goal && <progress value={Math.min(plan.balance, goal.cost)} max={goal.cost} aria-label={`Fortschritt für ${goal.title}`} />}</span><ChevronRight size={25} /></button>
+        <button className="peek-card reward-peek" onClick={() => openView("rewards")}><span className="peek-picture" aria-hidden="true">🎁</span><span className="peek-copy"><span>{goal ? "Dein Sparziel" : "Deine Wünsche"}</span><strong>{goal?.title ?? (archivedGoal ? "Dein Sparziel ist nicht mehr verfügbar" : "Magst du ein Sparziel wählen?")}</strong>{goal ? <><progress value={Math.min(plan.balance, goal.cost)} max={goal.cost} aria-label={`Fortschritt für ${goal.title}`} /><span>{plan.balance} Sterne verfügbar · {Math.max(0, goal.cost - plan.balance)} Sterne fehlen</span></> : <span>{archivedGoal ? "Anderen Wunsch wählen oder Sparziel entfernen" : "Ganz freiwillig – deine Sterne bleiben frei verfügbar"}</span>}</span><ChevronRight size={25} /></button>
       </aside>
     </main>
 

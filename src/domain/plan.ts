@@ -32,6 +32,7 @@ export type DayPlan = {
   rewardRequests?: RewardRequest[];
   appointments: Appointment[];
   rewards: Reward[];
+  savingsGoalId?: string | null;
 };
 
 export const sections: { id: DaySection; label: string; caption: string }[] = [

@@ -4,7 +4,7 @@ import { profileImageUrl } from "@/domain/profile-image";
 import { and, asc, eq, gte, isNull, sql } from "drizzle-orm";
 import { localDate, type DayPlan } from "@/domain/plan";
 import { db } from "./db/client";
-import { buddyEquipment, appointments, childImages, children, dailyTasks, families, pointEntries, rewards, taskTemplates } from "./db/schema";
+import { childSavingsGoals, buddyEquipment, appointments, childImages, children, dailyTasks, families, pointEntries, rewards, taskTemplates } from "./db/schema";
 
 export class PlanError extends Error {
   constructor(message: string, public status: number) { super(message); }
@@ -45,7 +45,7 @@ export async function getDayPlans(familyId: string, now = new Date()): Promise<D
     }
   });
 
-  const [profiles, tasks, balances, upcoming, rewardOptions, images, equipment] = await Promise.all([
+  const [profiles, tasks, balances, upcoming, rewardOptions, images, equipment, savingsGoals] = await Promise.all([
     db().select().from(children).where(and(eq(children.familyId, familyId), eq(children.active, true))).orderBy(asc(children.name)),
     db().select({ task: dailyTasks, completedAt: pointEntries.createdAt })
       .from(dailyTasks).leftJoin(pointEntries, eq(dailyTasks.id, pointEntries.taskId))
@@ -58,6 +58,7 @@ export async function getDayPlans(familyId: string, now = new Date()): Promise<D
       .where(and(eq(rewards.familyId, familyId), eq(rewards.active, true))).orderBy(asc(rewards.cost)),
     db().select({ childId: childImages.childId, version: childImages.version }).from(childImages).where(eq(childImages.familyId, familyId)),
     db().select().from(buddyEquipment).where(eq(buddyEquipment.familyId, familyId)),
+    db().select().from(childSavingsGoals).where(eq(childSavingsGoals.familyId, familyId)),
   ]);
 
   const history = await rewardHistory(familyId);
@@ -70,6 +71,7 @@ export async function getDayPlans(familyId: string, now = new Date()): Promise<D
     rewardRequests: history.filter((row) => row.childId === child.id),
     appointments: upcoming.filter((item) => item.childId === child.id).slice(0, 3).map((item) => ({ id: item.id, title: item.title, startsAt: item.startsAt.toISOString(), icon: item.icon })),
     rewards: rewardOptions,
+    savingsGoalId: savingsGoals.find((goal) => goal.childId === child.id)?.rewardId ?? null,
     tasks: tasks.filter(({ task }) => task.childId === child.id).map(({ task, completedAt }) => ({
       id: task.id, routineId: task.templateId, routineTitle: task.routineTitle, title: task.title, description: task.description, icon: task.icon,
       section: task.section, time: task.scheduledTime?.slice(0, 5) ?? null,
