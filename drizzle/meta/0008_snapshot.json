@@ -1,5 +1,5 @@
 {
-  "id": "0f93a71a-a0b1-4d73-9c7e-6926cd1da83c",
+  "id": "7d65ade1-6166-46ec-af21-d88d6f7630d1",
   "prevId": "3a1f941b-ba1c-4e48-a308-54588c1eda9f",
   "version": "7",
   "dialect": "postgresql",
@@ -734,12 +734,6 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
-        },
-        "pausedBy": {
-          "name": "pausedBy",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -816,25 +810,6 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
-        },
-        "daily_tasks_pausedBy_templateId_childId_familyId_routine_pauses_id_routineId_childId_familyId_fk": {
-          "name": "daily_tasks_pausedBy_templateId_childId_familyId_routine_pauses_id_routineId_childId_familyId_fk",
-          "tableFrom": "daily_tasks",
-          "tableTo": "routine_pauses",
-          "columnsFrom": [
-            "pausedBy",
-            "templateId",
-            "childId",
-            "familyId"
-          ],
-          "columnsTo": [
-            "id",
-            "routineId",
-            "childId",
-            "familyId"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -860,10 +835,6 @@
       },
       "policies": {},
       "checkConstraints": {
-        "paused_task_has_routine": {
-          "name": "paused_task_has_routine",
-          "value": "\"daily_tasks\".\"pausedBy\" is null or \"daily_tasks\".\"templateId\" is not null"
-        },
         "task_points_range": {
           "name": "task_points_range",
           "value": "\"daily_tasks\".\"points\" between 0 and 1000"
@@ -1900,144 +1871,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.routine_pauses": {
-      "name": "routine_pauses",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "familyId": {
-          "name": "familyId",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "childId": {
-          "name": "childId",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "routineId": {
-          "name": "routineId",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "startsOn": {
-          "name": "startsOn",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "endsOn": {
-          "name": "endsOn",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reason": {
-          "name": "reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "''"
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "revokedAt": {
-          "name": "revokedAt",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "routine_pause_dates": {
-          "name": "routine_pause_dates",
-          "columns": [
-            {
-              "expression": "familyId",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "routineId",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "startsOn",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "endsOn",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "routine_pauses_routineId_childId_familyId_task_templates_id_childId_familyId_fk": {
-          "name": "routine_pauses_routineId_childId_familyId_task_templates_id_childId_familyId_fk",
-          "tableFrom": "routine_pauses",
-          "tableTo": "task_templates",
-          "columnsFrom": [
-            "routineId",
-            "childId",
-            "familyId"
-          ],
-          "columnsTo": [
-            "id",
-            "childId",
-            "familyId"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "pause_routine_child_family_identity": {
-          "name": "pause_routine_child_family_identity",
-          "nullsNotDistinct": false,
-          "columns": [
-            "id",
-            "routineId",
-            "childId",
-            "familyId"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "pause_dates_ordered": {
-          "name": "pause_dates_ordered",
-          "value": "\"routine_pauses\".\"endsOn\" >= \"routine_pauses\".\"startsOn\""
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.task_templates": {
       "name": "task_templates",
       "schema": "",
@@ -2045,6 +1878,18 @@
         "steps": {
           "name": "steps",
           "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "copyRequestId": {
+          "name": "copyRequestId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "copyFingerprint": {
+          "name": "copyFingerprint",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -2163,6 +2008,14 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
+        "templates_copy_request": {
+          "name": "templates_copy_request",
+          "nullsNotDistinct": false,
+          "columns": [
+            "familyId",
+            "copyRequestId"
+          ]
+        },
         "templates_child_family_identity": {
           "name": "templates_child_family_identity",
           "nullsNotDistinct": false,

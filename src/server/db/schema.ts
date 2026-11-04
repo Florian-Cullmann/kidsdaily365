@@ -61,6 +61,8 @@ export const childImages = pgTable("child_images", {
 // Templates describe routines; occurrences are immutable daily snapshots.
 export const taskTemplates = pgTable("task_templates", {
   steps: jsonb().$type<RoutineStep[]>(),
+  copyRequestId: uuid(),
+  copyFingerprint: text(),
   id: uuid().primaryKey().defaultRandom(),
   familyId: uuid().notNull().references(() => families.id),
   childId: uuid().notNull(),
@@ -75,6 +77,7 @@ export const taskTemplates = pgTable("task_templates", {
   weekdays: integer().array().notNull().default(sql`ARRAY[1,2,3,4,5,6,7]::integer[]`),
 }, (table) => [
   foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
+  unique("templates_copy_request").on(table.familyId, table.copyRequestId),
   unique("templates_child_family_identity").on(table.id, table.childId, table.familyId),
   check("template_points_range", sql`${table.points} between 0 and 1000`),
   check("template_valid_weekdays", sql`cardinality(${table.weekdays}) between 1 and 7 and ${table.weekdays} <@ ARRAY[1,2,3,4,5,6,7]::integer[]`),

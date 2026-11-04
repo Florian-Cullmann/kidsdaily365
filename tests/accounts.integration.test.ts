@@ -498,3 +498,117 @@ describe("child buddy onboarding", () => {
     await expect(buddySetup(`Bearer ${paired.token}`)).rejects.toMatchObject({ status: 401 });
   });
 });
+
+describe("independent routine copies", () => {
+  it("copies only edited template fields once, preserves snapshots and keeps edits independent", async () => {
+    const { copyRoutine } = await import("@/server/copy-routine");
+    const parent = await actor();
+    const sourceChild = await child(parent, "Mika");
+    const targetChild = await child(parent, "Lina");
+    const routine = { childId: sourceChild.id, title: "Morgen", section: "morning", scheduledTime: "07:30", sortOrder: 12, active: true, weekdays: [1, 2, 3, 4, 5, 6, 7], steps: [
+      { title: "Frühstück", description: "In Ruhe essen", icon: "sun", points: 3 },
+      { title: "Zähne", description: "Zähne putzen", icon: "toothbrush", points: 4 },
+      { title: "Rucksack", description: "Alles dabei?", icon: "backpack", points: 5 },
+    ] };
+    const source = await saveRecord(parent, "routines", routine);
+    const plans = await getDayPlans(parent.familyId);
+    const sourceTask = plans.find((plan) => plan.child.id === sourceChild.id)!.tasks[0];
+    await completeTask(parent.familyId, sourceTask.id);
+    const snapshots = await db().select().from(dailyTasks).where(eq(dailyTasks.familyId, familyId));
+    const journal = await db().select().from(pointEntries).where(eq(pointEntries.familyId, familyId));
+    const draft = { requestId: randomUUID(), routine: { ...routine, childId: targetChild.id, title: "Linas Morgen", steps: [...routine.steps].reverse() } };
+    const copies = await Promise.all(Array.from({ length: 4 }, () => copyRoutine(parent, source.id, draft)));
+    expect(new Set(copies.map((copy) => copy.id)).size).toBe(1);
+    expect(await copyRoutine(parent, source.id, draft)).toEqual(copies[0]);
+    expect(await db().select().from(taskTemplates).where(eq(taskTemplates.familyId, familyId))).toHaveLength(2);
+    expect(await db().select().from(dailyTasks).where(eq(dailyTasks.familyId, familyId))).toEqual(snapshots);
+    expect(await db().select().from(pointEntries).where(eq(pointEntries.familyId, familyId))).toEqual(journal);
+    const [copy] = await db().select().from(taskTemplates).where(eq(taskTemplates.id, copies[0].id));
+    expect(copy).toMatchObject({ ...draft.routine, scheduledTime: "07:30:00" });
+    await saveRecord(parent, "routines", { ...routine, title: "Quelle geändert" }, source.id);
+    await saveRecord(parent, "routines", { ...draft.routine, title: "Kopie geändert" }, copy.id);
+    expect((await db().select().from(taskTemplates).where(eq(taskTemplates.id, source.id)))[0].title).toBe("Quelle geändert");
+    expect((await db().select().from(taskTemplates).where(eq(taskTemplates.id, copy.id)))[0].title).toBe("Kopie geändert");
+    expect(await copyRoutine(parent, source.id, draft)).toEqual(copies[0]);
+    await expect(copyRoutine(parent, source.id, { ...draft, routine: { ...draft.routine, title: "Anderer Auftrag" } })).rejects.toMatchObject({ status: 409 });
+    const nextPlans = await getDayPlans(parent.familyId);
+    expect(nextPlans.find((plan) => plan.child.id === targetChild.id)!.tasks).toHaveLength(3);
+    expect(nextPlans.find((plan) => plan.child.id === targetChild.id)!.tasks.every((task) => !task.completed)).toBe(true);
+    expect(await db().select().from(dailyTasks).where(eq(dailyTasks.childId, sourceChild.id))).toEqual(snapshots);
+  });
+
+  it("rejects foreign sources, foreign targets, archived targets and device credentials", async () => {
+    const { copyRoutine } = await import("@/server/copy-routine");
+    const { POST } = await import("@/app/api/parent/routines/[id]/copy/route");
+    const parent = await actor();
+    const other = await actor(otherFamilyId);
+    const ownChild = await child(parent);
+    const foreignChild = await child(other);
+    const routine = { childId: ownChild.id, title: "Abend", section: "evening", steps: [{ title: "Lesen", description: "Buch aussuchen", icon: "book", points: 2 }], weekdays: [1] };
+    const source = await saveRecord(parent, "routines", routine);
+    await expect(copyRoutine(other, source.id, { requestId: randomUUID(), routine: { ...routine, childId: foreignChild.id } })).rejects.toMatchObject({ status: 404 });
+    await expect(copyRoutine(parent, source.id, { requestId: randomUUID(), routine: { ...routine, childId: foreignChild.id } })).rejects.toMatchObject({ status: 404 });
+    await archiveRecord(parent, "children", ownChild.id);
+    await expect(copyRoutine(parent, source.id, { requestId: randomUUID(), routine })).rejects.toMatchObject({ status: 404 });
+    const context = { params: Promise.resolve({ id: source.id }) };
+    for (const authorization of ["", "Bearer android-token"]) {
+      const response = await POST(new Request(`${origin}/api/parent/routines/${source.id}/copy`, { method: "POST", headers: { Origin: origin, Authorization: authorization }, body: JSON.stringify({ requestId: randomUUID(), routine }) }), context);
+      expect(response.status).toBe(401);
+    }
+    expect((await POST(new Request(`${origin}/api/parent/routines/${source.id}/copy`, { method: "POST", headers: { Origin: "https://foreign.example" } }), context)).status).toBe(403);
+  });
+});
+
+describe("wall snapshot refresh", () => {
+  it("requires a wall session and isolates household profiles, including revoked and expired devices", async () => {
+    const { GET } = await import("@/app/api/wall/snapshot/route");
+    const parent = await actor(); const kid = await child(parent, "Mika");
+    const foreign = await child(await actor(otherFamilyId), "Foreign");
+    const request = (token?: string) => new Request(`${origin}/api/wall/snapshot?householdId=${otherFamilyId}`, { headers: token ? { authorization: `Bearer ${token}` } : {} });
+    const rejected = await GET(request());
+    expect(rejected.status).toBe(401);
+    expect(rejected.headers.get("cache-control")).toContain("no-store");
+    cookieState.set("kidsdaily_parent", await loginParent({ email: parent.email, password }));
+    expect((await GET(request())).status).toBe(401);
+    const phone = await exchangePairingCode((await createPairingCode(parent, { kind: "android", label: "Phone", childId: kid.id })).code, null);
+    expect((await GET(request(phone.token))).status).toBe(403);
+    cookieState.set("kidsdaily_device", phone.token);
+    expect((await GET(request())).status).toBe(401);
+    const wall = await exchangePairingCode((await createPairingCode(parent, { kind: "wall", label: "Wall" })).code, origin);
+    cookieState.set("kidsdaily_device", wall.token);
+    expect((await GET(request(phone.token))).status).toBe(403);
+    const response = await GET(request());
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    const snapshot = await response.json();
+    expect(snapshot.plans.map((plan: { child: { id: string } }) => plan.child.id)).toEqual([kid.id]);
+    expect(JSON.stringify(snapshot)).not.toContain(foreign.id);
+    expect(Number.isFinite(Date.parse(snapshot.syncedAt))).toBe(true);
+    await db().update(devices).set({ expiresAt: new Date(0) }).where(eq(devices.id, wall.id));
+    expect((await GET(request())).status).toBe(401);
+    await db().update(devices).set({ expiresAt: new Date(Date.now() + 60_000) }).where(eq(devices.id, wall.id));
+    await revokeDevice(parent, wall.id);
+    expect((await GET(request())).status).toBe(401);
+  });
+
+  it("returns external task, profile, appointment and archive changes while preserving daily snapshots", async () => {
+    const { GET } = await import("@/app/api/wall/snapshot/route");
+    const parent = await actor(); const kid = await child(parent);
+    const wall = await exchangePairingCode((await createPairingCode(parent, { kind: "wall", label: "Wall" })).code, origin);
+    cookieState.set("kidsdaily_device", wall.token);
+    const routine = await saveRecord(parent, "routines", { childId: kid.id, title: "Morgen", section: "morning", weekdays: [1,2,3,4,5,6,7], steps: [{ title: "Frühstück", icon: "sun", points: 5 }] });
+    const read = async () => (await (await GET(new Request(`${origin}/api/wall/snapshot`))).json()).plans;
+    const [first] = await read();
+    await completeTask(familyId, first.tasks[0].id);
+    await saveRecord(parent, "children", { name: "Mika", avatar: "M", buddyKind: "bear", buddyName: "Bruno" }, kid.id);
+    await saveRecord(parent, "appointments", { childId: kid.id, title: "Spielplatz", icon: "ball", startsAt: new Date(Date.now() + 60_000).toISOString() });
+    await saveRecord(parent, "routines", { childId: kid.id, title: "Neu", section: "morning", weekdays: [1,2,3,4,5,6,7], steps: [{ title: "Anderer Schritt", icon: "sun", points: 20 }] }, routine.id);
+    const [updated] = await read();
+    expect(updated.child).toMatchObject({ name: "Mika", buddyName: "Bruno", buddyKind: "bear" });
+    expect(updated.tasks[0]).toMatchObject({ id: first.tasks[0].id, title: "Frühstück", points: 5, completed: true });
+    expect(updated.balance).toBe(5);
+    expect(updated.appointments[0].title).toBe("Spielplatz");
+    await archiveRecord(parent, "children", kid.id);
+    expect(await read()).toEqual([]);
+  });
+});

@@ -298,3 +298,15 @@ progress::-moz-progress-bar { background: #efb832; border-radius: 20px; }
 .task-row.is-paused .task-words>span{color:#7d8b74}
 .task-row.is-paused .task-picture{opacity:.65}
 .done-badge:has(span){white-space:normal}.routine-heading>span{text-align:right}
+/* Small footer status stays clear of navigation and touch controls. */
+.wall-sync-status { display: flex; align-items: center; justify-content: flex-end; gap: 12px; justify-self: end; align-self: end; max-width: 100%; min-height: 44px; color: #fff; text-shadow: 0 1px 3px #000b; font-size: 12px; line-height: 1.4; text-align: right; }
+.wall-sync-status button { min-height: 44px; padding: 4px; border: 0; background: transparent; color: inherit; font-size: inherit; text-shadow: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.profile-screen > .wall-sync-status { align-self: flex-end; margin-top: auto; padding-top: 12px; }
+.center-page > .wall-sync-status { position: absolute; right: 16px; bottom: 12px; max-width: calc(100% - 32px); }
+.child-world:has(> .wall-sync-status) { grid-template-rows: auto minmax(0, 1fr) auto auto; }
+@media (max-width: 600px) { .wall-sync-status { flex-wrap: wrap; gap: 4px 12px; } }
+@media (min-width: 761px) and (orientation: landscape) {
+  .child-world:has(> .wall-sync-status) { grid-template-rows: auto minmax(0, 1fr) auto; padding-bottom: 52px; }
+  .child-world > .wall-sync-status { position: absolute; right: 8px; bottom: 8px; align-items: flex-end; }
+  .child-world > .wall-sync-status button { padding: 24px 0 0; }
+}

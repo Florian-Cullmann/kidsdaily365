@@ -13,7 +13,7 @@ Eine neue Pause darf frühestens am aktuellen Familientag beginnen. Die normale 
 - Manuell entfernte Schritte (`cancelledAt`) bleiben entfernt. Bestehende Tageskopien werden nicht aus einer inzwischen geänderten Vorlage rekonstruiert. Ist die Routine inzwischen archiviert oder der Wochentag entfernt, bleiben die bereits ausgesetzten Kopien auch nach Aufhebung ausgesetzt. Neue passende Tage folgen der dann gültigen Vorlage.
 - Vergangene Tage behalten ihren damaligen Zustand, auch wenn die Ausnahme später aufgehoben wird. Aufgehobene Ausnahmezeilen bleiben deshalb als Herkunftsnachweis gespeichert. Die Verwaltung zeigt nur noch aktuelle/künftige, nicht aufgehobene Ausnahmen.
 
-Die Terminberechnung verwendet ausschließlich Kalenderdaten der Familienzeitzone, keine Server- oder Browser-Tagesgrenzen. Ein bereits offener Kinderbildschirm erhält den Stand beim Neuladen. Ein Abschlussversuch aus einem veralteten Plan wird serverseitig abgelehnt und bietet das Neuladen an; diese Funktion führt keinen eigenen Synchronisationskanal ein.
+Die Terminberechnung verwendet ausschließlich Kalenderdaten der Familienzeitzone, keine Server- oder Browser-Tagesgrenzen. Ein bereits offener Kinderbildschirm erhält den Stand über die vorhandene Wandbildschirm-Synchronisierung (alle zehn Sekunden). Ein Abschlussversuch aus einem veralteten Plan wird serverseitig abgelehnt; diese Funktion führt keinen eigenen Synchronisationskanal ein.
 
 ## Konsistenz und Berechtigungen
 
@@ -21,7 +21,7 @@ Die Eltern-API ist auf Haushalt und Routine begrenzt; das Kind wird serverseitig
 
 Snapshot-Erstellung und Pausenänderungen sperren zuerst die Vorlage. Die Pause sperrt anschließend betroffene Tageszeilen in stabiler Reihenfolge und liest das Punktejournal **nach** dem Erwerb dieser Sperren. Der Abschluss sperrt dieselbe Tageszeile und prüft die Pausenmarkierung vor der Punktevergabe. So gilt bei gleichzeitigen Aktionen: Ein zuerst bestätigter Abschluss bleibt erhalten; eine zuerst angewendete Pause verhindert den Abschluss. Die bestehende eindeutige Tageskopie und Punktejournal-Constraint gelten weiterhin. Wiederholter Versand desselben Erstellauftrags erzeugt keine zweite Ausnahme; wiederholtes Aufheben verändert nichts erneut.
 
-Migration `0008_routine_pauses` ergänzt die Ausnahmen und eine getrennte Pausenreferenz an Tageskopien. Zusammengesetzte Fremdschlüssel sichern Haushalt, Kind und Routine zusätzlich auf Datenbankebene. Keine Schema-Pushes und keine Umdeutung bestehender manueller Entfernungen.
+Migration `0009_warm_sharon_carter` ergänzt die Ausnahmen und eine getrennte Pausenreferenz an Tageskopien. Zusammengesetzte Fremdschlüssel sichern Haushalt, Kind und Routine zusätzlich auf Datenbankebene. Keine Schema-Pushes und keine Umdeutung bestehender manueller Entfernungen.
 
 ## Prüfung
 
