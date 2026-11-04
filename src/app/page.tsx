@@ -14,5 +14,5 @@ export default async function Home() {
   if (await currentParent()) return <ExitParentMode />;
   const device = await currentWall();
   if (!device) return <PairDevice initialSetup={!await hasParents()} />;
-  return <Dashboard initialPlans={await getDayPlans(device.familyId)} demo={false} />;
+  return <Dashboard initialPlans={await getDayPlans(device.familyId)} demo={false} initialSyncedAt={new Date().toISOString()} />;
 }

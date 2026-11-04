@@ -558,3 +558,57 @@ describe("independent routine copies", () => {
     expect((await POST(new Request(`${origin}/api/parent/routines/${source.id}/copy`, { method: "POST", headers: { Origin: "https://foreign.example" } }), context)).status).toBe(403);
   });
 });
+
+describe("wall snapshot refresh", () => {
+  it("requires a wall session and isolates household profiles, including revoked and expired devices", async () => {
+    const { GET } = await import("@/app/api/wall/snapshot/route");
+    const parent = await actor(); const kid = await child(parent, "Mika");
+    const foreign = await child(await actor(otherFamilyId), "Foreign");
+    const request = (token?: string) => new Request(`${origin}/api/wall/snapshot?householdId=${otherFamilyId}`, { headers: token ? { authorization: `Bearer ${token}` } : {} });
+    const rejected = await GET(request());
+    expect(rejected.status).toBe(401);
+    expect(rejected.headers.get("cache-control")).toContain("no-store");
+    cookieState.set("kidsdaily_parent", await loginParent({ email: parent.email, password }));
+    expect((await GET(request())).status).toBe(401);
+    const phone = await exchangePairingCode((await createPairingCode(parent, { kind: "android", label: "Phone", childId: kid.id })).code, null);
+    expect((await GET(request(phone.token))).status).toBe(403);
+    cookieState.set("kidsdaily_device", phone.token);
+    expect((await GET(request())).status).toBe(401);
+    const wall = await exchangePairingCode((await createPairingCode(parent, { kind: "wall", label: "Wall" })).code, origin);
+    cookieState.set("kidsdaily_device", wall.token);
+    expect((await GET(request(phone.token))).status).toBe(403);
+    const response = await GET(request());
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    const snapshot = await response.json();
+    expect(snapshot.plans.map((plan: { child: { id: string } }) => plan.child.id)).toEqual([kid.id]);
+    expect(JSON.stringify(snapshot)).not.toContain(foreign.id);
+    expect(Number.isFinite(Date.parse(snapshot.syncedAt))).toBe(true);
+    await db().update(devices).set({ expiresAt: new Date(0) }).where(eq(devices.id, wall.id));
+    expect((await GET(request())).status).toBe(401);
+    await db().update(devices).set({ expiresAt: new Date(Date.now() + 60_000) }).where(eq(devices.id, wall.id));
+    await revokeDevice(parent, wall.id);
+    expect((await GET(request())).status).toBe(401);
+  });
+
+  it("returns external task, profile, appointment and archive changes while preserving daily snapshots", async () => {
+    const { GET } = await import("@/app/api/wall/snapshot/route");
+    const parent = await actor(); const kid = await child(parent);
+    const wall = await exchangePairingCode((await createPairingCode(parent, { kind: "wall", label: "Wall" })).code, origin);
+    cookieState.set("kidsdaily_device", wall.token);
+    const routine = await saveRecord(parent, "routines", { childId: kid.id, title: "Morgen", section: "morning", weekdays: [1,2,3,4,5,6,7], steps: [{ title: "Frühstück", icon: "sun", points: 5 }] });
+    const read = async () => (await (await GET(new Request(`${origin}/api/wall/snapshot`))).json()).plans;
+    const [first] = await read();
+    await completeTask(familyId, first.tasks[0].id);
+    await saveRecord(parent, "children", { name: "Mika", avatar: "M", buddyKind: "bear", buddyName: "Bruno" }, kid.id);
+    await saveRecord(parent, "appointments", { childId: kid.id, title: "Spielplatz", icon: "ball", startsAt: new Date(Date.now() + 60_000).toISOString() });
+    await saveRecord(parent, "routines", { childId: kid.id, title: "Neu", section: "morning", weekdays: [1,2,3,4,5,6,7], steps: [{ title: "Anderer Schritt", icon: "sun", points: 20 }] }, routine.id);
+    const [updated] = await read();
+    expect(updated.child).toMatchObject({ name: "Mika", buddyName: "Bruno", buddyKind: "bear" });
+    expect(updated.tasks[0]).toMatchObject({ id: first.tasks[0].id, title: "Frühstück", points: 5, completed: true });
+    expect(updated.balance).toBe(5);
+    expect(updated.appointments[0].title).toBe("Spielplatz");
+    await archiveRecord(parent, "children", kid.id);
+    expect(await read()).toEqual([]);
+  });
+});
