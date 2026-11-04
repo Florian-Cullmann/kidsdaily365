@@ -21,6 +21,20 @@ beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(instant); });
 afterEach(() => { controllers.splice(0).forEach((sync) => sync.stop()); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe("wall synchronization", () => {
+  it("shows a pending retry until it succeeds and ignores an aborted older request", async () => {
+    const old = deferred<Response>(); const retry = deferred<Response>();
+    const fetcher = vi.fn<typeof fetch>().mockReturnValueOnce(old.promise).mockReturnValueOnce(retry.promise);
+    const sync = create(fetcher); sync.start();
+    sync.offline();
+    expect(sync.getSnapshot()).toMatchObject({ phase: "offline", refreshing: false });
+    const pending = sync.refresh();
+    expect(sync.getSnapshot()).toMatchObject({ phase: "offline", refreshing: true });
+    old.resolve(snapshot()); await flush();
+    expect(sync.getSnapshot().refreshing).toBe(true);
+    retry.resolve(snapshot()); await pending;
+    expect(sync.getSnapshot()).toMatchObject({ phase: "connected", refreshing: false });
+  });
+
   it("polls profiles without a selection, coalesces requests and pauses reads while hidden", async () => {
     const first = deferred<Response>();
     const fetcher = vi.fn<typeof fetch>().mockReturnValueOnce(first.promise).mockResolvedValue(snapshot([]));
@@ -127,7 +141,7 @@ describe("wall synchronization", () => {
     }));
     const sync = create(fetcher); sync.start();
     await vi.advanceTimersByTimeAsync(5000);
-    expect(sync.getSnapshot().phase).toBe("offline");
+    expect(sync.getSnapshot()).toMatchObject({ phase: "offline", refreshing: false });
     void sync.refresh(); sync.stop(); await flush();
     expect((fetcher.mock.calls[1][1]?.signal as AbortSignal).aborted).toBe(true);
     await vi.advanceTimersByTimeAsync(30_000);

@@ -105,10 +105,15 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
 
   if (!demo && live.phase === "revoked") return <PairDevice revoked />;
 
-  const syncStatus = !demo && <div className={`wall-sync-status ${live.phase === "offline" ? "is-offline" : ""}`}>
-    <div><span role="status">{live.phase === "offline" ? "Verbindung unterbrochen · gespeicherter Stand" : live.dayChanged ? "Neuer Tag · Tagesplan wird geladen" : "Mit dem Server verbunden"}</span>
-    {live.syncedAt && <small>Letzter Abgleich: {new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: plans[0]?.timezone ?? "UTC" }).format(new Date(live.syncedAt))}</small>}</div>
-    {(live.phase === "offline" || live.dayChanged) && <button disabled={!!busy} onClick={() => void sync.refresh()}>Erneut versuchen</button>}
+  const syncTime = live.syncedAt ? new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
+    timeZone: plans[0]?.timezone ?? "UTC",
+  }).format(new Date(live.syncedAt)).replace(",", "") : null;
+  const retrying = live.refreshing && (live.phase === "offline" || !syncTime);
+  const syncStatus = !demo && <div className="wall-sync-status" aria-live="polite">
+    {live.phase === "offline" || retrying
+      ? <button disabled={!!busy || retrying} onClick={() => void sync.refresh()}>{retrying ? "Versuche Sync..." : "Sync fehlgeschlagen"}</button>
+      : <span>{syncTime ? `Letzter Sync: ${syncTime}` : "Versuche Sync..."}</span>}
   </div>;
 
   if (!plans.length) return <main className="center-page"><div className="setup-card"><h1>Hier ist Platz für eure Pläne.</h1><p>Noch kein Kinderprofil vorhanden. Bitte zuerst die Einrichtung auf dem Server abschließen.</p></div>{syncStatus}</main>;

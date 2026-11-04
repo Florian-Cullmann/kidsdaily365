@@ -4,6 +4,7 @@ export type WallState = {
   plans: DayPlan[];
   phase: "connected" | "offline" | "revoked";
   syncedAt: string | null;
+  refreshing: boolean;
   dayChanged: boolean;
   busyTaskId: string | null;
 };
@@ -24,7 +25,7 @@ export class WallSync {
   private ticks = 0;
 
   constructor(plans: DayPlan[], syncedAt: string | null, private fetcher: typeof fetch = (...args) => fetch(...args), private now = () => new Date()) {
-    this.state = { plans, syncedAt, phase: "connected", dayChanged: false, busyTaskId: null };
+    this.state = { plans, syncedAt, phase: "connected", refreshing: false, dayChanged: false, busyTaskId: null };
   }
 
   getSnapshot = () => this.state;
@@ -61,7 +62,7 @@ export class WallSync {
     this.write?.abort(); this.write = null;
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
-    if (this.state.busyTaskId) this.publish({ busyTaskId: null });
+    if (this.state.busyTaskId || this.state.refreshing) this.publish({ busyTaskId: null, refreshing: false });
   }
 
   private revoked() {
@@ -74,7 +75,7 @@ export class WallSync {
     this.read?.abort(); this.read = null;
     this.generation++;
     // Do not invalidate a write solely because the browser reports a network change.
-    this.publish({ phase: "offline" });
+    this.publish({ phase: "offline", refreshing: false });
     this.checkDay();
   };
 
@@ -85,6 +86,7 @@ export class WallSync {
     const generation = ++this.generation;
     const controller = new AbortController();
     this.read = controller;
+    this.publish({ refreshing: true });
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await this.fetcher("/api/wall/snapshot", { cache: "no-store", signal: controller.signal });
@@ -100,7 +102,10 @@ export class WallSync {
       if (this.active && generation === this.generation) this.publish({ phase: "offline" });
     } finally {
       clearTimeout(timeout);
-      if (this.read === controller) this.read = null;
+      if (this.read === controller) {
+        this.read = null;
+        this.publish({ refreshing: false });
+      }
     }
   };
 
@@ -115,7 +120,7 @@ export class WallSync {
     this.read?.abort(); this.read = null;
     const controller = new AbortController();
     this.write = controller;
-    this.publish({ busyTaskId: taskId });
+    this.publish({ busyTaskId: taskId, refreshing: false });
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await this.fetcher(`/api/tasks/${taskId}/complete`, { method: "POST", signal: controller.signal });
