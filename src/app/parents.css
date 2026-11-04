@@ -14,6 +14,7 @@
 .auth-form input, .parent-app input, .parent-app select, .parent-app textarea, .issued-code input {
   width: 100%; min-height: 49px; padding: 12px 14px; background: #fff; border: 1px solid #dcd3e7; border-radius: 11px; color: #3b2f4d; font-size: 16px; font-weight: 400;
 }
+.appointment-occurrence { margin-top: 18px; }
 .field-help { display: block; font-size: 13px; line-height: 1.6; color: #8a7c97; font-weight: 400; }
 .parent-primary, .parent-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 46px; border-radius: 11px; border: 1px solid transparent; padding: 11px 18px; font-size: 14px; font-weight: 700; }
 .parent-primary { background: #79619d; color: #fff; }
