@@ -1,0 +1,2103 @@
+{
+  "id": "7d65ade1-6166-46ec-af21-d88d6f7630d1",
+  "prevId": "3a1f941b-ba1c-4e48-a308-54588c1eda9f",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.allowed_apps": {
+      "name": "allowed_apps",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "familyId": {
+          "name": "familyId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "childId": {
+          "name": "childId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "packageName": {
+          "name": "packageName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "allowed_apps_familyId_families_id_fk": {
+          "name": "allowed_apps_familyId_families_id_fk",
+          "tableFrom": "allowed_apps",
+          "tableTo": "families",
+          "columnsFrom": [
+            "familyId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "allowed_apps_childId_familyId_children_id_familyId_fk": {
+          "name": "allowed_apps_childId_familyId_children_id_familyId_fk",
+          "tableFrom": "allowed_apps",
+          "tableTo": "children",
+          "columnsFrom": [
+            "childId",
+            "familyId"
+          ],
+          "columnsTo": [
+            "id",
+            "familyId"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "one_app_per_child": {
+          "name": "one_app_per_child",
+          "nullsNotDistinct": false,
+          "columns": [
+            "childId",
+            "packageName"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.appointments": {
+      "name": "appointments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "familyId": {
+          "name": "familyId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "childId": {
+          "name": "childId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "icon": {
+          "name": "icon",
+          "type": "appointment_icon",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'calendar'"
+        },
+        "startsAt": {
+          "name": "startsAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "endsAt": {
+          "name": "endsAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {
+        "appointments_child_time": {
+          "name": "appointments_child_time",
+          "columns": [
+            {
+              "expression": "familyId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "childId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "startsAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "appointments_familyId_families_id_fk": {
+          "name": "appointments_familyId_families_id_fk",
+          "tableFrom": "appointments",
+          "tableTo": "families",
+          "columnsFrom": [
+            "familyId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "appointments_childId_familyId_children_id_familyId_fk": {
+          "name": "appointments_childId_familyId_children_id_familyId_fk",
+          "tableFrom": "appointments",
+          "tableTo": "children",
+          "columnsFrom": [
+            "childId",
+            "familyId"
+          ],
+          "columnsTo": [
+            "id",
+            "familyId"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "appointment_end_after_start": {
+          "name": "appointment_end_after_start",
+          "value": "\"appointments\".\"endsAt\" is null or \"appointments\".\"endsAt\" > \"appointments\".\"startsAt\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.buddy_equipment": {
+      "name": "buddy_equipment",
+      "schema": "",
+      "columns": {
+        "familyId": {
+          "name": "familyId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "childId": {
+          "name": "childId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slot": {
+          "name": "slot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "accessoryId": {
+          "name": "accessoryId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "buddy_equipment_familyId_childId_accessoryId_buddy_ownership_familyId_childId_accessoryId_fk": {
+          "name": "buddy_equipment_familyId_childId_accessoryId_buddy_ownership_familyId_childId_accessoryId_fk",
+          "tableFrom": "buddy_equipment",
+          "tableTo": "buddy_ownership",
+          "columnsFrom": [
+            "familyId",
+            "childId",
+            "accessoryId"
+          ],
+          "columnsTo": [
+            "familyId",
+            "childId",
+            "accessoryId"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "buddy_equipped_slot": {
+          "name": "buddy_equipped_slot",
+          "nullsNotDistinct": false,
+          "columns": [
+            "familyId",
+            "childId",
+            "slot"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.buddy_ownership": {
+      "name": "buddy_ownership",
+      "schema": "",
+      "columns": {
+        "familyId": {
+          "name": "familyId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "childId": {
+          "name": "childId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "accessoryId": {
+          "name": "accessoryId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grantedAt": {
+          "name": "grantedAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "buddy_ownership_childId_familyId_children_id_familyId_fk": {
+          "name": "buddy_ownership_childId_familyId_children_id_familyId_fk",
+          "tableFrom": "buddy_ownership",
+          "tableTo": "children",
+          "columnsFrom": [
+            "childId",
+            "familyId"
+          ],
+          "columnsTo": [
+            "id",
+            "familyId"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "buddy_owned_identity": {
+          "name": "buddy_owned_identity",
+          "nullsNotDistinct": false,
+          "columns": [
+            "familyId",
+            "childId",
+            "accessoryId"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.child_images": {
+      "name": "child_images",
+      "schema": "",
+      "columns": {
+        "childId": {
+          "name": "childId",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "familyId": {
+          "name": "familyId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "data": {
+          "name": "data",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "child_images_childId_familyId_children_id_familyId_fk": {
+          "name": "child_images_childId_familyId_children_id_familyId_fk",
+          "tableFrom": "child_images",
+          "tableTo": "children",
+          "columnsFrom": [
+            "childId",
+            "familyId"
+          ],
+          "columnsTo": [
+            "id",
+            "familyId"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "profile_image_size": {
+          "name": "profile_image_size",
+          "value": "octet_length(\"child_images\".\"data\") between 1 and 1048576"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.child_messages": {
+      "name": "child_messages",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "familyId": {
+          "name": "familyId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "childId": {
+          "name": "childId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sender": {
+          "name": "sender",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "senderId": {
+          "name": "senderId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "requestId": {
+          "name": "requestId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "readAt": {
+          "name": "readAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "messages_conversation": {
+          "name": "messages_conversation",
+          "columns": [
+            {
+              "expression": "familyId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "childId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "createdAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "child_messages_childId_familyId_children_id_familyId_fk": {
+          "name": "child_messages_childId_familyId_children_id_familyId_fk",
+          "tableFrom": "child_messages",
+          "tableTo": "children",
+          "columnsFrom": [
+            "childId",
+            "familyId"
+          ],
+          "columnsTo": [
+            "id",
+            "familyId"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "message_request_identity": {
+          "name": "message_request_identity",
+          "nullsNotDistinct": false,
+          "columns": [
+            "familyId",
+            "childId",
+            "senderId",
+            "requestId"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "message_body_length": {
+          "name": "message_body_length",
+          "value": "length(\"child_messages\".\"body\") between 1 and 2000"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.children": {
+      "name": "children",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "familyId": {
+          "name": "familyId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "avatar": {
+          "name": "avatar",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reducedMotion": {
+          "name": "reducedMotion",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "buddyKind": {
+          "name": "buddyKind",
+          "type": "buddy_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'fox'"
+        },
+        "buddyName": {
+          "name": "buddyName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Fino'"
+        },
+        "buddyInitialized": {
+          "name": "buddyInitialized",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "children_familyId_families_id_fk": {
+          "name": "children_familyId_families_id_fk",
+          "tableFrom": "children",
+          "tableTo": "families",
+          "columnsFrom": [
+            "familyId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "children_family_identity": {
+          "name": "children_family_identity",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "familyId"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.daily_tasks": {
+      "name": "daily_tasks",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "familyId": {
+          "name": "familyId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "childId": {
+          "name": "childId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "templateId": {
+          "name": "templateId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stepIndex": {
+          "name": "stepIndex",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "routineTitle": {
+          "name": "routineTitle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "date": {
+          "name": "date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "icon": {
+          "name": "icon",
+          "type": "task_icon",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'heart'"
+        },
+        "section": {
+          "name": "section",
+          "type": "day_section",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scheduledTime": {
+          "name": "scheduledTime",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "points": {
+          "name": "points",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sortOrder": {
+          "name": "sortOrder",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "cancelledAt": {
+          "name": "cancelledAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "tasks_day_lookup": {
+          "name": "tasks_day_lookup",
+          "columns": [
+            {
+              "expression": "familyId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "childId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "daily_tasks_familyId_families_id_fk": {
+          "name": "daily_tasks_familyId_families_id_fk",
+          "tableFrom": "daily_tasks",
+          "tableTo": "families",
+          "columnsFrom": [
+            "familyId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "daily_tasks_childId_familyId_children_id_familyId_fk": {
+          "name": "daily_tasks_childId_familyId_children_id_familyId_fk",
+          "tableFrom": "daily_tasks",
+          "tableTo": "children",
+          "columnsFrom": [
+            "childId",
+            "familyId"
+          ],
+          "columnsTo": [
+            "id",
+            "familyId"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "daily_tasks_templateId_childId_familyId_task_templates_id_childId_familyId_fk": {
+          "name": "daily_tasks_templateId_childId_familyId_task_templates_id_childId_familyId_fk",
+          "tableFrom": "daily_tasks",
+          "tableTo": "task_templates",
+          "columnsFrom": [
+            "templateId",
+            "childId",
+            "familyId"
+          ],
+          "columnsTo": [
+            "id",
+            "childId",
+            "familyId"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "tasks_child_family_identity": {
+          "name": "tasks_child_family_identity",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "childId",
+            "familyId"
+          ]
+        },
+        "one_template_per_day": {
+          "name": "one_template_per_day",
+          "nullsNotDistinct": false,
+          "columns": [
+            "templateId",
+            "date",
+            "stepIndex"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "task_points_range": {
+          "name": "task_points_range",
+          "value": "\"daily_tasks\".\"points\" between 0 and 1000"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.device_maintenance_codes": {
+      "name": "device_maintenance_codes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "familyId": {
+          "name": "familyId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deviceId": {
+          "name": "deviceId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "codeHash": {
+          "name": "codeHash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usedAt": {
+          "name": "usedAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "device_maintenance_codes_familyId_families_id_fk": {
+          "name": "device_maintenance_codes_familyId_families_id_fk",
+          "tableFrom": "device_maintenance_codes",
+          "tableTo": "families",
+          "columnsFrom": [
+            "familyId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "device_maintenance_codes_deviceId_familyId_devices_id_familyId_fk": {
+          "name": "device_maintenance_codes_deviceId_familyId_devices_id_familyId_fk",
+          "tableFrom": "device_maintenance_codes",
+          "tableTo": "devices",
+          "columnsFrom": [
+            "deviceId",
+            "familyId"
+          ],
+          "columnsTo": [
+            "id",
+            "familyId"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "device_maintenance_codes_codeHash_unique": {
+          "name": "device_maintenance_codes_codeHash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "codeHash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.device_management": {
+      "name": "device_management",
+      "schema": "",
+      "columns": {
+        "deviceId": {
+          "name": "deviceId",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "familyId": {
+          "name": "familyId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "childId": {
+          "name": "childId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "enrollmentHash": {
+          "name": "enrollmentHash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enrollmentExpiresAt": {
+          "name": "enrollmentExpiresAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tokenHash": {
+          "name": "tokenHash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "locked": {
+          "name": "locked",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "acknowledgedRevision": {
+          "name": "acknowledgedRevision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": -1
+        },
+        "appliedLocked": {
+          "name": "appliedLocked",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lastSeenAt": {
+          "name": "lastSeenAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ready": {
+          "name": "ready",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "usagePermission": {
+          "name": "usagePermission",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "usageSince": {
+          "name": "usageSince",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "usageThrough": {
+          "name": "usageThrough",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "device_management_deviceId_familyId_devices_id_familyId_fk": {
+          "name": "device_management_deviceId_familyId_devices_id_familyId_fk",
+          "tableFrom": "device_management",
+          "tableTo": "devices",
+          "columnsFrom": [
+            "deviceId",
+            "familyId"
+          ],
+          "columnsTo": [
+            "id",
+            "familyId"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "device_management_childId_familyId_children_id_familyId_fk": {
+          "name": "device_management_childId_familyId_children_id_familyId_fk",
+          "tableFrom": "device_management",
+          "tableTo": "children",
+          "columnsFrom": [
+            "childId",
+            "familyId"
+          ],
+          "columnsTo": [
+            "id",
+            "familyId"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "device_management_tokenHash_unique": {
+          "name": "device_management_tokenHash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "tokenHash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.device_pairing_codes": {
+      "name": "device_pairing_codes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "familyId": {
+          "name": "familyId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "childId": {
+          "name": "childId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "device_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "codeHash": {
+          "name": "codeHash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usedAt": {
+          "name": "usedAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "device_pairing_codes_familyId_families_id_fk": {
+          "name": "device_pairing_codes_familyId_families_id_fk",
+          "tableFrom": "device_pairing_codes",
+          "tableTo": "families",
+          "columnsFrom": [
+            "familyId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "device_pairing_codes_childId_familyId_children_id_familyId_fk": {
+          "name": "device_pairing_codes_childId_familyId_children_id_familyId_fk",
+          "tableFrom": "device_pairing_codes",
+          "tableTo": "children",
+          "columnsFrom": [
+            "childId",
+            "familyId"
+          ],
+          "columnsTo": [
+            "id",
+            "familyId"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "device_pairing_codes_codeHash_unique": {
+          "name": "device_pairing_codes_codeHash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "codeHash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "pair_code_child_scope": {
+          "name": "pair_code_child_scope",
+          "value": "(\"device_pairing_codes\".\"kind\" = 'android' and \"device_pairing_codes\".\"childId\" is not null) or (\"device_pairing_codes\".\"kind\" = 'wall' and \"device_pairing_codes\".\"childId\" is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.device_usage_events": {
+      "name": "device_usage_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "deviceId": {
+          "name": "deviceId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "familyId": {
+          "name": "familyId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "eventKey": {
+          "name": "eventKey",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "at": {
+          "name": "at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "packageName": {
+          "name": "packageName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "usage_device_time": {
+          "name": "usage_device_time",
+          "columns": [
+            {
+              "expression": "familyId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "deviceId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "device_usage_events_deviceId_familyId_devices_id_familyId_fk": {
+          "name": "device_usage_events_deviceId_familyId_devices_id_familyId_fk",
+          "tableFrom": "device_usage_events",
+          "tableTo": "devices",
+          "columnsFrom": [
+            "deviceId",
+            "familyId"
+          ],
+          "columnsTo": [
+            "id",
+            "familyId"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "usage_device_event": {
+          "name": "usage_device_event",
+          "nullsNotDistinct": false,
+          "columns": [
+            "deviceId",
+            "eventKey"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.devices": {
+      "name": "devices",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "familyId": {
+          "name": "familyId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "childId": {
+          "name": "childId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "device_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tokenHash": {
+          "name": "tokenHash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "buddySetupTokenHash": {
+          "name": "buddySetupTokenHash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revokedAt": {
+          "name": "revokedAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "devices_familyId_families_id_fk": {
+          "name": "devices_familyId_families_id_fk",
+          "tableFrom": "devices",
+          "tableTo": "families",
+          "columnsFrom": [
+            "familyId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "devices_childId_familyId_children_id_familyId_fk": {
+          "name": "devices_childId_familyId_children_id_familyId_fk",
+          "tableFrom": "devices",
+          "tableTo": "children",
+          "columnsFrom": [
+            "childId",
+            "familyId"
+          ],
+          "columnsTo": [
+            "id",
+            "familyId"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "devices_tokenHash_unique": {
+          "name": "devices_tokenHash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "tokenHash"
+          ]
+        },
+        "devices_buddySetupTokenHash_unique": {
+          "name": "devices_buddySetupTokenHash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "buddySetupTokenHash"
+          ]
+        },
+        "device_family_identity": {
+          "name": "device_family_identity",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "familyId"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "device_child_scope": {
+          "name": "device_child_scope",
+          "value": "(\"devices\".\"kind\" = 'android' and \"devices\".\"childId\" is not null) or (\"devices\".\"kind\" = 'wall' and \"devices\".\"childId\" is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.families": {
+      "name": "families",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Europe/Berlin'"
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.parent_invitations": {
+      "name": "parent_invitations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "familyId": {
+          "name": "familyId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tokenHash": {
+          "name": "tokenHash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usedAt": {
+          "name": "usedAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "parent_invitations_familyId_families_id_fk": {
+          "name": "parent_invitations_familyId_families_id_fk",
+          "tableFrom": "parent_invitations",
+          "tableTo": "families",
+          "columnsFrom": [
+            "familyId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "parent_invitations_tokenHash_unique": {
+          "name": "parent_invitations_tokenHash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "tokenHash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.parent_sessions": {
+      "name": "parent_sessions",
+      "schema": "",
+      "columns": {
+        "tokenHash": {
+          "name": "tokenHash",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "parentId": {
+          "name": "parentId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "session_parent_lookup": {
+          "name": "session_parent_lookup",
+          "columns": [
+            {
+              "expression": "parentId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "parent_sessions_parentId_parents_id_fk": {
+          "name": "parent_sessions_parentId_parents_id_fk",
+          "tableFrom": "parent_sessions",
+          "tableTo": "parents",
+          "columnsFrom": [
+            "parentId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.parents": {
+      "name": "parents",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "familyId": {
+          "name": "familyId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "passwordHash": {
+          "name": "passwordHash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "parents_familyId_families_id_fk": {
+          "name": "parents_familyId_families_id_fk",
+          "tableFrom": "parents",
+          "tableTo": "families",
+          "columnsFrom": [
+            "familyId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "parents_email_unique": {
+          "name": "parents_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        },
+        "parent_family_identity": {
+          "name": "parent_family_identity",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "familyId"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.point_entries": {
+      "name": "point_entries",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "familyId": {
+          "name": "familyId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "childId": {
+          "name": "childId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "taskId": {
+          "name": "taskId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "points_child_lookup": {
+          "name": "points_child_lookup",
+          "columns": [
+            {
+              "expression": "familyId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "childId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "point_entries_familyId_families_id_fk": {
+          "name": "point_entries_familyId_families_id_fk",
+          "tableFrom": "point_entries",
+          "tableTo": "families",
+          "columnsFrom": [
+            "familyId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "point_entries_taskId_childId_familyId_daily_tasks_id_childId_familyId_fk": {
+          "name": "point_entries_taskId_childId_familyId_daily_tasks_id_childId_familyId_fk",
+          "tableFrom": "point_entries",
+          "tableTo": "daily_tasks",
+          "columnsFrom": [
+            "taskId",
+            "childId",
+            "familyId"
+          ],
+          "columnsTo": [
+            "id",
+            "childId",
+            "familyId"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "point_entries_taskId_unique": {
+          "name": "point_entries_taskId_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "taskId"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "earned_points_range": {
+          "name": "earned_points_range",
+          "value": "\"point_entries\".\"amount\" between 0 and 1000"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.rewards": {
+      "name": "rewards",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "familyId": {
+          "name": "familyId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cost": {
+          "name": "cost",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "rewards_familyId_families_id_fk": {
+          "name": "rewards_familyId_families_id_fk",
+          "tableFrom": "rewards",
+          "tableTo": "families",
+          "columnsFrom": [
+            "familyId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "reward_cost_positive": {
+          "name": "reward_cost_positive",
+          "value": "\"rewards\".\"cost\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.task_templates": {
+      "name": "task_templates",
+      "schema": "",
+      "columns": {
+        "steps": {
+          "name": "steps",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "copyRequestId": {
+          "name": "copyRequestId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "copyFingerprint": {
+          "name": "copyFingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "familyId": {
+          "name": "familyId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "childId": {
+          "name": "childId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "icon": {
+          "name": "icon",
+          "type": "task_icon",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'heart'"
+        },
+        "section": {
+          "name": "section",
+          "type": "day_section",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scheduledTime": {
+          "name": "scheduledTime",
+          "type": "time",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "points": {
+          "name": "points",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 5
+        },
+        "sortOrder": {
+          "name": "sortOrder",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "weekdays": {
+          "name": "weekdays",
+          "type": "integer[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "ARRAY[1,2,3,4,5,6,7]::integer[]"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "task_templates_familyId_families_id_fk": {
+          "name": "task_templates_familyId_families_id_fk",
+          "tableFrom": "task_templates",
+          "tableTo": "families",
+          "columnsFrom": [
+            "familyId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "task_templates_childId_familyId_children_id_familyId_fk": {
+          "name": "task_templates_childId_familyId_children_id_familyId_fk",
+          "tableFrom": "task_templates",
+          "tableTo": "children",
+          "columnsFrom": [
+            "childId",
+            "familyId"
+          ],
+          "columnsTo": [
+            "id",
+            "familyId"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "templates_copy_request": {
+          "name": "templates_copy_request",
+          "nullsNotDistinct": false,
+          "columns": [
+            "familyId",
+            "copyRequestId"
+          ]
+        },
+        "templates_child_family_identity": {
+          "name": "templates_child_family_identity",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "childId",
+            "familyId"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "template_points_range": {
+          "name": "template_points_range",
+          "value": "\"task_templates\".\"points\" between 0 and 1000"
+        },
+        "template_valid_weekdays": {
+          "name": "template_valid_weekdays",
+          "value": "cardinality(\"task_templates\".\"weekdays\") between 1 and 7 and \"task_templates\".\"weekdays\" <@ ARRAY[1,2,3,4,5,6,7]::integer[]"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.appointment_icon": {
+      "name": "appointment_icon",
+      "schema": "public",
+      "values": [
+        "calendar",
+        "tooth",
+        "ball",
+        "heart"
+      ]
+    },
+    "public.buddy_kind": {
+      "name": "buddy_kind",
+      "schema": "public",
+      "values": [
+        "fox",
+        "rabbit",
+        "bear"
+      ]
+    },
+    "public.day_section": {
+      "name": "day_section",
+      "schema": "public",
+      "values": [
+        "morning",
+        "afternoon",
+        "evening"
+      ]
+    },
+    "public.device_kind": {
+      "name": "device_kind",
+      "schema": "public",
+      "values": [
+        "wall",
+        "android"
+      ]
+    },
+    "public.task_icon": {
+      "name": "task_icon",
+      "schema": "public",
+      "values": [
+        "sun",
+        "toothbrush",
+        "backpack",
+        "book",
+        "moon",
+        "heart"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

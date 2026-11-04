@@ -8,6 +8,7 @@ import type { ManagementData } from "@/server/management";
 import type { Resource } from "@/domain/management";
 import { ParentRecordForm, type EditableRecord, type RecordDraft } from "./parent-record-form";
 import { UnsavedRecordDialog } from "./unsaved-record-dialog";
+import { RoutinePauses } from "./routine-pauses";
 import { BuddyWardrobe } from "./buddy-wardrobe";
 import { ProfilePicture } from "./profile-picture";
 import { ProfileImageEditor } from "./profile-image-editor";
@@ -72,10 +73,14 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
     setLeaveAction(null);
     setFormOpen(false);
     setEditing(null);
+    setCopySource(null);
   }
   const [data, setData] = useState(initialData);
   const [tab, setTab] = useState<Tab>(initialTab);
   const [formVersion, setFormVersion] = useState(0);
+  const [pauseRoutineId, setPauseRoutineId] = useState<string | null>(null);
+  const pauseRoutine = data.routines.find(routine => routine.id === pauseRoutineId);
+  const [copySource, setCopySource] = useState<{ id: string; childName: string; requestId: string } | null>(null);
   const [editing, setEditing] = useState<EditableRecord | null>(null);
   const [buddyChildId, setBuddyChildId] = useState<string | null>(null);
   const buddyChild = data.children.find((child) => child.id === buddyChildId && child.active);
@@ -91,9 +96,23 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
   const activeChildren = data.children.filter((child) => child.active).length;
   const isResource = !["overview", "devices", "account"].includes(tab);
 
-  function navigate(id: Tab) { setBuddyChildId(null); setImageChildId(null); setTab(id); setFormOpen(false); setEditing(null); setError(""); setNotice(""); setIssuedCode(null); }
+  function navigate(id: Tab) { setCopySource(null); setPauseRoutineId(null); setBuddyChildId(null); setImageChildId(null); setTab(id); setFormOpen(false); setEditing(null); setError(""); setNotice(""); setIssuedCode(null); }
   function createRecord(resource: Resource) {
     leave(() => { navigate(resource); setEditing(null); setFormOpen(true); });
+  }
+  function copyRecord(record: EditableRecord) {
+    leave(() => {
+      setPauseRoutineId(null);
+      // getRandomValues also works on a household LAN served over HTTP.
+      const bytes = crypto.getRandomValues(new Uint8Array(16));
+      bytes[6] = (bytes[6] & 15) | 64;
+      bytes[8] = (bytes[8] & 63) | 128;
+      const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+      const requestId = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+      setCopySource({ id: record.id, childName: childName(record.childId), requestId });
+      setEditing({ ...record, childId: data.children.find((child) => child.active && child.id !== record.childId)?.id ?? data.children.find((child) => child.active)?.id, active: true });
+      setFormOpen(true); setError(""); setNotice("");
+    });
   }
   async function action(run: () => Promise<void>) {
     if (pending.current) return;
@@ -109,7 +128,8 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
   async function refresh() { setData(await request("/api/parent/data")); }
   async function save(input: unknown) {
     await action(async () => {
-      await request(`/api/parent/records/${tab}${editing ? `/${editing.id}` : ""}`, editing ? "PUT" : "POST", input);
+      if (copySource) await request(`/api/parent/routines/${copySource.id}/copy`, "POST", { requestId: copySource.requestId, routine: input });
+      else await request(`/api/parent/records/${tab}${editing ? `/${editing.id}` : ""}`, editing ? "PUT" : "POST", input);
       clearDraft(); setNotice("Gespeichert.");
       await refresh();
     });
@@ -142,7 +162,7 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
   const childName = (id: unknown) => data.children.find((child) => child.id === id)?.name ?? "";
   return <div className="parent-app">
     <aside className="parent-sidebar"><Link onNavigate={(event) => { event.preventDefault(); leave(() => router.push("/")); }} href="/" className="brand"><span className="brand-mark"><House size={24} /></span><span>kidsdaily<span className="brand-number">365</span></span></Link><span className="parent-sidebar-caption">ELTERNBEREICH</span>
-      <nav aria-label="Elternverwaltung">{tabs.map((item) => <button key={item.id} disabled={busy} className={tab === item.id ? "active" : ""} aria-current={tab === item.id ? "page" : undefined} onClick={() => leave(() => navigate(item.id))}><item.icon size={20} /><span>{item.label}</span></button>)}</nav>
+      <nav aria-label="Elternverwaltung"><Link onNavigate={(event) => { event.preventDefault(); leave(() => router.push("/eltern/verlauf")); }} className="parent-secondary" href="/eltern/verlauf">Tagesverlauf & Sterne</Link><Link onNavigate={(event) => { event.preventDefault(); leave(() => router.push("/eltern/woche")); }} href="/eltern/woche"><CalendarDays size={20} /><span>Wochenvorschau</span></Link>{tabs.map((item) => <button key={item.id} disabled={busy} className={tab === item.id ? "active" : ""} aria-current={tab === item.id ? "page" : undefined} onClick={() => leave(() => navigate(item.id))}><item.icon size={20} /><span>{item.label}</span></button>)}</nav>
       <div className="parent-sidebar-bottom"><Link onNavigate={(event) => { event.preventDefault(); leave(() => router.push("/")); }} href="/">Zum Kinderbildschirm</Link><button disabled={busy} onClick={() => action(async () => { await request("/api/auth/logout", "POST"); clearDraft(); router.replace("/login"); router.refresh(); })}><LogOut size={18} /> Abmelden</button></div>
     </aside>
     <main className="parent-main"><header className="parent-topbar"><span>{data.family.name}</span><span><ShieldCheck size={17} /> Angemeldet als {parent.name}</span></header>
@@ -163,16 +183,21 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
       </>}
 
       {isResource && <>
-        {tab === "routines" && <div className="parent-callout">Routinen werden an den gewählten Wochentagen in den Tagesplan übernommen. Änderungen gelten für noch nicht angelegte Tagespläne. Bestehende Aufgaben kannst du unter Einzelaufgaben bearbeiten.</div>}
+        {tab === "routines" && <div className="parent-callout">Änderungen gelten für neue Tagespläne. Pausen sind für einzelne Tage oder Ferien möglich. Bestehende Aufgaben bearbeitest du unter Einzelaufgaben.</div>}
         {tab === "apps" && <div className="parent-callout">Diese Liste legt die erlaubten Apps je Kind fest. Die echte Sperre auf dem Handy benötigt später den verwalteten Android-Launcher. Ein normaler Startbildschirm allein schützt das Gerät nicht.</div>}
         {tab === "rewards" && <div className="parent-callout">Das Einlösen von Wünschen und der Kauf von Buddy-Accessoires sind noch nicht verfügbar. Hier werden keine Sterne abgezogen.</div>}
+        {tab === "routines" && pauseRoutine && <RoutinePauses key={pauseRoutine.id} routine={pauseRoutine} childName={childName(pauseRoutine.childId)} today={data.today} timezone={data.family.timezone} pauses={data.pauses.filter(pause => pause.routineId === pauseRoutine.id)} busy={busy} onClose={() => setPauseRoutineId(null)} onCreate={input => action(async () => {
+          await request(`/api/parent/routines/${pauseRoutine.id}/pauses`, "POST", input); await refresh(); setNotice("Pause gespeichert. Erledigte Schritte und Sterne bleiben erhalten.");
+        })} onRevoke={id => action(async () => {
+          await request(`/api/parent/routines/${pauseRoutine.id}/pauses/${id}`, "DELETE"); await refresh(); setNotice("Pause aufgehoben. Andere Pausen und manuell entfernte Aufgaben bleiben erhalten.");
+        })} />}
         {buddyChild && <BuddyWardrobe child={buddyChild} busy={busy} onClose={() => setBuddyChildId(null)} onAction={(accessoryId, command) => action(async () => { await request(`/api/parent/children/${buddyChild.id}/buddy`, "POST", { accessoryId, action: command }); await refresh(); setNotice("Buddy-Ausstattung gespeichert."); })} />}
         {imageChild && <ProfileImageEditor key={imageChild.id} child={imageChild} onCancel={() => setImageChildId(null)} onDone={async () => { await refresh(); setImageChildId(null); setNotice("Profilbild aktualisiert."); }} />}
-        {formOpen && <ParentRecordForm key={`${tab}-${editing?.id ?? "new"}-${formVersion}`} resource={tab as Resource} data={data} record={editing} busy={busy} draftRef={draftRef} onSave={save} onCancel={() => leave(clearDraft)} />}
+        {formOpen && <ParentRecordForm key={`${tab}-${copySource?.requestId ?? editing?.id ?? "new"}-${formVersion}`} copySource={copySource?.childName} resource={tab as Resource} data={data} record={editing} busy={busy} draftRef={draftRef} onSave={save} onCancel={() => leave(clearDraft)} />}
         <div className="parent-records">{(data[tab as Resource] as unknown as EditableRecord[]).map((record) => <article key={record.id} className={`parent-record ${record.active === false ? "is-archived" : ""}`}>
           {tab === "children" && <div className="record-buddy"><ProfilePicture imageUrl={record.imageUrl as string | null} buddyKind={record.buddyKind as "fox" | "rabbit" | "bear"} equipped={record.equippedAccessories as string[]} /></div>}
-          <div className="record-description"><h3>{String(record.name ?? record.title ?? record.label)}</h3><p>{tab === "children" ? (record.buddyInitialized === false ? "Buddy wählt das Kind auf Android" : `Buddy: ${record.buddyName}`) : tab === "apps" ? `${childName(record.childId)} · ${record.packageName}` : tab === "appointments" ? `${childName(record.childId)} · ${new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short", timeZone: data.family.timezone }).format(new Date(String(record.startsAt)))}` : tab === "routines" ? `${childName(record.childId)} · ${(record.steps as unknown[]).length} Schritte` : tab === "rewards" ? `${record.cost} Sterne` : `${childName(record.childId)} · ${record.points} Sterne${tab === "tasks" ? ` · ${record.date}` : ""}`}</p>{record.active === false && <span className="archive-label">Archiviert</span>}{record.completed === true && <span className="archive-label">Erledigt · Verlauf geschützt</span>}</div>
-          <div className="record-actions">{tab === "children" && record.active !== false && <button disabled={busy} onClick={() => leave(() => { setBuddyChildId(record.id); setImageChildId(null); setFormOpen(false); setError(""); })}>Ausstattung</button>}{tab === "children" && record.active !== false && <button disabled={busy} onClick={() => leave(() => { setBuddyChildId(null); setImageChildId(record.id); setFormOpen(false); setError(""); })}>Profilbild</button>}<button disabled={busy || record.completed === true} onClick={() => leave(() => { setBuddyChildId(null); setImageChildId(null); setEditing(record); setFormOpen(true); setError(""); })}>Bearbeiten</button>{record.active !== false && record.completed !== true && <button className="quiet-danger" disabled={busy} onClick={() => archive(record)}>{tab === "tasks" ? "Aus Plan nehmen" : "Archivieren"}</button>}</div>
+          <div className="record-description"><h3>{String(record.name ?? record.title ?? record.label)}</h3><p>{tab === "children" ? (record.buddyInitialized === false ? "Buddy wählt das Kind auf Android" : `Buddy: ${record.buddyName}`) : tab === "apps" ? `${childName(record.childId)} · ${record.packageName}` : tab === "appointments" ? `${childName(record.childId)} · ${new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short", timeZone: data.family.timezone }).format(new Date(String(record.startsAt)))}` : tab === "routines" ? `${childName(record.childId)} · ${(record.steps as unknown[]).length} Schritte` : tab === "rewards" ? `${record.cost} Sterne` : `${childName(record.childId)} · ${record.points} Sterne${tab === "tasks" ? ` · ${record.date}` : ""}`}</p>{record.active === false && <span className="archive-label">Archiviert</span>}{tab === "routines" && data.pauses.some(pause => pause.routineId === record.id) && <span className="routine-pause-badge">{data.pauses.some(pause => pause.routineId === record.id && pause.startsOn <= data.today) ? "Heute pausiert" : "Pause geplant"}</span>}{tab === "tasks" && !!record.pausedBy && record.completed !== true && <span className="routine-pause-badge">Ausgesetzt · Routine-Pause</span>}{record.completed === true && <span className="archive-label">Erledigt · Verlauf geschützt</span>}</div>
+          <div className="record-actions">{tab === "routines" && <button disabled={busy} onClick={() => leave(() => { setPauseRoutineId(record.id); setFormOpen(false); setError(""); setNotice(""); })}>Pausen verwalten</button>}{tab === "routines" && <button disabled={busy || !activeChildren} onClick={() => copyRecord(record)}>Routine kopieren</button>}{tab === "children" && record.active !== false && <button disabled={busy} onClick={() => leave(() => { setBuddyChildId(record.id); setImageChildId(null); setFormOpen(false); setError(""); })}>Ausstattung</button>}{tab === "children" && record.active !== false && <button disabled={busy} onClick={() => leave(() => { setBuddyChildId(null); setImageChildId(record.id); setFormOpen(false); setError(""); })}>Profilbild</button>}<button disabled={busy || record.completed === true} onClick={() => leave(() => { setBuddyChildId(null); setImageChildId(null); setCopySource(null); setEditing(record); setFormOpen(true); setError(""); })}>Bearbeiten</button>{record.active !== false && record.completed !== true && <button className="quiet-danger" disabled={busy} onClick={() => archive(record)}>{tab === "tasks" ? "Aus Plan nehmen" : "Archivieren"}</button>}</div>
         </article>)}{!formOpen && !data[tab as Resource].length && <div className="parent-empty"><selected.icon size={35} /><h3>{emptyMessages[tab as Resource]}</h3></div>}</div>
       </>}
 

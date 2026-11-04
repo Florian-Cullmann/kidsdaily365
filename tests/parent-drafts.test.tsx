@@ -12,7 +12,7 @@ const data = {
   family: { name: "Testfamilie", timezone: "Europe/Berlin" }, today: "2026-11-04",
   children: [{ id: "child", name: "Mika", avatar: "M", active: true, buddyInitialized: false, equippedAccessories: [], ownedAccessories: [] }],
   routines: ["Morgen", "Abend"].map((title, index) => ({ id: `routine-${index}`, title, childId: "child", active: true, weekdays: [1, 2, 3, 4, 5], section: "morning", sortOrder: 0, steps: [{ title: "Zähne putzen", description: "", icon: "toothbrush", points: 5 }, { title: "Rucksack packen", description: "", icon: "backpack", points: 3 }] })),
-  tasks: [], appointments: [], rewards: [], apps: [], devices: [], parents: [],
+  pauses: [], tasks: [], appointments: [], rewards: [], apps: [], devices: [], parents: [],
 } as unknown as ManagementData;
 
 beforeAll(() => {
@@ -47,12 +47,28 @@ describe("Elternentwürfe", () => {
   });
   it("protects cancel, new records, other records and the home link", () => {
     mount(); edit(); changeTitle();
-    for (const click of [() => fireEvent.click(screen.getByRole("button", { name: "Abbrechen" })), () => fireEvent.click(screen.getByRole("button", { name: "Neu anlegen" })), () => fireEvent.click(screen.getAllByRole("button", { name: "Bearbeiten" })[1]), () => fireEvent.click(screen.getByText("Zum Kinderbildschirm"))]) {
+    for (const click of [() => fireEvent.click(screen.getAllByRole("button", { name: "Routine kopieren" })[0]), () => fireEvent.click(screen.getAllByRole("button", { name: "Pausen verwalten" })[0]), () => fireEvent.click(screen.getByRole("button", { name: "Abbrechen" })), () => fireEvent.click(screen.getByRole("button", { name: "Neu anlegen" })), () => fireEvent.click(screen.getAllByRole("button", { name: "Bearbeiten" })[1]), () => fireEvent.click(screen.getByText("Zum Kinderbildschirm"))]) {
       click(); expect(screen.getByRole("dialog")).toBeTruthy(); fireEvent(screen.getByRole("dialog"), new Event("cancel", { cancelable: true }));
       expect((screen.getByLabelText("Bezeichnung") as HTMLInputElement).value).toBe("Neuer Morgen");
     }
     fireEvent.click(screen.getByRole("button", { name: "Neu anlegen" })); discard();
     expect((screen.getByLabelText("Bezeichnung") as HTMLInputElement).value).toBe(""); expect(unload()).toBe(false);
+  });
+  it("protects copy drafts and clears them after a confirmed copy even if refresh fails", async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(Response.json({})).mockRejectedValueOnce(new TypeError("offline"));
+    vi.stubGlobal("fetch", fetch);
+    mount(); edit(); changeTitle();
+    fireEvent.click(screen.getAllByRole("button", { name: "Routine kopieren" })[0]); discard();
+    expect((screen.getByLabelText("Bezeichnung") as HTMLInputElement).value).toBe("Morgen");
+    expect(unload()).toBe(false);
+    changeTitle(); navigate();
+    fireEvent.click(screen.getByRole("button", { name: "Weiter bearbeiten" }));
+    expect(unload()).toBe(true);
+    fireEvent.submit(screen.getByLabelText("Bezeichnung").closest("form")!);
+    await waitFor(() => expect(screen.queryByLabelText("Bezeichnung")).toBeNull());
+    expect(fetch.mock.calls[0][0]).toBe("/api/parent/routines/routine-0/copy");
+    expect(fetch.mock.calls[0][1].method).toBe("POST");
+    expect(unload()).toBe(false);
   });
   it("tracks step edits, order and add/remove, including complete restoration", () => {
     mount(); edit();
