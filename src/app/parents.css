@@ -185,8 +185,14 @@
 .wardrobe-star { font-size: 50px; color: #bf861f; }
 .wardrobe-accessory h3 { margin: 8px 0; }
 
-.parent-child-filter { display:flex; flex-wrap:wrap; align-items:end; gap:16px; padding:20px; margin-bottom:20px; border:1px solid var(--parent-border, #dce5dc); border-radius:16px; background:#fff; }
-.parent-child-filter label { display:grid; gap:8px; font-weight:600; min-width:220px; }
-.parent-child-filter select { min-height:48px; max-width:100%; padding:10px 14px; border:1px solid #aebfad; border-radius:10px; font:inherit; background:white; color:inherit; }
-.parent-child-filter p { flex:1; margin:0; align-self:center; }
-@media(max-width:600px) { .parent-child-filter label { min-width:0; width:100%; } }
+/* Keep the filter controls on one baseline and the scope below them. */
+.parent-child-filter { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px 20px; padding: 20px; margin-bottom: 20px; border: 1px solid #e9e0f0; border-radius: 16px; background: #fff; }
+.parent-child-filter label { width: 100%; max-width: 360px; min-width: 0; }
+.parent-child-filter select { min-width: 0; }
+.parent-child-filter p { grid-column: 1 / -1; grid-row: 2; margin: 0; color: #786584; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.parent-child-filter > button { grid-column: 2; grid-row: 1; min-height: 49px; }
+@media (max-width: 600px) {
+  .parent-child-filter { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 16px; }
+  .parent-child-filter label { max-width: none; }
+  .parent-child-filter > button { grid-column: 1; grid-row: 3; min-height: 52px; }
+}
