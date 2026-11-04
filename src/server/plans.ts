@@ -1,9 +1,9 @@
 import "server-only";
 import { profileImageUrl } from "@/domain/profile-image";
-import { and, asc, eq, gt, gte, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, gte, lte, isNull, or, sql } from "drizzle-orm";
 import { localDate, type DayPlan } from "@/domain/plan";
 import { db } from "./db/client";
-import { buddyEquipment, appointments, childImages, children, dailyTasks, families, pointEntries, rewards, taskTemplates } from "./db/schema";
+import { buddyEquipment, appointments, childImages, children, dailyTasks, families, pointEntries, rewards, routinePauses, taskTemplates } from "./db/schema";
 
 export class PlanError extends Error {
   constructor(message: string, public status: number) { super(message); }
@@ -34,12 +34,16 @@ export async function getDayPlans(familyId: string, now = new Date()): Promise<D
         eq(dailyTasks.familyId, familyId), eq(dailyTasks.templateId, template.id), eq(dailyTasks.date, date),
       )).limit(1);
       if (existing) continue;
+      const [pause] = await tx.select({ id: routinePauses.id }).from(routinePauses).where(and(
+        eq(routinePauses.familyId, familyId), eq(routinePauses.childId, template.childId), eq(routinePauses.routineId, template.id),
+        lte(routinePauses.startsOn, date), gte(routinePauses.endsOn, date), isNull(routinePauses.revokedAt),
+      )).orderBy(asc(routinePauses.createdAt), asc(routinePauses.id)).limit(1);
       const steps = template.steps ?? [template];
       await tx.insert(dailyTasks).values(steps.map((step, stepIndex) => ({
         familyId, childId: template.childId, templateId: template.id, date, stepIndex,
         routineTitle: template.title, title: step.title, description: step.description, icon: step.icon,
         section: template.section, scheduledTime: template.scheduledTime,
-        points: step.points, sortOrder: template.sortOrder,
+        points: step.points, sortOrder: template.sortOrder, pausedBy: pause?.id ?? null,
       })));
     }
   });
@@ -72,7 +76,7 @@ export async function getDayPlans(familyId: string, now = new Date()): Promise<D
     tasks: tasks.filter(({ task }) => task.childId === child.id).map(({ task, completedAt }) => ({
       id: task.id, routineId: task.templateId, routineTitle: task.routineTitle, title: task.title, description: task.description, icon: task.icon,
       section: task.section, time: task.scheduledTime?.slice(0, 5) ?? null,
-      points: task.points, completed: completedAt !== null,
+      points: task.points, completed: completedAt !== null, paused: task.pausedBy !== null && completedAt === null,
     })),
   }));
 }
@@ -86,6 +90,7 @@ export async function completeTask(familyId: string, taskId: string, now = new D
     if (!task) throw new PlanError("Aufgabe nicht gefunden.", 404);
     const [child] = await tx.select({ id: children.id }).from(children).where(and(eq(children.id, task.childId), eq(children.active, true))).for("share");
     if (!child) throw new PlanError("Kinderprofil ist nicht aktiv.", 409);
+    if (task.pausedBy) throw new PlanError("Diese Aufgabe hat heute Pause. Bitte den Plan neu laden.", 409);
     if (task.date !== date) throw new PlanError("Ein neuer Tag hat begonnen. Bitte den Plan neu laden.", 409);
     const inserted = await tx.insert(pointEntries).values({
       familyId, childId: task.childId, taskId: task.id, amount: task.points,

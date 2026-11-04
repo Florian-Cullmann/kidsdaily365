@@ -293,6 +293,11 @@ progress::-moz-progress-bar { background: #efb832; border-radius: 20px; }
 
 .profile-photo { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 
+.task-row.is-paused{background:#f1f5ed;border-color:#dce6d5;color:#65755d;opacity:1}
+.task-row.is-paused .check-circle{border:2px dashed #9aac8c;background:#e6eddf;color:#7b916c}
+.task-row.is-paused .task-words>span{color:#7d8b74}
+.task-row.is-paused .task-picture{opacity:.65}
+.done-badge:has(span){white-space:normal}.routine-heading>span{text-align:right}
 /* Small footer status stays clear of navigation and touch controls. */
 .wall-sync-status { display: flex; align-items: center; justify-content: flex-end; gap: 12px; justify-self: end; align-self: end; max-width: 100%; min-height: 44px; color: #fff; text-shadow: 0 1px 3px #000b; font-size: 12px; line-height: 1.4; text-align: right; }
 .wall-sync-status button { min-height: 44px; padding: 4px; border: 0; background: transparent; color: inherit; font-size: inherit; text-shadow: inherit; text-decoration: underline; text-underline-offset: 3px; }

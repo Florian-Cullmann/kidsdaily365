@@ -83,6 +83,20 @@ export const taskTemplates = pgTable("task_templates", {
   check("template_valid_weekdays", sql`cardinality(${table.weekdays}) between 1 and 7 and ${table.weekdays} <@ ARRAY[1,2,3,4,5,6,7]::integer[]`),
 ]);
 
+// Exceptions are retained after revocation so historical paused snapshots keep their provenance.
+export const routinePauses = pgTable("routine_pauses", {
+  id: uuid().primaryKey().defaultRandom(),
+  familyId: uuid().notNull(), childId: uuid().notNull(), routineId: uuid().notNull(),
+  startsOn: date().notNull(), endsOn: date().notNull(), reason: text().notNull().default(""),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  revokedAt: timestamp({ withTimezone: true }),
+}, (table) => [
+  foreignKey({ columns: [table.routineId, table.childId, table.familyId], foreignColumns: [taskTemplates.id, taskTemplates.childId, taskTemplates.familyId] }).onDelete("cascade"),
+  unique("pause_routine_child_family_identity").on(table.id, table.routineId, table.childId, table.familyId),
+  index("routine_pause_dates").on(table.familyId, table.routineId, table.startsOn, table.endsOn),
+  check("pause_dates_ordered", sql`${table.endsOn} >= ${table.startsOn}`),
+]);
+
 export const dailyTasks = pgTable("daily_tasks", {
   id: uuid().primaryKey().defaultRandom(),
   familyId: uuid().notNull().references(() => families.id),
@@ -99,9 +113,12 @@ export const dailyTasks = pgTable("daily_tasks", {
   points: integer().notNull(),
   sortOrder: integer().notNull().default(0),
   cancelledAt: timestamp({ withTimezone: true }),
+  pausedBy: uuid(),
 }, (table) => [
   foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
   foreignKey({ columns: [table.templateId, table.childId, table.familyId], foreignColumns: [taskTemplates.id, taskTemplates.childId, taskTemplates.familyId] }),
+  foreignKey({ columns: [table.pausedBy, table.templateId, table.childId, table.familyId], foreignColumns: [routinePauses.id, routinePauses.routineId, routinePauses.childId, routinePauses.familyId] }),
+  check("paused_task_has_routine", sql`${table.pausedBy} is null or ${table.templateId} is not null`),
   unique("tasks_child_family_identity").on(table.id, table.childId, table.familyId),
   unique("one_template_per_day").on(table.templateId, table.date, table.stepIndex),
   index("tasks_day_lookup").on(table.familyId, table.childId, table.date),
