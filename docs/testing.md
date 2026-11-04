@@ -119,6 +119,17 @@ Screenshots mit ausschließlich fiktiven Daten: [Elterneditor](proof/routine-edi
 
 Automatisierte Bildtests prüfen echte Dekodierung, Größenlimits, Ausschnitt, EXIF-Ausrichtung und entfernte Metadaten. Die Datenbanktests prüfen Ersetzen/Entfernen, Rechte, Profiltrennung und unabhängigen Punktestand. Keine echten Kinderfotos in Tests oder Nachweisen verwenden.
 
+## Lesende Wochenvorschau (#33)
+
+- Unter Elternbereich → Wochenvorschau Kind und Datum wählen. Vorherige/nächste Woche und Rückkehr zur aktuellen Woche prüfen; eine Woche läuft von Montag bis Sonntag in Familienzeit.
+- Eine Routine heute am Wandbildschirm materialisieren, danach ihre Vorlage ändern. Die Wochenvorschau zeigt die gespeicherten Schritte unverändert und für zukünftige, noch nicht angelegte Routinen die neue Vorlage mit „Vorschau“. Auch entfernte Schritte bleiben nachvollziehbar; fehlende historische Tage werden nicht aus heutigen Vorlagen rekonstruiert.
+- Einzelaufgaben und Termine einschließlich mehrtägiger Zeiträume prüfen. Terminenden sind exklusiv: Ein Ende um Mitternacht belegt nicht den Folgetag. Alle angezeigten Terminzeiten folgen der Familienzeitzone, auch am DST-Wechsel.
+- Archivierte Kinder bleiben auswählbar, erhalten aber keine berechneten Routinen. Leere Tage bleiben neutral. Auf 390 px und großem Bildschirm sowie mit Tastatur prüfen.
+- Ohne Elternsitzung (auch mit Launcher-Bearer) führt die Seite zur Anmeldung. Ein Kind eines anderen Haushalts liefert keine Daten.
+- `tests/week-preview.integration.test.ts` prüft unveränderte Tageskopien und leeres Punktejournal nach Vorschauabrufen gegen PostgreSQL. Die Lesetransaktion selbst ist `READ ONLY`, mit konsistentem Snapshot.
+- Kompatibilität mit #28: Bis dessen additive Migration auf `main` liegt, erkennt ein lesender Adapter die vorhandene Tabelle `routine_pauses`; er verwendet ausschließlich deren inklusive Datumsbereiche, `revokedAt` und den gespeicherten `daily_tasks.pausedBy`-Verweis. Kein eigenes Pausenmodell und keine Migration in #33. Pausierte Schritte heißen „Pausiert · nicht fällig“, erledigte Schritte bleiben erledigt. Nach Integration von #28 kann der Adapter auf die gemeinsamen Drizzle-Typen umgestellt werden.
+- Der zusätzliche Pausen-Integrationstest läuft, sobald die #28-Migration in der disposable Testdatenbank vorhanden ist; ohne diese Tabelle wird ausschließlich dieser Test übersprungen. Beide Datenbankstände prüfen. Die Migration aus #28 ausschließlich in einer disposable `*_test`-Datenbank separat anwenden, niemals außerhalb des normalen Migrationsablaufs auf deployed Daten.
+
 ## Routinen für Geschwister kopieren
 
 Unter **Routinen → Routine kopieren** erscheint ein unabhängiger Entwurf mit Quellkind und aktivem Zielkind. Titel, Schritte (einschließlich Erklärung, Symbol und Sternen), Schrittfolge, Tagesabschnitt, Uhrzeit, Sortierung und Wochentage sind vor dem Speichern änderbar. Die Kopie startet aktiv; bei Bedarf im Entwurf deaktivieren. Abbrechen schreibt nichts.
