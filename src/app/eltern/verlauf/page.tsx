@@ -24,7 +24,6 @@ export default async function History({ searchParams }: { searchParams: Promise<
       <label>Datum<input type="date" name="date" required defaultValue={data.date} /></label>
       <button className="parent-primary" disabled={!data.childId}>Anzeigen</button>
     </form>
-    <p className="parent-callout">Zeiten in {data.timezone}. Diese Ansicht verändert keine Aufgaben oder Sterne. Fehlende Tageskopien zählen nicht als versäumte Aufgaben.</p>
     {!data.tasks.length ? <div className="parent-empty"><h2>{!data.profiles.length ? "Noch keine Kinderprofile" : data.page > 1 ? "Keine weiteren Aufgaben" : "Keine Tageskopien gespeichert"}</h2><p>{data.page > 1 ? "Gehe zur vorherigen Seite zurück." : "Für diese Auswahl ist kein gespeicherter Verlauf vorhanden."}</p></div> : <section aria-label="Gespeicherte Aufgaben" className="parent-records">{data.tasks.map((task) => <article className="parent-record" key={task.id}>
       <div className="record-description"><h2>{task.title}</h2><p>{sections[task.section]}{task.scheduledTime ? ` · ${task.scheduledTime.slice(0, 5)} Uhr` : ""} · {task.routineTitle ?? "Einzelaufgabe"}</p>{task.description && <p>{task.description}</p>}
       <p>{task.completedAt ? `Erledigt am ${time(task.completedAt)}` : task.cancelledAt ? `Entfernt / ausgesetzt am ${time(task.cancelledAt)}` : "Offen · kein Abschluss gespeichert"}</p></div>
