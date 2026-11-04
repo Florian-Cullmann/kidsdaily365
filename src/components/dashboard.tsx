@@ -21,7 +21,7 @@ function appointmentTime(startsAt: string, timezone: string) {
 
 function appointmentDay(startsAt: string, plan: DayPlan) {
   if (localDate(new Date(startsAt), plan.timezone) === plan.date) return "Heute";
-  return new Intl.DateTimeFormat("de-DE", { weekday: "short", day: "numeric", month: "short", timeZone: plan.timezone }).format(new Date(startsAt));
+  return new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "numeric", month: "long", timeZone: plan.timezone }).format(new Date(startsAt));
 }
 
 export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; demo: boolean }) {
