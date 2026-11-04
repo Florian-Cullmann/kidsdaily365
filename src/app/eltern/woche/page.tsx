@@ -35,7 +35,6 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
       </form>
       <nav className="week-navigation" aria-label="Wochenauswahl">{shiftDate(data.start, -7) >= "2000-01-01" && <Link href={href(shiftDate(data.start, -7))}>← Vorherige Woche</Link>}<Link href={href(data.today)}>Aktuelle Woche</Link>{shiftDate(data.start, 7) <= "2100-12-31" && <Link href={href(shiftDate(data.start, 7))}>Nächste Woche →</Link>}</nav>
       <h2>{data.child.name} · {dayLabel(data.start)} – {dayLabel(data.end)} {data.end.slice(0, 4)}</h2>
-      <p className="week-note">Gespeicherte Tageskopien bleiben unverändert. „Vorschau“ zeigt aktuelle Routinen für noch nicht angelegte Tage ab heute und kann sich durch Änderungen an Vorlagen ändern. Vergangene Tage werden nicht ergänzt. Diese Ansicht speichert und erledigt keine Aufgaben.</p>
       {!data.child.active && <p className="week-note">Dieses Profil ist archiviert. Gespeicherte Aufgaben und Termine bleiben sichtbar; neue Routinen werden nicht vorausberechnet.</p>}
       <div className="week-grid">{data.days.map((day) => <section className="week-day" key={day.date} aria-label={dayLabel(day.date)}>
         <h3>{dayLabel(day.date)}{day.date === data.today && <span className="week-today">Heute</span>}</h3>
