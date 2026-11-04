@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CalendarDays, Check, ChevronRight, Heart, House, Maximize, Star, Users } from "lucide-react";
+import { CalendarDays, Check, ChevronRight, Heart, House, Star, Users } from "lucide-react";
 import { completeDemoTask, localDate, type DayPlan, type TaskIcon } from "@/domain/plan";
 import { ProfilePicture } from "./profile-picture";
+import { FullscreenControl } from "./fullscreen-control";
 import { Buddy } from "./buddy";
 import Link from "next/link";
 
@@ -86,17 +87,11 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
     } finally { pending.current = false; setBusy(null); }
   }
 
-  async function fullscreen() {
-    try {
-      if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
-      else await document.exitFullscreen();
-    } catch { setError("Vollbild bitte über die Taste F11 aktivieren."); }
-  }
-
   if (!plans.length) return <main className="center-page"><div className="setup-card"><h1>Hier ist Platz für eure Pläne.</h1><p>Noch kein Kinderprofil vorhanden. Bitte zuerst die Einrichtung auf dem Server abschließen.</p></div></main>;
 
   if (!plan) return <main className="profile-screen forest-world">
-    <div className="brand profile-brand"><span className="brand-mark"><House size={27} /></span><span>kidsdaily<span className="brand-number">365</span></span></div>
+    <header className="profile-header"><div className="brand profile-brand"><span className="brand-mark"><House size={27} /></span><span>kidsdaily<span className="brand-number">365</span></span></div>
+    <FullscreenControl /></header>
     <div className="profile-welcome"><span className="welcome-tag">Dein kleiner Alltagsbegleiter</span><h1>Wer ist heute dabei?</h1><p>Tippe auf dein Bild. Dein Buddy freut sich auf dich!</p></div>
     <div className="profile-grid">{plans.map((item, index) => <button key={item.child.id} className={`profile-tile tile-${index % 3}`} onClick={() => chooseProfile(item.child.id)}>
       <span className="profile-art"><ProfilePicture imageUrl={item.child.imageUrl} buddyKind={item.child.buddyKind} equipped={item.child.equippedAccessories} /><span className="profile-initial">{item.child.avatar}</span></span>
@@ -117,7 +112,7 @@ export function Dashboard({ initialPlans, demo }: { initialPlans: DayPlan[]; dem
   return <div className="child-world forest-world" data-calm={plan.child.reducedMotion}>
     <header className="child-header">
       <div><p className="date-label">{dateLabel}</p><h1>Hallo {plan.child.name}! <span className="hello-sun" aria-hidden="true">☀️</span></h1><p className="hello-caption">{view === "day" ? "Ein kleiner Schritt nach dem anderen." : view === "appointments" ? "Das hast du als Nächstes vor." : "Hier wohnen deine gesammelten Sterne."}</p></div>
-      <div className="header-actions">{demo && <span className="demo-badge">Demo · ohne Speicherung</span>}<button className="fullscreen-button" onClick={fullscreen}><Maximize size={25} /><span>Vollbild</span></button></div>
+      <div className="header-actions">{demo && <span className="demo-badge">Demo · ohne Speicherung</span>}<FullscreenControl /></div>
     </header>
 
     <main className={`play-space view-${view}`}>

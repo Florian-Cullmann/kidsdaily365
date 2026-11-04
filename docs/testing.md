@@ -118,3 +118,11 @@ Screenshots mit ausschließlich fiktiven Daten: [Elterneditor](proof/routine-edi
 5. Vollständigen PostgreSQL-Dump der separaten Testdatenbank in eine leere `*_test`-Datenbank zurückspielen. Bildversionen und SHA-256-Prüfsummen der `child_images.data`-Spalte müssen übereinstimmen. Die Unraid-Anleitung enthält den produktiven Backup-Weg.
 
 Automatisierte Bildtests prüfen echte Dekodierung, Größenlimits, Ausschnitt, EXIF-Ausrichtung und entfernte Metadaten. Die Datenbanktests prüfen Ersetzen/Entfernen, Rechte, Profiltrennung und unabhängigen Punktestand. Keine echten Kinderfotos in Tests oder Nachweisen verwenden.
+
+### Vollbild am Wandbildschirm (#64)
+
+- In der Profilauswahl startet Vollbild erst durch Antippen. Der Knopf zeigt dann „Vollbild verlassen“ und den gedrückten Zustand für Screenreader.
+- Profil wählen, Termine/Sterne öffnen und „Wer ist dran?“ antippen: Der Ausstieg bleibt erreichbar; Profile, Aufgaben, Navigation und Elternzugang bleiben bedienbar. Bei 1366×768 und schmalem Fenster prüfen.
+- Per Knopf und separat per Escape verlassen: Beschriftung und zugänglicher Zustand wechseln zurück. Erneut starten und verlassen.
+- Unter Windows/Edge F11 separat testen: Browser-Vollbild mit F11 verlassen. Falls F11 App-Vollbild beendet, muss dessen Knopf zurückwechseln. Reines Browser-Vollbild liefert keinen verlässlichen Fullscreen-API-Status (siehe [Betriebsanleitung](unraid.md)).
+- Fehlende/gesperrte Fullscreen-API sowie abgewiesenes Starten und Verlassen simulieren: verständlicher Hinweis, kein automatischer Wiederholungsversuch, weiter bedienbare Oberfläche; danach erfolgreich erneut versuchen.

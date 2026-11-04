@@ -73,6 +73,10 @@ Das neue Passwort wird verborgen interaktiv eingelesen. Niemals ein echtes Passw
 
 Für den ersten Test Edge öffnen und die App-Adresse aufrufen. Der Vollbildknopf der App oder `F11` blendet die Browseroberfläche aus. Für einen dauerhaften Wandbildschirm Windows Assigned Access/Edge-Kiosk mit der App-URL einrichten. [Microsoft beschreibt die Edge-Kiosk-Varianten hier](https://learn.microsoft.com/en-us/deployedge/microsoft-edge-configure-kiosk-mode).
 
+**Browser-Vollbild ist kein sicherer Windows-Kiosk.** Es sperrt weder andere Anwendungen noch Windows-Bedienung. Die App startet Vollbild ausschließlich nach Antippen. Der Knopf zeigt bei aktivem App-Vollbild „Vollbild verlassen“ und bleibt auch nach einem Profilwechsel erreichbar; alternativ beendet Escape diesen Modus. Abgewiesene oder nicht unterstützte Anfragen zeigen einen Hinweis und werden nicht automatisch wiederholt.
+
+Windows-Browser-Vollbild über F11 bzw. das Browsermenü ist ein separater Modus: F11 schaltet es wieder aus. Dieser Zustand ist für Webseiten nicht zuverlässig erkennbar und wird deshalb nicht als aktives App-Vollbild angezeigt. Der App-Knopf folgt dem tatsächlichen `fullscreenchange`-Status, auch wenn der Browser App-Vollbild per Tastatur beendet. Am Zielgerät beide Modi getrennt prüfen. Für Assigned Access einen separaten Eltern-/Administratorzugang und einen getesteten Wartungs- und Wiederherstellungsweg vorsehen.
+
 Die Kiosk-Konfiguration muss Cookies zwischen Sitzungen behalten, wenn die Freigabe dauerhaft gelten soll. Manche Edge-Kiosk-/InPrivate-Modi löschen Sitzungsdaten beim Beenden; dann wird erneut der Gerätecode benötigt. Vor dem Dauerbetrieb am konkreten Windows-System prüfen. Windows-Anzeigeskalierung und native Auflösung am 14-Zoll-Gerät testen; Ausgangspunkt sind 1366×768 oder 1920×1080 im Querformat bei gut lesbarer Skalierung. Ruhezustand, automatische Anmeldung und Bildschirmzeiten bewusst für euren Alltag einstellen.
 
 Das Manifest bereitet einen späteren App-Rahmen vor. Offline-Funktion, Hintergrundsynchronisation und eine garantierte PWA-Installation gibt es noch nicht. Für den aktuellen Betrieb genügt ein Browser im Vollbild.

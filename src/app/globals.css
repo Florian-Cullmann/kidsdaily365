@@ -292,3 +292,10 @@ progress::-moz-progress-bar { background: #efb832; border-radius: 20px; }
 .routine-group { display: grid; gap: 10px; }
 
 .profile-photo { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+
+/* Fullscreen controls stay in normal flow, including on the profile picker. */
+.profile-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; width: 100%; flex-wrap: wrap; }
+.fullscreen-control { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: 260px; }
+.fullscreen-hint, .fullscreen-error { font-size: 13px; line-height: 1.4; text-align: right; color: #49425c; }
+.fullscreen-hint { padding: 6px 8px; border-radius: 10px; background: #ffffffe0; }
+.fullscreen-error { padding: 8px; border-radius: 10px; background: #fff0ed; color: #862c22; }
