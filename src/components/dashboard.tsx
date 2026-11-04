@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CalendarDays, Check, ChevronRight, Heart, House, Maximize, Star, Users } from "lucide-react";
-import { completeDemoTask, localDate, type DayPlan, type TaskIcon } from "@/domain/plan";
-import { appointmentStatus } from "@/domain/appointments";
+import { completeDemoTask, type DayPlan, type TaskIcon } from "@/domain/plan";
+import { appointmentLabel, relevantAppointments } from "@/domain/appointments";
 import { ProfilePicture } from "./profile-picture";
 import { Buddy } from "./buddy";
 import Link from "next/link";
@@ -21,13 +21,8 @@ function appointmentTime(startsAt: string, timezone: string) {
   return new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: timezone }).format(new Date(startsAt));
 }
 
-function appointmentDay(startsAt: string, plan: DayPlan) {
-  if (localDate(new Date(startsAt), plan.timezone) === plan.date) return "Heute";
-  return new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "numeric", month: "long", timeZone: plan.timezone }).format(new Date(startsAt));
-}
-
 export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { initialPlans: DayPlan[]; demo: boolean; initialSyncedAt?: string | null }) {
-  const [now, setNow] = useState(() => new Date());
+  const [now, setNow] = useState<Date | null>(null);
   const [demoPlans, setDemoPlans] = useState(initialPlans);
   const [sync] = useState(() => new WallSync(initialPlans, initialSyncedAt));
   const live = useSyncExternalStore(sync.subscribe, sync.getSnapshot, sync.getSnapshot);
@@ -48,10 +43,16 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
   const plan = plans.find((item) => item.child.id === childId);
 
   useEffect(() => {
-    const updateTime = () => setNow(new Date());
-    const timer = setInterval(updateTime, 15_000);
-    document.addEventListener("visibilitychange", updateTime);
-    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", updateTime); };
+    const tick = () => setNow(new Date());
+    const initial = setTimeout(tick, 0);
+    const timer = setInterval(tick, 1_000);
+    document.addEventListener("visibilitychange", tick);
+    window.addEventListener("focus", tick);
+    return () => {
+      clearTimeout(initial); clearInterval(timer);
+      document.removeEventListener("visibilitychange", tick);
+      window.removeEventListener("focus", tick);
+    };
   }, []);
 
   useEffect(() => {
@@ -143,9 +144,8 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
     id, tasks: plan.tasks.filter((task) => (task.routineId ?? task.id) === id),
   }));
   const next = plan.tasks.find((task) => !task.completed);
-  const visibleAppointments = plan.appointments.filter((item) => appointmentStatus(item, now, plan.timezone) !== "past");
-  const nextAppointment = visibleAppointments[0];
-  const appointmentLabel = (item: DayPlan["appointments"][number]) => appointmentStatus(item, now, plan.timezone) === "running" ? "Jetzt" : appointmentDay(item.startsAt, plan);
+  const appointments = now ? relevantAppointments(plan.appointments, plan.timezone, now) : plan.appointments;
+  const nextAppointment = appointments[0];
   const goal = plan.rewards.find((reward) => reward.cost > plan.balance) ?? plan.rewards[0];
   const dateLabel = new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "numeric", month: "long", timeZone: plan.timezone }).format(new Date(`${plan.date}T12:00:00Z`));
 
@@ -171,7 +171,7 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
           {!plan.tasks.length && <div className="empty-state"><span aria-hidden="true">🌈</span><h3>Heute ist Platz für dich.</h3><p>Gerade stehen keine Aufgaben an.</p></div>}
         </div>}
 
-        {view === "appointments" && <div className="detail-scroll">{visibleAppointments.length ? visibleAppointments.map((item) => <article className="appointment-row" key={item.id}><span className="detail-picture" aria-hidden="true">{appointmentPictures[item.icon]}</span><div><span className="appointment-date">{appointmentLabel(item)}</span><h3>{item.title}</h3></div><time dateTime={item.startsAt}>{appointmentTime(item.startsAt, plan.timezone)}</time></article>) : <div className="empty-state"><span aria-hidden="true">🌻</span><h3>Gerade ist nichts geplant.</h3><p>Ein bisschen Zeit für dich.</p></div>}</div>}
+        {view === "appointments" && <div className="detail-scroll">{appointments.length ? appointments.map((item) => <article className="appointment-row" key={item.id}><span className="detail-picture" aria-hidden="true">{appointmentPictures[item.icon]}</span><div><span className="appointment-date">{appointmentLabel(item, plan.timezone, now)}</span><h3>{item.title}</h3></div><time dateTime={item.startsAt}>{appointmentTime(item.startsAt, plan.timezone)}</time></article>) : <div className="empty-state"><span aria-hidden="true">🌻</span><h3>Gerade ist nichts geplant.</h3><p>Ein bisschen Zeit für dich.</p></div>}</div>}
 
         {view === "rewards" && <div className="detail-scroll"><p className="wishes-intro">Plant zusammen etwas, worauf du dich freust.</p>{plan.rewards.length ? plan.rewards.map((reward, index) => <article className="wish-card" key={reward.id}><span className="detail-picture" aria-hidden="true">{rewardPictures[index % rewardPictures.length]}</span><div><h3>{reward.title}</h3><p>{plan.balance >= reward.cost ? "Du hast genug Sterne!" : `Noch ${reward.cost - plan.balance} Sterne`}</p><progress value={Math.min(plan.balance, reward.cost)} max={reward.cost} aria-label={`Fortschritt für ${reward.title}`} /><span className="wish-count">{plan.balance} / {reward.cost} Sterne</span></div></article>) : <div className="empty-state"><span aria-hidden="true">🎁</span><h3>Was wünschst du dir?</h3><p>Hier ist Platz für eure gemeinsamen Ideen.</p></div>}<p className="wishes-note">Das Einlösen kommt später dazu.</p></div>}
 
@@ -182,7 +182,7 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
         <div className="buddy-scene"><Buddy kind={plan.child.buddyKind} equipped={plan.child.equippedAccessories} className="main-buddy" priority /><span className="buddy-name">Dein {plan.child.buddyName}</span>
           <button className="star-treasure" onClick={() => openView("rewards")} aria-label={`${plan.balance} Sterne gesammelt. Deine Wünsche ansehen.`}><span aria-hidden="true">⭐</span><div><strong>{plan.balance}</strong><span>deine Sterne</span></div><ChevronRight size={27} /></button>
         </div>
-        <button className="peek-card appointment-peek" onClick={() => openView("appointments")}><span className="peek-picture" aria-hidden="true">📅</span><span className="peek-copy"><span>{nextAppointment && appointmentStatus(nextAppointment, now, plan.timezone) === "running" ? "Dein Termin jetzt" : "Dein nächster Termin"}</span><strong>{nextAppointment?.title ?? "Gerade nichts geplant"}</strong>{nextAppointment && <span>{appointmentLabel(nextAppointment)} · {appointmentTime(nextAppointment.startsAt, plan.timezone)} Uhr</span>}</span><ChevronRight size={25} /></button>
+        <button className="peek-card appointment-peek" onClick={() => openView("appointments")}><span className="peek-picture" aria-hidden="true">📅</span><span className="peek-copy"><span>{nextAppointment && now && appointmentLabel(nextAppointment, plan.timezone, now) === "Jetzt" ? "Dein Termin läuft gerade" : "Dein nächster Termin"}</span><strong>{nextAppointment?.title ?? "Gerade nichts geplant"}</strong>{nextAppointment && <span>{appointmentLabel(nextAppointment, plan.timezone, now)} · {appointmentTime(nextAppointment.startsAt, plan.timezone)} Uhr</span>}</span><ChevronRight size={25} /></button>
         <button className="peek-card reward-peek" onClick={() => openView("rewards")}><span className="peek-picture" aria-hidden="true">🎁</span><span className="peek-copy"><span>Darauf kannst du dich freuen</span><strong>{goal?.title ?? "Dein nächster Wunsch"}</strong>{goal && <progress value={Math.min(plan.balance, goal.cost)} max={goal.cost} aria-label={`Fortschritt für ${goal.title}`} />}</span><ChevronRight size={25} /></button>
       </aside>
     </main>

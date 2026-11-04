@@ -145,6 +145,38 @@ describe("persisted daily plans", () => {
     expect(points).toHaveLength(0);
   });
 
+  it.each([
+    ["Europe/Berlin", "2026-03-29T21:30:00Z", "2026-03-29T22:00:00Z"],
+    ["Europe/Berlin", "2026-10-25T22:30:00Z", "2026-10-25T23:00:00Z"],
+    ["America/New_York", "2026-11-02T04:30:00Z", "2026-11-02T05:00:00Z"],
+  ])("returns all relevant appointments with ends and household isolation in %s at %s", async (timezone, at, midnight) => {
+    await db().update(families).set({ timezone }).where(eq(families.id, familyId));
+    const instant = new Date(at);
+    const relative = (hours: number) => new Date(instant.getTime() + hours * 3_600_000);
+    const rows = [
+      { title: "Läuft über Mitternacht", startsAt: relative(-2), endsAt: relative(2) },
+      { title: "Heute ohne Ende", startsAt: relative(-1), endsAt: null },
+      ...Array.from({ length: 5 }, (_, i) => ({ title: `Zukunft ${i}`, startsAt: relative(i + 1), endsAt: null })),
+    ];
+    await db().insert(appointments).values([
+      ...rows.map(row => ({ ...row, familyId, childId: firstChild })),
+      { familyId, childId: firstChild, title: "Exakt beendet", startsAt: relative(-2), endsAt: instant },
+      { familyId, childId: firstChild, title: "Gestern ohne Ende", startsAt: relative(-26) },
+      { familyId, childId: firstChild, title: "Archiviert", startsAt: relative(1), active: false },
+      { familyId, childId: secondChild, title: "Geschwister", startsAt: relative(-1) },
+      { familyId: otherFamilyId, childId: foreignChild, title: "Andere Familie", startsAt: relative(1) },
+    ]);
+    const [first, second] = await getDayPlans(familyId, instant);
+    expect(first.appointments.map(item => item.title)).toEqual(rows.map(row => row.title));
+    expect(first.appointments[0].endsAt).toBe(relative(2).toISOString());
+    expect(first.appointments[1].endsAt).toBeNull();
+    expect(second.appointments.map(item => item.title)).toEqual(["Geschwister"]);
+    const [nextDay] = await getDayPlans(familyId, new Date(midnight));
+    expect(nextDay.appointments.map(item => item.title)).toEqual(rows.filter(row => row.title !== "Heute ohne Ende").map(row => row.title));
+    const [ended] = await getDayPlans(familyId, relative(2));
+    expect(ended.appointments.some(item => item.title === "Läuft über Mitternacht")).toBe(false);
+  });
+
   it("shows each child's own appointments and buddy", async () => {
     await db().insert(appointments).values({ familyId, childId: secondChild, title: "Musik", startsAt: new Date("2026-11-01T16:00:00Z") });
     const [first, second] = await getDayPlans(familyId, now);
