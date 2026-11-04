@@ -9,6 +9,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("next/link", () => ({ default: ({ children, onNavigate, ...props }: { children: React.ReactNode; onNavigate?: (event: { preventDefault: () => void }) => void }) => <a {...props} onClick={onNavigate}>{children}</a> }));
 const parent = { id: "parent", familyId: "family", name: "Demo-Eltern", email: "demo@example.test" };
 const data = {
+  childFilter: { id: "", invalid: false }, limited: { tasks: false, appointments: false },
   family: { name: "Testfamilie", timezone: "Europe/Berlin" }, today: "2026-11-04",
   children: [{ id: "child", name: "Mika", avatar: "M", active: true, buddyInitialized: false, equippedAccessories: [], ownedAccessories: [] }],
   routines: ["Morgen", "Abend"].map((title, index) => ({ id: `routine-${index}`, title, childId: "child", active: true, weekdays: [1, 2, 3, 4, 5], section: "morning", sortOrder: 0, steps: [{ title: "Zähne putzen", description: "", icon: "toothbrush", points: 5 }, { title: "Rucksack packen", description: "", icon: "backpack", points: 3 }] })),
@@ -28,6 +29,29 @@ function navigate() { fireEvent.click(screen.getByRole("button", { name: "Termin
 function discard() { fireEvent.click(screen.getByRole("button", { name: "Änderungen verwerfen" })); }
 
 describe("Elternentwürfe", () => {
+  it("protects a draft when changing or clearing the child filter", async () => {
+    const fetch = vi.fn().mockResolvedValue(Response.json({ ...data, childFilter: { id: "child", invalid: false } }));
+    vi.stubGlobal("fetch", fetch);
+    mount(); edit(); changeTitle();
+    fireEvent.change(screen.getByLabelText("Kind auswählen"), { target: { value: "child" } });
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(fetch).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Weiter bearbeiten" }));
+    expect((screen.getByLabelText("Bezeichnung") as HTMLInputElement).value).toBe("Neuer Morgen");
+    expect((screen.getByLabelText("Kind auswählen") as HTMLSelectElement).value).toBe("");
+    fireEvent.change(screen.getByLabelText("Kind auswählen"), { target: { value: "child" } });
+    discard();
+    await waitFor(() => expect(screen.queryByLabelText("Bezeichnung")).toBeNull());
+    expect(fetch).toHaveBeenCalledWith("/api/parent/data?child=child", expect.anything());
+    edit(); changeTitle();
+    fireEvent.click(screen.getByRole("button", { name: "Alle Kinder anzeigen" }));
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    fetch.mockResolvedValue(Response.json(data));
+    discard();
+    await waitFor(() => expect((screen.getByLabelText("Kind auswählen") as HTMLSelectElement).value).toBe(""));
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
   it.each(["Kinderprofile", "Routinen", "Einzelaufgaben", "Termine", "Wünsche", "Android-Apps"])("compares actual values and reversions in %s", (tab) => {
     mount(); fireEvent.click(screen.getByRole("button", { name: tab }));
     fireEvent.click(screen.getByRole("button", { name: tab === "Kinderprofile" ? "Kind hinzufügen" : "Neu anlegen" }));

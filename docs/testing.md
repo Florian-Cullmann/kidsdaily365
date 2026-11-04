@@ -119,6 +119,27 @@ Screenshots mit ausschließlich fiktiven Daten: [Elterneditor](proof/routine-edi
 
 Automatisierte Bildtests prüfen echte Dekodierung, Größenlimits, Ausschnitt, EXIF-Ausrichtung und entfernte Metadaten. Die Datenbanktests prüfen Ersetzen/Entfernen, Rechte, Profiltrennung und unabhängigen Punktestand. Keine echten Kinderfotos in Tests oder Nachweisen verwenden.
 
+### Kinderfilter in der Elternverwaltung
+
+Unter Routinen, Einzelaufgaben, Terminen und Android-Apps begrenzt „Kind auswählen“
+die Liste auf ein Kind. Liste (`tab`) und Auswahl (`child`) stehen in der URL und
+bleiben beim Listenwechsel, Speichern, Archivieren und Neuladen erhalten.
+„Alle Kinder anzeigen“ setzt den Filter zurück. Kinderprofile und gemeinsame Wünsche
+bleiben ungefiltert. Neue Einträge verwenden das ausgewählte aktive Kind; archivierte
+Kinder stehen nur zur Rückschau zur Verfügung, nicht als Ziel neuer Einträge.
+
+Mit zwei fiktiven Kindern und gleichnamigen Routinen prüfen: filtern, Liste wechseln,
+Neuanlage mit Vorbelegung, tatsächliche Zuordnung beim Bearbeiten, speichern,
+archivieren und neu laden. Ein leeres sowie ein archiviertes Profil auswählen.
+Eine ungültige oder fremde `child`-ID muss einen erklärten Leerzustand mit Rücksetzknopf
+zeigen. Auswahl und Rücksetzen auch per Tastatur prüfen.
+
+Der Server filtert vor dem Lade-Limit. Aufgaben und Termine zeigen höchstens 1.000
+Einträge; bei weiteren Treffern erscheint ein ausdrücklicher Hinweis. Es gibt noch
+keine Pagination. Integrationstests erzeugen mehr als 1.000 Einträge eines anderen
+Kindes und prüfen, dass das ausgewählte Kind trotzdem gefunden wird. Die Eltern-API
+bleibt mit Wandcookie oder Android-Token ohne Elternsitzung gesperrt.
+
 ## Ungespeicherte Elternformulare (#41)
 
 Kinderprofile, Routinen, Einzelaufgaben, Termine, Wünsche und App-Freigaben vergleichen

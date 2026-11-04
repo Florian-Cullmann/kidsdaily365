@@ -49,7 +49,7 @@ async function request(url: string, method = "GET", body?: unknown) {
   return data;
 }
 
-export function ParentConsole({ parent, initialData, initialTab = "overview" }: { parent: ParentActor; initialData: ManagementData; initialTab?: Tab }) {
+export function ParentConsole({ parent, initialData, initialTab = "overview" }: { parent: ParentActor; initialData: ManagementData; initialTab?: string }) {
   const router = useRouter();
   const pending = useRef(false);
   const draftRef = useRef<RecordDraft | null>(null);
@@ -76,7 +76,7 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
     setCopySource(null);
   }
   const [data, setData] = useState(initialData);
-  const [tab, setTab] = useState<Tab>(initialTab);
+  const [tab, setTab] = useState<Tab>(tabs.find((item) => item.id === initialTab)?.id ?? "overview");
   const [formVersion, setFormVersion] = useState(0);
   const [pauseRoutineId, setPauseRoutineId] = useState<string | null>(null);
   const pauseRoutine = data.routines.find(routine => routine.id === pauseRoutineId);
@@ -96,7 +96,22 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
   const activeChildren = data.children.filter((child) => child.active).length;
   const isResource = !["overview", "devices", "account"].includes(tab);
 
-  function navigate(id: Tab) { setCopySource(null); setPauseRoutineId(null); setBuddyChildId(null); setImageChildId(null); setTab(id); setFormOpen(false); setEditing(null); setError(""); setNotice(""); setIssuedCode(null); }
+  const childFiltered = ["routines", "tasks", "appointments", "apps"].includes(tab);
+  const filterChild = data.children.find((child) => child.id === data.childFilter.id);
+  function rememberView(id: Tab, childId = data.childFilter.id) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", id);
+    if (childId) url.searchParams.set("child", childId); else url.searchParams.delete("child");
+    window.history.replaceState(null, "", url);
+  }
+  async function filterByChild(childId: string) {
+    await action(async () => {
+      const next: ManagementData = await request(`/api/parent/data?${new URLSearchParams({ child: childId })}`);
+      setData(next); clearDraft(); setPauseRoutineId(null);
+      rememberView(tab, next.childFilter.id);
+    });
+  }
+  function navigate(id: Tab) { rememberView(id); setCopySource(null); setPauseRoutineId(null); setBuddyChildId(null); setImageChildId(null); setTab(id); setFormOpen(false); setEditing(null); setError(""); setNotice(""); setIssuedCode(null); }
   function createRecord(resource: Resource) {
     leave(() => { navigate(resource); setEditing(null); setFormOpen(true); });
   }
@@ -125,7 +140,7 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
     }
     finally { pending.current = false; setBusy(false); }
   }
-  async function refresh() { setData(await request("/api/parent/data")); }
+  async function refresh() { setData(await request(`/api/parent/data?${new URLSearchParams({ child: data.childFilter.id })}`)); }
   async function save(input: unknown) {
     await action(async () => {
       if (copySource) await request(`/api/parent/routines/${copySource.id}/copy`, "POST", { requestId: copySource.requestId, routine: input });
@@ -166,14 +181,14 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
       <div className="parent-sidebar-bottom"><Link onNavigate={(event) => { event.preventDefault(); leave(() => router.push("/")); }} href="/">Zum Kinderbildschirm</Link><button disabled={busy} onClick={() => action(async () => { await request("/api/auth/logout", "POST"); clearDraft(); router.replace("/login"); router.refresh(); })}><LogOut size={18} /> Abmelden</button></div>
     </aside>
     <main className="parent-main"><header className="parent-topbar"><span>{data.family.name}</span><span><ShieldCheck size={17} /> Angemeldet als {parent.name}</span></header>
-      <div className="parent-title"><div><h1>{selected.label}</h1><p>{descriptions[tab]}</p></div>{isResource && <button disabled={busy} className="parent-primary" onClick={() => createRecord(tab as Resource)}><Plus size={20} />{tab === "children" ? "Kind hinzufügen" : "Neu anlegen"}</button>}</div>
+      <div className="parent-title"><div><h1>{selected.label}</h1><p>{descriptions[tab]}</p></div>{isResource && <button disabled={busy || (childFiltered && data.childFilter.invalid)} className="parent-primary" onClick={() => createRecord(tab as Resource)}><Plus size={20} />{tab === "children" ? "Kind hinzufügen" : "Neu anlegen"}</button>}</div>
       <div className="parent-feedback" aria-live="polite">{notice && <p className="parent-success"><Check size={19} />{notice}</p>}<p className="parent-error" role="alert">{error}</p></div>
 
       {tab === "overview" && <>
         {!activeChildren && <section className="parent-panel"><h2>{data.children.length ? "Keine aktiven Kinderprofile vorhanden." : "Noch keine Kinderprofile vorhanden."}</h2><p>Lege ein Kinderprofil an, um Aufgaben und Termine zuzuordnen.</p><button className="parent-primary" onClick={() => createRecord("children")}>Kind hinzufügen</button></section>}
         <div className="parent-overview-grid">{[
           { title: "Kinderprofile", text: `${activeChildren} ${activeChildren === 1 ? "aktives Profil" : "aktive Profile"}${activeChildren ? ` · ${data.children.filter((child) => child.active).map((child) => child.name).join(", ")}` : ""}`, view: "children" as Tab, icon: Users },
-          { title: "Routinen", text: `${data.routines.filter((routine) => routine.active).length} aktive Routinen`, view: "routines" as Tab, icon: BookOpen },
+          { title: "Routinen", text: data.childFilter.id ? "Routinen für eure Kinder verwalten" : `${data.routines.filter((routine) => routine.active).length} aktive Routinen`, view: "routines" as Tab, icon: BookOpen },
           { title: "Einzelaufgaben", text: "Aktuelle und geplante Aufgaben bearbeiten", view: "tasks" as Tab, icon: ClipboardList },
           { title: "Termine", text: "Termine anlegen und bearbeiten", view: "appointments" as Tab, icon: CalendarDays },
           { title: "Geräte", text: "Wandbildschirme und Handys verbinden oder sperren", view: "devices" as Tab, icon: MonitorSmartphone },
@@ -183,6 +198,16 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
       </>}
 
       {isResource && <>
+        {childFiltered && <section className="parent-child-filter" aria-label="Liste nach Kind filtern">
+          <label htmlFor="child-filter">Kind auswählen<select id="child-filter" value={data.childFilter.id} disabled={busy} onChange={(event) => { const childId = event.target.value; leave(() => { void filterByChild(childId); }); }}>
+            <option value="">Alle Kinder</option>
+            {data.childFilter.invalid && <option value={data.childFilter.id}>Kind nicht verfügbar</option>}
+            {data.children.map((child) => <option key={child.id} value={child.id}>{child.name}{child.active ? "" : " (archiviert)"}</option>)}
+          </select></label>
+          <p role="status">{data.childFilter.invalid ? "Dieses Kind ist nicht verfügbar. Bitte wähle ein Kind aus eurer Familie." : filterChild ? `Einträge für ${filterChild.name}${filterChild.active ? "" : " · archiviertes Profil (Rückschau)"}` : "Einträge aller Kinder"}</p>
+          {data.childFilter.id && <button className="parent-secondary" disabled={busy} onClick={() => leave(() => { void filterByChild(""); })}>Alle Kinder anzeigen</button>}
+        </section>}
+        {(tab === "tasks" || tab === "appointments") && data.limited[tab] && <p className="parent-callout" role="status">Die Liste ist auf 1.000 Einträge begrenzt. {data.childFilter.id ? "Auch für dieses Kind gibt es weitere Einträge, die hier nicht angezeigt werden." : "Wähle ein Kind, um dessen Einträge gezielt zu laden."}</p>}
         {tab === "routines" && <div className="parent-callout">Änderungen gelten für neue Tagespläne. Pausen sind für einzelne Tage oder Ferien möglich. Bestehende Aufgaben bearbeitest du unter Einzelaufgaben.</div>}
         {tab === "apps" && <div className="parent-callout">Diese Liste legt die erlaubten Apps je Kind fest. Die echte Sperre auf dem Handy benötigt später den verwalteten Android-Launcher. Ein normaler Startbildschirm allein schützt das Gerät nicht.</div>}
         {tab === "rewards" && <div className="parent-callout">Das Einlösen von Wünschen und der Kauf von Buddy-Accessoires sind noch nicht verfügbar. Hier werden keine Sterne abgezogen.</div>}
@@ -193,12 +218,12 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
         })} />}
         {buddyChild && <BuddyWardrobe child={buddyChild} busy={busy} onClose={() => setBuddyChildId(null)} onAction={(accessoryId, command) => action(async () => { await request(`/api/parent/children/${buddyChild.id}/buddy`, "POST", { accessoryId, action: command }); await refresh(); setNotice("Buddy-Ausstattung gespeichert."); })} />}
         {imageChild && <ProfileImageEditor key={imageChild.id} child={imageChild} onCancel={() => setImageChildId(null)} onDone={async () => { await refresh(); setImageChildId(null); setNotice("Profilbild aktualisiert."); }} />}
-        {formOpen && <ParentRecordForm key={`${tab}-${copySource?.requestId ?? editing?.id ?? "new"}-${formVersion}`} copySource={copySource?.childName} resource={tab as Resource} data={data} record={editing} busy={busy} draftRef={draftRef} onSave={save} onCancel={() => leave(clearDraft)} />}
+        {formOpen && <ParentRecordForm key={`${tab}-${copySource?.requestId ?? editing?.id ?? "new"}-${formVersion}`} copySource={copySource?.childName} resource={tab as Resource} data={data} record={editing} defaultChildId={filterChild?.active ? filterChild.id : data.childFilter.id ? "" : undefined} busy={busy} draftRef={draftRef} onSave={save} onCancel={() => leave(clearDraft)} />}
         <div className="parent-records">{(data[tab as Resource] as unknown as EditableRecord[]).map((record) => <article key={record.id} className={`parent-record ${record.active === false ? "is-archived" : ""}`}>
           {tab === "children" && <div className="record-buddy"><ProfilePicture imageUrl={record.imageUrl as string | null} buddyKind={record.buddyKind as "fox" | "rabbit" | "bear"} equipped={record.equippedAccessories as string[]} /></div>}
           <div className="record-description"><h3>{String(record.name ?? record.title ?? record.label)}</h3><p>{tab === "children" ? (record.buddyInitialized === false ? "Buddy wählt das Kind auf Android" : `Buddy: ${record.buddyName}`) : tab === "apps" ? `${childName(record.childId)} · ${record.packageName}` : tab === "appointments" ? `${childName(record.childId)} · ${new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short", timeZone: data.family.timezone }).format(new Date(String(record.startsAt)))}` : tab === "routines" ? `${childName(record.childId)} · ${(record.steps as unknown[]).length} Schritte` : tab === "rewards" ? `${record.cost} Sterne` : `${childName(record.childId)} · ${record.points} Sterne${tab === "tasks" ? ` · ${record.date}` : ""}`}</p>{record.active === false && <span className="archive-label">Archiviert</span>}{tab === "routines" && data.pauses.some(pause => pause.routineId === record.id) && <span className="routine-pause-badge">{data.pauses.some(pause => pause.routineId === record.id && pause.startsOn <= data.today) ? "Heute pausiert" : "Pause geplant"}</span>}{tab === "tasks" && !!record.pausedBy && record.completed !== true && <span className="routine-pause-badge">Ausgesetzt · Routine-Pause</span>}{record.completed === true && <span className="archive-label">Erledigt · Verlauf geschützt</span>}</div>
           <div className="record-actions">{tab === "routines" && <button disabled={busy} onClick={() => leave(() => { setPauseRoutineId(record.id); setFormOpen(false); setError(""); setNotice(""); })}>Pausen verwalten</button>}{tab === "routines" && <button disabled={busy || !activeChildren} onClick={() => copyRecord(record)}>Routine kopieren</button>}{tab === "children" && record.active !== false && <button disabled={busy} onClick={() => leave(() => { setBuddyChildId(record.id); setImageChildId(null); setFormOpen(false); setError(""); })}>Ausstattung</button>}{tab === "children" && record.active !== false && <button disabled={busy} onClick={() => leave(() => { setBuddyChildId(null); setImageChildId(record.id); setFormOpen(false); setError(""); })}>Profilbild</button>}<button disabled={busy || record.completed === true} onClick={() => leave(() => { setBuddyChildId(null); setImageChildId(null); setCopySource(null); setEditing(record); setFormOpen(true); setError(""); })}>Bearbeiten</button>{record.active !== false && record.completed !== true && <button className="quiet-danger" disabled={busy} onClick={() => archive(record)}>{tab === "tasks" ? "Aus Plan nehmen" : "Archivieren"}</button>}</div>
-        </article>)}{!formOpen && !data[tab as Resource].length && <div className="parent-empty"><selected.icon size={35} /><h3>{emptyMessages[tab as Resource]}</h3></div>}</div>
+        </article>)}{!formOpen && !data[tab as Resource].length && <div className="parent-empty"><selected.icon size={35} /><h3>{childFiltered && data.childFilter.id ? data.childFilter.invalid ? "Keine Einträge: Kind nicht verfügbar." : "Keine Einträge für dieses Kind in dieser Liste." : emptyMessages[tab as Resource]}</h3></div>}</div>
       </>}
 
       {tab === "devices" && <>

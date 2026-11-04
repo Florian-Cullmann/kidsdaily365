@@ -40,8 +40,8 @@ function snapshot(form: HTMLFormElement) {
   }));
 }
 
-export function ParentRecordForm({ resource, data, record, copySource, busy, draftRef, onSave, onCancel }: {
-  copySource?: string; resource: Resource; data: ManagementData; record: EditableRecord | null; busy: boolean;
+export function ParentRecordForm({ resource, data, record, defaultChildId, copySource, busy, draftRef, onSave, onCancel }: {
+  defaultChildId?: string; copySource?: string; resource: Resource; data: ManagementData; record: EditableRecord | null; busy: boolean;
   draftRef: RefObject<RecordDraft | null>;
   onSave: (input: unknown) => Promise<void>; onCancel: () => void;
 }) {
@@ -114,7 +114,7 @@ export function ParentRecordForm({ resource, data, record, copySource, busy, dra
     <div className="record-form-heading"><h3>{copySource ? "Routine kopieren" : record ? "Eintrag bearbeiten" : "Neuen Eintrag anlegen"}</h3></div>
     {copySource && <div className="parent-callout"><p>Quelle: {copySource} · {String(record?.title)}</p><p>{enabled && firstDate ? `Im Tagesplan ab ${new Intl.DateTimeFormat("de-DE", { dateStyle: "long", timeZone: "UTC" }).format(new Date(`${firstDate}T12:00:00Z`))}.` : enabled ? "Bitte einen Wiederholungstag wählen." : "Nicht im Tagesplan: Routine ist inaktiv."}</p></div>}
     <fieldset disabled={busy} className="record-fields">
-      {withChild && <label>{copySource ? "Zielkind" : "Für welches Kind?"}<select name="childId" defaultValue={text("childId", data.children.find((child) => child.active)?.id)} required><option value="">Bitte auswählen</option>{data.children.filter((child) => !copySource || child.active).map((child) => <option key={child.id} value={child.id}>{child.name}{child.active ? "" : " (archiviert)"}</option>)}</select></label>}
+      {withChild && <label>{copySource ? "Zielkind" : "Für welches Kind?"}<select name="childId" defaultValue={text("childId", defaultChildId ?? data.children.find((child) => child.active)?.id)} required><option value="">Bitte auswählen</option>{data.children.filter((child) => child.active || (!copySource && child.id === record?.childId)).map((child) => <option key={child.id} value={child.id}>{child.name}{child.active ? "" : " (archiviert)"}</option>)}</select></label>}
       {resource === "children" && <>
         <label>Name<input name="name" defaultValue={text("name")} required maxLength={80} autoComplete="off" /></label>
         <label>Profilkürzel<input name="avatar" defaultValue={text("avatar")} maxLength={3} placeholder="z. B. M" /></label>

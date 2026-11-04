@@ -1,3 +1,4 @@
+import { GET as getParentData } from "@/app/api/parent/data/route";
 import { buddySetup } from "@/server/buddy-setup";
 import { GET as getBuddySetup, POST as postBuddySetup } from "@/app/api/device/buddy-setup/route";
 import { changeBuddyEquipment } from "@/server/buddy";
@@ -496,6 +497,69 @@ describe("child buddy onboarding", () => {
     const paired = await exchangePairingCode(wall.code, origin, "wall");
     expect(paired.buddySetupToken).toBeNull();
     await expect(buddySetup(`Bearer ${paired.token}`)).rejects.toMatchObject({ status: 401 });
+  });
+});
+
+
+describe("parent list child filters", () => {
+  it("filters before the 1000-row limit and preserves family-wide profiles and wishes", async () => {
+    const parent = await actor();
+    const a = await child(parent, "Mika");
+    const b = await child(parent, "Leni");
+    const today = localDate(new Date(), "Europe/Berlin");
+    await db().insert(dailyTasks).values(Array.from({ length: 1001 }, (_, i) => ({ familyId, childId: a.id, title: `Task ${i}`, date: today, section: "morning" as const, points: 1 })));
+    await db().insert(dailyTasks).values({ familyId, childId: b.id, title: "Leni task", date: "2099-01-01", section: "morning", points: 1 });
+    await db().insert(appointments).values(Array.from({ length: 1001 }, (_, i) => ({ familyId, childId: a.id, title: `Date ${i}`, startsAt: new Date("2099-01-01T12:00:00Z") })));
+    await db().insert(appointments).values({ familyId, childId: b.id, title: "Leni date", startsAt: new Date("2026-01-01T12:00:00Z") });
+    await db().insert(taskTemplates).values([a, b].map((kid) => ({ familyId, childId: kid.id, title: "Morgenroutine", section: "morning" as const, points: 1 })));
+    await saveRecord(parent, "rewards", { title: "Familienausflug", cost: 10, active: true });
+    const all = await getManagementData(parent);
+    expect(all.tasks).toHaveLength(1000);
+    expect(all.appointments).toHaveLength(1000);
+    expect(all.limited).toEqual({ tasks: true, appointments: true });
+    expect(all.tasks.some((row) => row.childId === b.id)).toBe(false);
+    expect(all.appointments.some((row) => row.childId === b.id)).toBe(false);
+    const filtered = await getManagementData(parent, b.id);
+    expect(filtered.childFilter).toEqual({ id: b.id, invalid: false });
+    expect(filtered.tasks.map((row) => row.title)).toEqual(["Leni task"]);
+    expect(filtered.appointments.map((row) => row.title)).toEqual(["Leni date"]);
+    expect(filtered.routines.map((row) => row.childId)).toEqual([b.id]);
+    expect(filtered.apps.map((row) => row.childId)).toEqual([b.id]);
+    expect(filtered.children).toHaveLength(2);
+    expect(filtered.rewards.map((row) => row.title)).toEqual(["Familienausflug"]);
+    expect(filtered.limited).toEqual({ tasks: false, appointments: false });
+    expect((await getManagementData(parent, a.id)).limited).toEqual({ tasks: true, appointments: true });
+    await archiveRecord(parent, "children", b.id);
+    const archived = await getManagementData(parent, b.id);
+    expect(archived.childFilter.invalid).toBe(false);
+    expect(archived.children.find((row) => row.id === b.id)?.active).toBe(false);
+    expect(archived.appointments).toHaveLength(1);
+    await expect(saveRecord(parent, "appointments", { childId: b.id, title: "New", startsAt: "2099-01-01T12:00:00Z", icon: "calendar", active: true })).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("rejects device-only access and makes foreign, missing and malformed filters empty without exposing another household", async () => {
+    const parent = await actor();
+    const own = await child(parent);
+    const foreign = await child(await actor(otherFamilyId), "Foreign child");
+    const request = (id: string, token?: string) => new Request(`${origin}/api/parent/data?child=${encodeURIComponent(id)}`, { headers: token ? { authorization: `Bearer ${token}` } : {} });
+    expect((await getParentData(request(own.id))).status).toBe(401);
+    const wallCode = await createPairingCode(parent, { kind: "wall", label: "Wall" });
+    cookieState.set("kidsdaily_device", (await exchangePairingCode(wallCode.code, origin)).token);
+    expect((await getParentData(request(own.id))).status).toBe(401);
+    const launcherCode = await createPairingCode(parent, { kind: "android", childId: own.id, label: "Phone" });
+    const launcher = await exchangePairingCode(launcherCode.code, origin);
+    expect((await getParentData(request(own.id, launcher.token))).status).toBe(401);
+    cookieState.set("kidsdaily_parent", await loginParent({ email: parent.email, password }));
+    for (const id of [foreign.id, randomUUID(), "not-a-uuid"]) {
+      const response = await getParentData(request(id));
+      expect(response.status).toBe(200);
+      const data = await response.json();
+      expect(data.childFilter).toEqual({ id, invalid: true });
+      for (const resource of ["routines", "tasks", "appointments", "apps"]) expect(data[resource]).toEqual([]);
+      expect(data.children.map((row: { id: string }) => row.id)).toEqual([own.id]);
+    }
+    const valid = await getParentData(request(own.id));
+    expect((await valid.json()).apps.map((row: { childId: string }) => row.childId)).toEqual([own.id]);
   });
 });
 
