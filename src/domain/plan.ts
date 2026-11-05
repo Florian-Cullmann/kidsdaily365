@@ -7,7 +7,7 @@ export type ChildProfile = {
   id: string; name: string; avatar: string; reducedMotion: boolean;
   buddyKind: BuddyKind; buddyName: string;
 };
-export type Appointment = { id: string; title: string; startsAt: string; icon: "calendar" | "tooth" | "ball" | "heart" };
+export type Appointment = { id: string; title: string; startsAt: string; endsAt?: string | null; icon: "calendar" | "tooth" | "ball" | "heart" };
 export type Reward = { id: string; title: string; cost: number };
 export type Task = {
   routineId?: string | null;
@@ -20,6 +20,7 @@ export type Task = {
   time: string | null;
   points: number;
   completed: boolean;
+  paused?: boolean;
 };
 export type DayPlan = {
   date: string;
@@ -63,10 +64,22 @@ export function localDate(now: Date, timezone: string): string {
 // Also used by demo mode. Completing the same task twice must be a no-op.
 export function completeDemoTask(plan: DayPlan, taskId: string): DayPlan {
   const task = plan.tasks.find((item) => item.id === taskId);
-  if (!task || task.completed) return plan;
+  if (!task || task.completed || task.paused) return plan;
   return {
     ...plan,
     balance: plan.balance + task.points,
     tasks: plan.tasks.map((item) => item.id === taskId ? { ...item, completed: true } : item),
   };
+}
+
+/** Paused steps are visible, but never counted as completed or as outstanding work. */
+export function taskProgress(tasks: Task[]) {
+  const done = tasks.filter(task => task.completed).length;
+  const paused = tasks.filter(task => task.paused && !task.completed).length;
+  const total = tasks.length - paused;
+  const open = total - done;
+  const label = total === 0 && paused > 0 ? "Heute Pause" : paused > 0
+    ? `${done} geschafft${open ? ` · ${open} offen` : ""} · ${paused} mit Pause`
+    : `${done} von ${total} geschafft`;
+  return { done, paused, total, label };
 }

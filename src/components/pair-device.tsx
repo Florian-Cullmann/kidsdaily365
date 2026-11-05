@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { House, LockKeyhole } from "lucide-react";
 import Link from "next/link";
 
-export function PairDevice({ initialSetup = false }: { initialSetup?: boolean }) {
+export function PairDevice({ initialSetup = false, revoked = false }: { initialSetup?: boolean; revoked?: boolean }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -25,7 +25,8 @@ export function PairDevice({ initialSetup = false }: { initialSetup?: boolean })
   return <main className="center-page"><form className="setup-card" onSubmit={submit}>
     <div className="brand-mark"><House size={28} /></div>
     <span className="eyebrow">Willkommen bei KidsDaily365</span>
-    <h1>Ein Platz für euren Alltag.</h1>
+    <h1>{revoked ? "Diesen Bildschirm erneut freigeben" : "Ein Platz für euren Alltag."}</h1>
+    {revoked && <p role="status">Die Gerätefreigabe ist abgelaufen oder wurde beendet. Bitte einen neuen Gerätecode verwenden.</p>}
     <p>{initialSetup ? "Richtet zuerst euren Elternzugang und eure Kinderprofile ein. Danach könnt ihr diesen Bildschirm freigeben." : "Ein Elternteil erstellt im Elternbereich einen einmaligen Gerätecode für diesen Wandbildschirm."}</p>
     {initialSetup && <Link className="primary-button" href="/register">Familie einrichten</Link>}
     <label htmlFor="code">Gerätecode</label>

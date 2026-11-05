@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { demoPlans } from "@/domain/demo";
-import { completeDemoTask, groupTasksBySection, localDate, type Task } from "@/domain/plan";
+import { completeDemoTask, groupTasksBySection, taskProgress, localDate, type Task } from "@/domain/plan";
 
 describe("family day boundaries", () => {
   it("uses the family timezone rather than the server date", () => {
@@ -50,6 +50,19 @@ describe("visible day sections", () => {
       .toEqual([[["step-2", "step-1"], ["routine"]], [["afternoon"]], [["evening"], ["later-step"]]]);
     expect(result.flatMap((section) => section.groups.flatMap((group) => group.tasks))).toHaveLength(tasks.length);
     expect(result[0].groups[0].tasks.every((item) => item.completed)).toBe(true);
+  });
+
+  it("keeps paused routine steps visible without counting them as pending work", () => {
+    const tasks = [
+      task("done", "morning", { routineId: "routine", completed: true }),
+      task("paused", "morning", { routineId: "routine", paused: true }),
+      task("evening", "evening"),
+    ];
+    const sections = groupTasksBySection(tasks);
+    expect(sections[0].groups[0].tasks.map((item) => item.id)).toEqual(["done", "paused"]);
+    expect(taskProgress(sections[0].groups[0].tasks)).toEqual({ done: 1, paused: 1, total: 1, label: "1 geschafft · 1 mit Pause" });
+    expect(completeDemoTask({ ...demoPlans()[0], tasks }, "paused").tasks).toEqual(tasks);
+    expect(sections[1].groups[0].tasks).toEqual([tasks[2]]);
   });
 
   it("omits empty sections but keeps completed and untimed tasks", () => {
