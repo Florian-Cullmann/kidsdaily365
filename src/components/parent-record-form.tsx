@@ -86,10 +86,11 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onSaveS
     await onSave(input);
   }
 
-  return <form className="record-form" onSubmit={submit}>
+  return <form className={`record-form${resource === "appointments" ? " appointment-form" : ""}`} onSubmit={submit}>
     {record?.seriesId ? <p className="parent-callout">Du bearbeitest nur dieses Vorkommen der Serie. Das Kind bleibt unverändert. Andere Termine bleiben erhalten.</p> : null}
-    <div className="record-form-heading"><h3>{record ? "Eintrag bearbeiten" : "Neuen Eintrag anlegen"}</h3></div>
+    <div className="record-form-heading"><h3>{resource === "appointments" ? (record ? "Termin bearbeiten" : "Neuen Termin anlegen") : (record ? "Eintrag bearbeiten" : "Neuen Eintrag anlegen")}</h3></div>
     <fieldset disabled={busy} className="record-fields">
+      {resource === "appointments" && <label className="wide-field">Was steht an?<input name="title" defaultValue={text("title")} placeholder="z. B. Musikunterricht" required maxLength={80} /></label>}
       {withChild && <label>Für welches Kind?<select name="childId" defaultValue={text("childId", data.children.find((child) => child.active)?.id)} required><option value="">Bitte auswählen</option>{data.children.filter((child) => record?.seriesId ? child.id === record.childId : !!record || child.active).map((child) => <option key={child.id} value={child.id}>{child.name}{child.active ? "" : " (archiviert)"}</option>)}</select></label>}
       {resource === "children" && <>
         <label>Name<input name="name" defaultValue={text("name")} required maxLength={80} autoComplete="off" /></label>
@@ -100,7 +101,7 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onSaveS
         </> : <p>Dein Kind wählt und benennt seinen Buddy nach dem Verbinden selbst auf seinem Android-Gerät.</p>}
         <label className="check-field"><input name="reducedMotion" type="checkbox" defaultChecked={record?.reducedMotion !== false} /><span>Bewegungsarme Darstellung</span></label>
       </>}
-      {(isTask || resource === "appointments" || resource === "rewards") && <label className="wide-field">{resource === "rewards" ? "Wunsch oder Belohnung" : "Bezeichnung"}<input name="title" defaultValue={text("title")} required maxLength={80} /></label>}
+      {(isTask || resource === "rewards") && <label className="wide-field">{resource === "rewards" ? "Wunsch oder Belohnung" : "Bezeichnung"}<input name="title" defaultValue={text("title")} required maxLength={80} /></label>}
       {isTask && <>
         {resource === "tasks" && <>
         <label className="wide-field">Kurze Erklärung<textarea name="description" defaultValue={text("description")} maxLength={500} rows={2} /></label>
@@ -141,11 +142,12 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onSaveS
         <button type="button" className="parent-secondary" disabled={steps.length >= 50} onClick={() => { setOpenStep(steps.length); setSteps((items) => [...items, { title: "", description: "", icon: "heart", points: 5 }]); }}>Aufgabe hinzufügen</button>
       </div>}
       {resource === "appointments" && <>
+        <label>Bildsymbol<select name="icon" defaultValue={text("icon", "calendar")}><option value="calendar">📅 Termin</option><option value="tooth">🦷 Zahnarzt</option><option value="ball">⚽ Sport</option><option value="heart">💛 Allgemein</option></select></label>
         <p className="field-help wide-field">Alle Uhrzeiten gelten in eurer Familienzeitzone: <strong>{data.family.timezone}</strong> – auch auf Reisen.</p>
-        {!record && onSaveSeries && <label className="wide-field">Wiederholung<select value={weekly ? "weekly" : "once"} onChange={(e) => { setWeekly(e.target.value === "weekly"); setTimeError(""); }}><option value="once">Einmaliger Termin</option><option value="weekly">Wöchentlich als Serie</option></select></label>}
+        {!record && onSaveSeries && <fieldset className="wide-field appointment-repeat"><legend>Wie oft findet der Termin statt?</legend>{[[false, "Einmalig"], [true, "Jede Woche"]].map(([repeat, label]) => <label key={String(repeat)}><input type="radio" name="repeat" checked={weekly === repeat} onChange={() => { setWeekly(Boolean(repeat)); setTimeError(""); }} /><span>{label}</span></label>)}</fieldset>}
         {weekly ? <AppointmentSeriesFields value={seriesDraft} onChange={setSeriesDraft} timezone={data.family.timezone} /> : <><AppointmentTimeField name="startsAt" label="Beginn" original={record?.startsAt} timeZone={data.family.timezone} required />
         <AppointmentTimeField name="endsAt" label="Ende (optional)" original={record?.endsAt} timeZone={data.family.timezone} /></>}
-        <label>Bildsymbol<select name="icon" defaultValue={text("icon", "calendar")}><option value="calendar">📅 Termin</option><option value="tooth">🦷 Zahnarzt</option><option value="ball">⚽ Sport</option><option value="heart">💛 Allgemein</option></select></label>
+
         {timeError && <p role="alert" className="field-help wide-field">{timeError}</p>}
       </>}
       {resource === "rewards" && <label>Benötigte Sterne<input name="cost" type="number" defaultValue={value("cost", 50)} min={1} max={1_000_000} required /></label>}
@@ -155,6 +157,6 @@ export function ParentRecordForm({ resource, data, record, busy, onSave, onSaveS
       </>}
       {resource !== "tasks" && !weekly && <label className="check-field wide-field"><input name="active" type="checkbox" defaultChecked={record?.active !== false} /><span>{resource === "apps" ? "App freigegeben" : "Aktiv"}</span></label>}
     </fieldset>
-    <div className="record-form-actions"><button type="button" className="parent-secondary" onClick={onCancel} disabled={busy}>Abbrechen</button><button className="parent-primary" disabled={busy}>{busy ? "Wird gespeichert …" : "Speichern"}</button></div>
+    <div className="record-form-actions"><button type="button" className="parent-secondary" onClick={onCancel} disabled={busy}>Abbrechen</button><button className="parent-primary" disabled={busy}>{busy ? "Wird gespeichert …" : resource === "appointments" && !record ? (weekly ? "Terminserie anlegen" : "Termin anlegen") : "Speichern"}</button></div>
   </form>;
 }

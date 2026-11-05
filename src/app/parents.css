@@ -190,3 +190,23 @@
 .series-preview li { padding: 10px 4px; color: #61536e; line-height: 1.6; border-bottom: 1px solid #e9e3ee; }
 .series-preview li label { margin-top: 10px; }
 .series-preview .parent-error { margin-top: 14px; }
+
+/* Appointment creation: identity, recurrence, then a readable occurrence list. */
+.appointment-repeat { display: flex; gap: 12px; border: 0; padding: 0; margin: 4px 0 0; min-width: 0; }
+.appointment-repeat legend { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+.parent-app .appointment-repeat label { display: flex; flex: 1; flex-direction: row; align-items: center; gap: 10px; min-height: 52px; padding: 12px 16px; border: 1px solid #ded3e9; border-radius: 12px; cursor: pointer; }
+.appointment-repeat label:has(:checked) { background: #f2ecf8; border-color: #806297; color: #553b70; }
+.parent-app .appointment-repeat input { width: 18px; min-height: 18px; height: 18px; accent-color: #73558e; }
+.series-schedule-hint { align-self: center; line-height: 1.8; margin: 0; }
+.series-preview-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.series-preview-heading h4 { margin: 0; }
+.series-preview-heading > span { background: #ebe2f3; color: #604577; border-radius: 20px; padding: 6px 12px; font-size: 13px; white-space: nowrap; }
+.series-preview .series-occurrence { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.series-occurrence strong { font-weight: 600; }
+.series-dst-note { font-size: 13px; line-height: 1.6; color: #61536e; padding: 10px 12px; background: #fff; border-radius: 8px; }
+.appointment-form .series-preview ol { list-style: none; padding: 0; margin-bottom: 0; }
+.appointment-form .series-preview li:last-child { border-bottom: 0; }
+@media (max-width: 600px) {
+  .parent-app .appointment-repeat label { padding: 10px; }
+  .series-occurrence { flex-direction: column; gap: 2px !important; }
+}
