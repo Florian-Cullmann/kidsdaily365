@@ -285,14 +285,19 @@ progress::-moz-progress-bar { background: #efb832; border-radius: 20px; }
   .setup-card { padding: 26px; }
 }
 
-.routine-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px; color: #36553d; }
-.routine-heading h3 { margin: 0; font-size: 1.2rem; }
+.routine-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; padding: 14px 18px; color: #36553d; }
+.routine-heading h4 { margin: 0; font-size: 1.2rem; }
 .routine-heading span { font-size: .95rem; }
 .routine-group + .routine-group { margin-top: 18px; }
 .routine-group { display: grid; gap: 10px; }
 
 .profile-photo { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 
+.day-section { flex-shrink: 0; min-width: 0; }
+.day-section + .day-section { margin-top: 18px; }
+.day-section-heading { padding: 12px 14px; margin-bottom: 10px; border-radius: 16px; background: #f1f4ec; color: #36553d; }
+.day-section-heading h3 { margin: 0; font-size: 1.35rem; }
+.day-section-heading p { margin: 4px 0 0; font-size: .95rem; }
 .unsaved-record-dialog { width: min(540px, calc(100% - 32px)); padding: 28px; border: 1px solid #ded9e8; border-radius: 24px; color: #302b43; background: #fff; box-shadow: 0 20px 80px #21182d40; }
 .unsaved-record-dialog::backdrop { background: #21182d80; }
 .unsaved-record-dialog h2 { margin-top: 0; }
