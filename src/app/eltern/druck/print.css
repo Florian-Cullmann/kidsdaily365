@@ -1,0 +1,27 @@
+.print-plan { max-width: 210mm; margin: 24px auto; padding: 14mm; background: white; color: #111; font: 11pt/1.45 "Segoe UI", Arial, sans-serif; overflow-wrap: anywhere; }
+.print-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-bottom: 24px; }
+.print-controls a, .print-controls button { display: inline-flex; align-items: center; min-height: 48px; padding: 10px 16px; border: 1px solid #555; border-radius: 8px; background: white; font: inherit; }
+.print-controls p { width: 100%; margin: 0; }
+.print-plan h1 { font-size: 26pt; margin: 0; }
+.print-plan h2 { font-size: 15pt; border-bottom: 1px solid #444; padding-bottom: 4px; margin: 22px 0 10px; }
+.print-plan h3 { font-size: 12pt; margin: 0 0 6px; }
+.print-plan p { margin: 4px 0 8px; }
+.print-eyebrow { font-size: 9pt; letter-spacing: .15em; }
+.print-date { font-size: 15pt; font-weight: 600; }
+.print-note { font-size: 10pt; }
+.print-task, .print-event { margin: 0 0 12px; break-inside: avoid; }
+.print-task-row { display: flex; gap: 10px; }
+.print-task-row > div { min-width: 0; }
+.print-checkbox { flex: 0 0 6mm; width: 6mm; height: 6mm; border: 1.5px solid #222; margin-top: 1px; text-align: center; line-height: 5mm; }
+.print-checkbox-inactive { border-color: transparent; }
+.print-description { white-space: pre-wrap; }
+.print-status { font-size: 9pt; }
+@media (max-width: 600px) { .print-plan { margin: 0; padding: 20px; } }
+@page { size: A4 portrait; margin: 14mm; }
+@media print {
+  html, body { background: white !important; color: black; }
+  .print-plan { max-width: none; margin: 0; padding: 0; }
+  .print-controls { display: none !important; }
+  .print-plan h2, .print-plan h3 { break-after: avoid; }
+  .print-plan p { orphans: 3; widows: 3; }
+}

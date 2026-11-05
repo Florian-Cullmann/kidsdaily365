@@ -37,6 +37,7 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
       <h2>{data.child.name} · {dayLabel(data.start)} – {dayLabel(data.end)} {data.end.slice(0, 4)}</h2>
       {!data.child.active && <p className="week-note">Dieses Profil ist archiviert. Gespeicherte Aufgaben und Termine bleiben sichtbar; neue Routinen werden nicht vorausberechnet.</p>}
       <div className="week-grid">{data.days.map((day) => <section className="week-day" key={day.date} aria-label={dayLabel(day.date)}>
+        <Link href={`/eltern/druck?${new URLSearchParams({ childId: data.child!.id, date: day.date })}`}>Tagesplan drucken</Link>
         <h3>{dayLabel(day.date)}{day.date === data.today && <span className="week-today">Heute</span>}</h3>
         {day.appointments.length > 0 && <div className="week-section"><h4>Termine</h4>{day.appointments.map((event) => <article className="week-event" key={event.id}><strong>{event.title}</strong><p>{eventTime(event.startsAt)}{event.endsAt && ` – ${eventTime(event.endsAt)}`}</p>{event.endsAt && <small>Zeitraum in Familienzeit; an allen betroffenen Tagen sichtbar.</small>}</article>)}</div>}
         {sections.map((section) => { const tasks = day.tasks.filter((task) => task.section === section.id); return tasks.length > 0 && <div className="week-section" key={section.id}><h4>{section.label.replace("Mein ", "")}</h4>{tasks.map((task, index) => <article className={`week-task ${(task.cancelled || task.paused) ? "week-cancelled" : ""}`} key={task.id}>
