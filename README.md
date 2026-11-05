@@ -12,6 +12,7 @@ Eine selbst gehostete Familien-App für neurodivergente Kinder: eigener Buddy, �
 - [Wöchentliche Terminserien](docs/appointment-series.md) mit vollständiger Vorschau, Familienzeitzone und höchstens 53 Vorkommen; einzelne Termine verschieben/absagen oder die verbleibende Serie nach Vorschau beenden.
 - Routinenänderungen gelten für noch nicht angelegte Tagespläne. Bestehende Tageskopien und verdiente Sterne bleiben erhalten; die Migration übernimmt bisherige Routinen als Gruppen mit einem Schritt.
 - Kindliche Waldwelt, große Aufgabenkarten zum Abhaken und untere Navigation für Wand-Tablets. Profile und Punkte bleiben getrennt; paralleles Abhaken vergibt keine doppelten Sterne.
+- Wandbildschirme gleichen sichtbare Pläne und die Profilauswahl alle zehn Sekunden ab. Auswahl, Ansicht und Scrollposition bleiben erhalten; Verbindungsprobleme zeigen den letzten Abgleich, ein Widerruf führt zurück zur Kopplung. Nach dem Tageswechsel werden alte Aufgaben bis zum Laden des neuen Plans nicht mehr angeboten.
 - Wandbildschirme und Android-Geräte einzeln freigeben und sperren. Android-Geräte gehören genau einem Kind und haben keine Schreibrechte.
 - Lokaler Android-Elternzugang mit Offline-Wartung, einmaliger Eltern-Bestätigung zur Einrichtung und begrenzten Fehlversuchen.
 - App-Freigaben je Kind im Elternbereich; Audible als erste Freigabe bei neuen Profilen.

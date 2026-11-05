@@ -1,5 +1,5 @@
 {
-  "id": "f0975683-8cf6-4340-8365-dd27b45cb3a5",
+  "id": "7d65ade1-6166-46ec-af21-d88d6f7630d1",
   "prevId": "3a1f941b-ba1c-4e48-a308-54588c1eda9f",
   "version": "7",
   "dialect": "postgresql",
@@ -93,125 +93,10 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.appointment_series": {
-      "name": "appointment_series",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "familyId": {
-          "name": "familyId",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "childId": {
-          "name": "childId",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "requestId": {
-          "name": "requestId",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "inputHash": {
-          "name": "inputHash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "timezone": {
-          "name": "timezone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "endedAt": {
-          "name": "endedAt",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "appointment_series_familyId_families_id_fk": {
-          "name": "appointment_series_familyId_families_id_fk",
-          "tableFrom": "appointment_series",
-          "tableTo": "families",
-          "columnsFrom": [
-            "familyId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "appointment_series_childId_familyId_children_id_familyId_fk": {
-          "name": "appointment_series_childId_familyId_children_id_familyId_fk",
-          "tableFrom": "appointment_series",
-          "tableTo": "children",
-          "columnsFrom": [
-            "childId",
-            "familyId"
-          ],
-          "columnsTo": [
-            "id",
-            "familyId"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "appointment_series_request": {
-          "name": "appointment_series_request",
-          "nullsNotDistinct": false,
-          "columns": [
-            "familyId",
-            "requestId"
-          ]
-        },
-        "appointment_series_child_family": {
-          "name": "appointment_series_child_family",
-          "nullsNotDistinct": false,
-          "columns": [
-            "id",
-            "childId",
-            "familyId"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.appointments": {
       "name": "appointments",
       "schema": "",
       "columns": {
-        "seriesId": {
-          "name": "seriesId",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "occurrenceIndex": {
-          "name": "occurrenceIndex",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
         "id": {
           "name": "id",
           "type": "uuid",
@@ -322,42 +207,12 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
-        },
-        "appointments_seriesId_childId_familyId_appointment_series_id_childId_familyId_fk": {
-          "name": "appointments_seriesId_childId_familyId_appointment_series_id_childId_familyId_fk",
-          "tableFrom": "appointments",
-          "tableTo": "appointment_series",
-          "columnsFrom": [
-            "seriesId",
-            "childId",
-            "familyId"
-          ],
-          "columnsTo": [
-            "id",
-            "childId",
-            "familyId"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "appointment_series_occurrence": {
-          "name": "appointment_series_occurrence",
-          "nullsNotDistinct": false,
-          "columns": [
-            "seriesId",
-            "occurrenceIndex"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "appointment_series_position": {
-          "name": "appointment_series_position",
-          "value": "(\"appointments\".\"seriesId\" is null and \"appointments\".\"occurrenceIndex\" is null) or (\"appointments\".\"seriesId\" is not null and \"appointments\".\"occurrenceIndex\" is not null and \"appointments\".\"occurrenceIndex\" between 0 and 52)"
-        },
         "appointment_end_after_start": {
           "name": "appointment_end_after_start",
           "value": "\"appointments\".\"endsAt\" is null or \"appointments\".\"endsAt\" > \"appointments\".\"startsAt\""
@@ -2026,6 +1881,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "copyRequestId": {
+          "name": "copyRequestId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "copyFingerprint": {
+          "name": "copyFingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "id": {
           "name": "id",
           "type": "uuid",
@@ -2141,6 +2008,14 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
+        "templates_copy_request": {
+          "name": "templates_copy_request",
+          "nullsNotDistinct": false,
+          "columns": [
+            "familyId",
+            "copyRequestId"
+          ]
+        },
         "templates_child_family_identity": {
           "name": "templates_child_family_identity",
           "nullsNotDistinct": false,

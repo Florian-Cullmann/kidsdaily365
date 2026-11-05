@@ -63,6 +63,8 @@ jobs:
       - run: npm run check
       - run: npm run db:migrate
       - run: npm run test:integration
+      - name: Verify backup failures, rotation and isolated restore with fictional data
+        run: BACKUP_INTEGRATION=1 python3 -m unittest discover -s tests -p backup_test.py
       - run: npm run build
       - name: Build runtime and migration images
         run: |
