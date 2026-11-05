@@ -148,7 +148,24 @@ export const rewards = pgTable("rewards", {
   active: boolean().notNull().default(true),
 }, (table) => [check("reward_cost_positive", sql`${table.cost} > 0`)]);
 
+// Concrete occurrences are created once; retries and cancellations never regenerate them.
+export const appointmentSeries = pgTable("appointment_series", {
+  id: uuid().primaryKey().defaultRandom(),
+  familyId: uuid().notNull().references(() => families.id),
+  childId: uuid().notNull(),
+  requestId: uuid().notNull(),
+  inputHash: text().notNull(),
+  timezone: text().notNull(),
+  endedAt: timestamp({ withTimezone: true }),
+}, (table) => [
+  foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
+  unique("appointment_series_request").on(table.familyId, table.requestId),
+  unique("appointment_series_child_family").on(table.id, table.childId, table.familyId),
+]);
+
 export const appointments = pgTable("appointments", {
+  seriesId: uuid(),
+  occurrenceIndex: integer(),
   id: uuid().primaryKey().defaultRandom(),
   familyId: uuid().notNull().references(() => families.id),
   childId: uuid().notNull(),
@@ -159,6 +176,9 @@ export const appointments = pgTable("appointments", {
   active: boolean().notNull().default(true),
 }, (table) => [
   foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
+  foreignKey({ columns: [table.seriesId, table.childId, table.familyId], foreignColumns: [appointmentSeries.id, appointmentSeries.childId, appointmentSeries.familyId] }),
+  unique("appointment_series_occurrence").on(table.seriesId, table.occurrenceIndex),
+  check("appointment_series_position", sql`(${table.seriesId} is null and ${table.occurrenceIndex} is null) or (${table.seriesId} is not null and ${table.occurrenceIndex} is not null and ${table.occurrenceIndex} between 0 and 52)`),
   index("appointments_child_time").on(table.familyId, table.childId, table.startsAt),
   check("appointment_end_after_start", sql`${table.endsAt} is null or ${table.endsAt} > ${table.startsAt}`),
 ]);

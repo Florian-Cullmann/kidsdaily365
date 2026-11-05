@@ -1,4 +1,5 @@
 import "server-only";
+import { editAppointment } from "./appointment-series";
 import { profileImageUrl } from "@/domain/profile-image";
 import { and, asc, desc, eq, gte, isNull, sql } from "drizzle-orm";
 import { managementSchemas, type Resource } from "@/domain/management";
@@ -94,11 +95,11 @@ export async function saveRecord(parent: ParentActor, resource: Resource, input:
         return (await db().insert(dailyTasks).values({ ...data, familyId }).returning({ id: dailyTasks.id }))[0];
       }
       case "appointments": {
+        if (id) return editAppointment(parent, id, managementSchemas.appointments.parse(input));
         const parsed = managementSchemas.appointments.parse(input);
         await checkChild(parent, parsed.childId);
         const data = { ...parsed, startsAt: new Date(parsed.startsAt), endsAt: parsed.endsAt ? new Date(parsed.endsAt) : null };
-        return id ? checkUpdated(await db().update(appointments).set(data).where(and(eq(appointments.id, id), eq(appointments.familyId, familyId))).returning({ id: appointments.id }))
-          : (await db().insert(appointments).values({ ...data, familyId }).returning({ id: appointments.id }))[0];
+        return (await db().insert(appointments).values({ ...data, familyId }).returning({ id: appointments.id }))[0];
       }
       case "rewards": {
         const data = managementSchemas.rewards.parse(input);
@@ -131,12 +132,13 @@ async function editTask(parent: ParentActor, id: string, data: typeof management
 }
 
 export async function archiveRecord(parent: ParentActor, resource: Resource, id: string) {
+  if (resource === "appointments") return editAppointment(parent, id, null);
   if (resource === "tasks") return editTask(parent, id, null);
   if (resource === "children") {
     const [child] = await db().select().from(children).where(and(eq(children.id, id), eq(children.familyId, parent.familyId)));
     if (!child) throw new ApiError("Kinderprofil nicht gefunden.", 404);
     return saveRecord(parent, resource, { name: child.name, avatar: child.avatar, buddyKind: child.buddyKind, buddyName: child.buddyName, reducedMotion: child.reducedMotion, active: false }, id);
   }
-  const table = { routines: taskTemplates, appointments, rewards, apps: allowedApps }[resource];
+  const table = { routines: taskTemplates, rewards, apps: allowedApps }[resource];
   return checkUpdated(await db().update(table).set({ active: false }).where(and(eq(table.id, id), eq(table.familyId, parent.familyId))).returning({ id: table.id }));
 }

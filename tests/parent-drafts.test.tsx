@@ -29,6 +29,19 @@ function navigate() { fireEvent.click(screen.getByRole("button", { name: "Termin
 function discard() { fireEvent.click(screen.getByRole("button", { name: "Änderungen verwerfen" })); }
 
 describe("Elternentwürfe", () => {
+  it("protects a weekly series draft when changing the child filter", () => {
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+    mount(); navigate(); fireEvent.click(screen.getByRole("button", { name: "Neu anlegen" }));
+    fireEvent.click(screen.getByLabelText("Jede Woche"));
+    fireEvent.change(screen.getByLabelText("Erster Termin · Beginn"), { target: { value: "2027-03-23T16:00" } });
+    fireEvent.change(screen.getByLabelText("Wiederholen bis einschließlich"), { target: { value: "2027-04-13" } });
+    expect(unload()).toBe(true);
+    fireEvent.change(screen.getByLabelText("Kind auswählen"), { target: { value: "child" } });
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Weiter bearbeiten" }));
+    expect((screen.getByLabelText("Erster Termin · Beginn") as HTMLInputElement).value).toBe("2027-03-23T16:00");
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it("protects a draft when changing or clearing the child filter", async () => {
     const fetch = vi.fn().mockResolvedValue(Response.json({ ...data, childFilter: { id: "child", invalid: false } }));
     vi.stubGlobal("fetch", fetch);
@@ -56,7 +69,7 @@ describe("Elternentwürfe", () => {
     mount(); fireEvent.click(screen.getByRole("button", { name: tab }));
     fireEvent.click(screen.getByRole("button", { name: tab === "Kinderprofile" ? "Kind hinzufügen" : "Neu anlegen" }));
     expect(unload()).toBe(false);
-    const input = screen.getByLabelText(tab === "Kinderprofile" ? "Name" : tab === "Android-Apps" ? "Anzeigename" : tab === "Wünsche" ? "Wunsch oder Belohnung" : "Bezeichnung");
+    const input = screen.getByLabelText(tab === "Kinderprofile" ? "Name" : tab === "Android-Apps" ? "Anzeigename" : tab === "Wünsche" ? "Wunsch oder Belohnung" : tab === "Termine" ? "Was steht an?" : "Bezeichnung");
     fireEvent.change(input, { target: { value: "Entwurf" } }); expect(unload()).toBe(true);
     fireEvent.change(input, { target: { value: "" } }); expect(unload()).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "Abbrechen" })); expect(screen.queryByRole("dialog")).toBeNull();

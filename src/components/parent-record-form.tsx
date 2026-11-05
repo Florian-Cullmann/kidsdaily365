@@ -3,6 +3,8 @@
 import { useLayoutEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { firstRoutineDate, type Resource, type RoutineStep } from "@/domain/management";
 import { appointmentLocalInput, appointmentCandidates, appointmentInstant, appointmentRange } from "@/domain/appointment-time";
+import { AppointmentSeriesFields, type SeriesDraft } from "./appointment-series-fields";
+import { createSeriesSchema, resolveSeries } from "@/domain/appointment-series";
 import type { ManagementData } from "@/server/management";
 
 export type EditableRecord = Record<string, unknown> & { id: string };
@@ -40,11 +42,14 @@ function snapshot(form: HTMLFormElement) {
   }));
 }
 
-export function ParentRecordForm({ resource, data, record, defaultChildId, copySource, busy, draftRef, onSave, onCancel }: {
+export function ParentRecordForm({ resource, data, record, defaultChildId, copySource, busy, draftRef, onSave, onSaveSeries, onCancel }: {
   defaultChildId?: string; copySource?: string; resource: Resource; data: ManagementData; record: EditableRecord | null; busy: boolean;
   draftRef: RefObject<RecordDraft | null>;
-  onSave: (input: unknown) => Promise<void>; onCancel: () => void;
+  onSaveSeries?: (input: unknown) => Promise<void>; onSave: (input: unknown) => Promise<void>; onCancel: () => void;
 }) {
+  const [weekly, setWeekly] = useState(false);
+  const [seriesDraft, setSeriesDraft] = useState<SeriesDraft>({ startLocal: "", endLocal: null, until: "", choices: {} });
+  const seriesRequestId = useRef<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const lastFocus = useRef<HTMLElement | null>(null);
   const [weekdays, setWeekdays] = useState<number[]>(() => record?.weekdays as number[] ?? [1, 2, 3, 4, 5, 6, 7]);
@@ -97,6 +102,13 @@ export function ParentRecordForm({ resource, data, record, defaultChildId, copyS
       input = resource === "routines" ? { childId: fields.childId, title: fields.title, section: fields.section, scheduledTime: fields.scheduledTime, sortOrder: fields.sortOrder, steps, active, weekdays: form.getAll("weekdays").map(Number) } : { ...fields, date: field("date") };
     } else if (resource === "appointments") {
       try {
+        if (weekly && !record && onSaveSeries) {
+          seriesRequestId.current ??= crypto.randomUUID();
+          const series = createSeriesSchema.parse({ ...seriesDraft, requestId: seriesRequestId.current, childId: field("childId"), title: field("title"), icon: field("icon") });
+          resolveSeries(series, data.family.timezone);
+          await onSaveSeries(series);
+          return;
+        }
         const startsAt = appointmentInstant(field("startsAt"), data.family.timezone, field("startsAtInstant"), record?.startsAt);
         const endsAt = field("endsAt") ? appointmentInstant(field("endsAt"), data.family.timezone, field("endsAtInstant"), record?.endsAt) : null;
         input = { childId: field("childId"), title: field("title"), icon: field("icon"), ...appointmentRange(startsAt, endsAt), active };
@@ -110,11 +122,13 @@ export function ParentRecordForm({ resource, data, record, defaultChildId, copyS
     await onSave(input);
   }
 
-  return <form ref={formRef} className="record-form" onSubmit={submit} onFocusCapture={(event) => { if (event.target.matches("input, select, textarea")) lastFocus.current = event.target; }}>
-    <div className="record-form-heading"><h3>{copySource ? "Routine kopieren" : record ? "Eintrag bearbeiten" : "Neuen Eintrag anlegen"}</h3></div>
+  return <form ref={formRef} onFocusCapture={(event) => { if (event.target.matches("input, select, textarea")) lastFocus.current = event.target; }} className={`record-form${resource === "appointments" ? " appointment-form" : ""}`} onSubmit={submit}>
+    {record?.seriesId ? <p className="parent-callout">Du bearbeitest nur dieses Vorkommen der Serie. Das Kind bleibt unverändert. Andere Termine bleiben erhalten.</p> : null}
+    <div className="record-form-heading"><h3>{copySource ? "Routine kopieren" : resource === "appointments" ? (record ? "Termin bearbeiten" : "Neuen Termin anlegen") : (record ? "Eintrag bearbeiten" : "Neuen Eintrag anlegen")}</h3></div>
     {copySource && <div className="parent-callout"><p>Quelle: {copySource} · {String(record?.title)}</p><p>{enabled && firstDate ? `Im Tagesplan ab ${new Intl.DateTimeFormat("de-DE", { dateStyle: "long", timeZone: "UTC" }).format(new Date(`${firstDate}T12:00:00Z`))}.` : enabled ? "Bitte einen Wiederholungstag wählen." : "Nicht im Tagesplan: Routine ist inaktiv."}</p></div>}
     <fieldset disabled={busy} className="record-fields">
-      {withChild && <label>{copySource ? "Zielkind" : "Für welches Kind?"}<select name="childId" defaultValue={text("childId", defaultChildId ?? data.children.find((child) => child.active)?.id)} required><option value="">Bitte auswählen</option>{data.children.filter((child) => child.active || (!copySource && child.id === record?.childId)).map((child) => <option key={child.id} value={child.id}>{child.name}{child.active ? "" : " (archiviert)"}</option>)}</select></label>}
+      {resource === "appointments" && <label className="wide-field">Was steht an?<input name="title" defaultValue={text("title")} placeholder="z. B. Musikunterricht" required maxLength={80} /></label>}
+      {withChild && <label>{copySource ? "Zielkind" : "Für welches Kind?"}<select name="childId" defaultValue={text("childId", defaultChildId ?? data.children.find((child) => child.active)?.id)} required><option value="">Bitte auswählen</option>{data.children.filter((child) => record?.seriesId ? child.id === record.childId : child.active || (!copySource && child.id === record?.childId)).map((child) => <option key={child.id} value={child.id}>{child.name}{child.active ? "" : " (archiviert)"}</option>)}</select></label>}
       {resource === "children" && <>
         <label>Name<input name="name" defaultValue={text("name")} required maxLength={80} autoComplete="off" /></label>
         <label>Profilkürzel<input name="avatar" defaultValue={text("avatar")} maxLength={3} placeholder="z. B. M" /></label>
@@ -124,7 +138,7 @@ export function ParentRecordForm({ resource, data, record, defaultChildId, copyS
         </> : <p>Dein Kind wählt und benennt seinen Buddy nach dem Verbinden selbst auf seinem Android-Gerät.</p>}
         <label className="check-field"><input name="reducedMotion" type="checkbox" defaultChecked={record?.reducedMotion !== false} /><span>Bewegungsarme Darstellung</span></label>
       </>}
-      {(isTask || resource === "appointments" || resource === "rewards") && <label className="wide-field">{resource === "rewards" ? "Wunsch oder Belohnung" : "Bezeichnung"}<input name="title" defaultValue={text("title")} required maxLength={80} /></label>}
+      {(isTask || resource === "rewards") && <label className="wide-field">{resource === "rewards" ? "Wunsch oder Belohnung" : "Bezeichnung"}<input name="title" defaultValue={text("title")} required maxLength={80} /></label>}
       {isTask && <>
         {resource === "tasks" && <>
         <label className="wide-field">Kurze Erklärung<textarea name="description" defaultValue={text("description")} maxLength={500} rows={2} /></label>
@@ -165,9 +179,12 @@ export function ParentRecordForm({ resource, data, record, defaultChildId, copyS
         <button type="button" className="parent-secondary" disabled={steps.length >= 50} onClick={() => { setOpenStep(steps.length); setSteps((items) => [...items, { title: "", description: "", icon: "heart", points: 5 }]); }}>Aufgabe hinzufügen</button>
       </div>}
       {resource === "appointments" && <>
-        <AppointmentTimeField name="startsAt" label="Beginn" original={record?.startsAt} timeZone={data.family.timezone} required />
-        <AppointmentTimeField name="endsAt" label="Ende (optional)" original={record?.endsAt} timeZone={data.family.timezone} />
         <label>Bildsymbol<select name="icon" defaultValue={text("icon", "calendar")}><option value="calendar">📅 Termin</option><option value="tooth">🦷 Zahnarzt</option><option value="ball">⚽ Sport</option><option value="heart">💛 Allgemein</option></select></label>
+        <p className="field-help wide-field">Alle Uhrzeiten gelten in eurer Familienzeitzone: <strong>{data.family.timezone}</strong> – auch auf Reisen.</p>
+        {!record && onSaveSeries && <fieldset className="wide-field appointment-repeat"><legend>Wie oft findet der Termin statt?</legend>{[[false, "Einmalig"], [true, "Jede Woche"]].map(([repeat, label]) => <label key={String(repeat)}><input type="radio" name="repeat" checked={weekly === repeat} onChange={() => { setWeekly(Boolean(repeat)); setTimeError(""); }} /><span>{label}</span></label>)}</fieldset>}
+        {weekly ? <AppointmentSeriesFields value={seriesDraft} onChange={setSeriesDraft} timezone={data.family.timezone} /> : <><AppointmentTimeField name="startsAt" label="Beginn" original={record?.startsAt} timeZone={data.family.timezone} required />
+        <AppointmentTimeField name="endsAt" label="Ende (optional)" original={record?.endsAt} timeZone={data.family.timezone} /></>}
+
         {timeError && <p role="alert" className="field-help wide-field">{timeError}</p>}
       </>}
       {resource === "rewards" && <label>Benötigte Sterne<input name="cost" type="number" defaultValue={value("cost", 50)} min={1} max={1_000_000} required /></label>}
@@ -175,8 +192,8 @@ export function ParentRecordForm({ resource, data, record, defaultChildId, copyS
         <label>Anzeigename<input name="label" defaultValue={text("label")} required maxLength={80} placeholder="Audible" /></label>
         <label className="wide-field">Android-Paketname<input name="packageName" defaultValue={text("packageName")} required maxLength={255} placeholder="com.audible.application" autoCapitalize="none" autoCorrect="off" spellCheck={false} /><span className="field-help">Exakter Paketname der installierten App, keine Website oder Suchbegriffe.</span></label>
       </>}
-      {resource !== "tasks" && <label className="check-field wide-field"><input name="active" type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} /><span>{resource === "apps" ? "App freigegeben" : "Aktiv"}</span></label>}
+      {resource !== "tasks" && !weekly && <label className="check-field wide-field"><input name="active" type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} /><span>{resource === "apps" ? "App freigegeben" : "Aktiv"}</span></label>}
     </fieldset>
-    <div className="record-form-actions"><button type="button" className="parent-secondary" onClick={onCancel} disabled={busy}>Abbrechen</button><button className="parent-primary" disabled={busy}>{busy ? "Wird gespeichert …" : "Speichern"}</button></div>
+    <div className="record-form-actions"><button type="button" className="parent-secondary" onClick={onCancel} disabled={busy}>Abbrechen</button><button className="parent-primary" disabled={busy}>{busy ? "Wird gespeichert …" : resource === "appointments" && !record ? (weekly ? "Terminserie anlegen" : "Termin anlegen") : "Speichern"}</button></div>
   </form>;
 }
