@@ -348,3 +348,10 @@ progress::-moz-progress-bar { background: #efb832; border-radius: 20px; }
   .child-world > .wall-sync-status { position: absolute; right: 8px; bottom: 8px; align-items: flex-end; }
   .child-world > .wall-sync-status button { padding: 24px 0 0; }
 }
+
+.history-totals { display: flex; flex-wrap: wrap; gap: 1rem 2rem; padding: 1.2rem 0; color: #514567; }
+.history-totals strong { display: block; font-size: 1.4rem; }
+.task-correction { margin-top: 1rem; }
+.history-correction { padding: 1rem; border-radius: .7rem; background: #f5f1fa; }
+.history-correction { margin-top: 1rem; }
+.correction-reason { white-space: pre-wrap; overflow-wrap: anywhere; }

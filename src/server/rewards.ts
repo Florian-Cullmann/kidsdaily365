@@ -1,27 +1,14 @@
 import "server-only";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "./db/client";
-import { children, pointEntries, rewardRequestKeys, rewardRequests, rewards } from "./db/schema";
+import { pointEntries, rewardRequestKeys, rewardRequests, rewards } from "./db/schema";
+import { lockWallet, walletBalance } from "./wallet";
 import { ApiError } from "./errors";
 import { isUniqueViolation, type ParentActor } from "./auth/parent";
 
 export const rewardRequestInput = z.object({ requestId: z.uuid(), rewardId: z.uuid() }).strict();
 export const rewardDecisionInput = z.object({ decision: z.enum(["approved", "rejected"]) }).strict();
-type Transaction = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
-
-// All future spending (including buddy purchases) must acquire this child lock
-// before reading the journal and inserting its unique expense key in the same tx.
-export async function lockWallet(tx: Transaction, familyId: string, childId: string, requireActive = true) {
-  const [child] = await tx.select().from(children).where(and(eq(children.familyId, familyId), eq(children.id, childId))).for("update");
-  if (!child || (requireActive && !child.active)) throw new ApiError("Aktives Kinderprofil nicht gefunden.", 404);
-  return child;
-}
-export async function walletBalance(tx: Transaction, familyId: string, childId: string) {
-  const [row] = await tx.select({ value: sql`coalesce(sum(${pointEntries.amount}), 0)`.mapWith(Number) }).from(pointEntries)
-    .where(and(eq(pointEntries.familyId, familyId), eq(pointEntries.childId, childId)));
-  return row.value;
-}
 export async function requestReward(familyId: string, childId: string, input: unknown) {
   const data = rewardRequestInput.parse(input);
   return db().transaction(async (tx) => {

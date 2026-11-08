@@ -1,10 +1,14 @@
 import "server-only";
+import { alias } from "drizzle-orm/pg-core";
+import { lockWallet } from "./wallet";
 import { rewardHistory } from "./rewards";
 import { profileImageUrl } from "@/domain/profile-image";
 import { and, asc, eq, gt, gte, lte, isNull, or, sql } from "drizzle-orm";
 import { localDate, type DayPlan } from "@/domain/plan";
 import { db } from "./db/client";
 import { childSavingsGoals, buddyEquipment, appointments, childImages, children, dailyTasks, families, pointEntries, rewards, routinePauses, taskTemplates } from "./db/schema";
+
+const corrections = alias(pointEntries, "task_corrections");
 
 export class PlanError extends Error {
   constructor(message: string, public status: number) { super(message); }
@@ -49,24 +53,25 @@ export async function getDayPlans(familyId: string, now = new Date()): Promise<D
     }
   });
 
-  const [profiles, tasks, balances, upcoming, rewardOptions, images, equipment, savingsGoals] = await Promise.all([
-    db().select().from(children).where(and(eq(children.familyId, familyId), eq(children.active, true))).orderBy(asc(children.name)),
-    db().select({ task: dailyTasks, completedAt: pointEntries.createdAt })
+  const [profiles, tasks, balances, upcoming, rewardOptions, images, equipment, savingsGoals] = await db().transaction(async (tx) => Promise.all([
+    tx.select().from(children).where(and(eq(children.familyId, familyId), eq(children.active, true))).orderBy(asc(children.name)),
+    tx.select({ task: dailyTasks, completedAt: pointEntries.createdAt, correctedAt: corrections.createdAt })
       .from(dailyTasks).leftJoin(pointEntries, eq(dailyTasks.id, pointEntries.taskId))
+      .leftJoin(corrections, eq(corrections.correctionOf, pointEntries.id))
       .where(and(eq(dailyTasks.familyId, familyId), eq(dailyTasks.date, date), isNull(dailyTasks.cancelledAt)))
       .orderBy(asc(dailyTasks.sortOrder), asc(dailyTasks.templateId), asc(dailyTasks.stepIndex), asc(dailyTasks.id)),
-    db().select({ childId: pointEntries.childId, balance: sql`sum(${pointEntries.amount})`.mapWith(Number), earnedTotal: sql`sum(greatest(${pointEntries.amount}, 0))`.mapWith(Number) })
+    tx.select({ childId: pointEntries.childId, balance: sql`sum(${pointEntries.amount})`.mapWith(Number), earnedTotal: sql`sum(case when ${pointEntries.expenseKey} is null then ${pointEntries.amount} else 0 end)`.mapWith(Number) })
       .from(pointEntries).where(eq(pointEntries.familyId, familyId)).groupBy(pointEntries.childId),
-    db().select().from(appointments).where(and(eq(appointments.familyId, familyId), eq(appointments.active, true), or(
+    tx.select().from(appointments).where(and(eq(appointments.familyId, familyId), eq(appointments.active, true), or(
       gte(appointments.startsAt, now), gt(appointments.endsAt, now),
       and(isNull(appointments.endsAt), sql`(${appointments.startsAt} AT TIME ZONE ${timezone})::date = ${date}::date`),
     ))).orderBy(asc(appointments.startsAt)),
-    db().select({ id: rewards.id, title: rewards.title, cost: rewards.cost }).from(rewards)
+    tx.select({ id: rewards.id, title: rewards.title, cost: rewards.cost }).from(rewards)
       .where(and(eq(rewards.familyId, familyId), eq(rewards.active, true))).orderBy(asc(rewards.cost)),
-    db().select({ childId: childImages.childId, version: childImages.version }).from(childImages).where(eq(childImages.familyId, familyId)),
-    db().select().from(buddyEquipment).where(eq(buddyEquipment.familyId, familyId)),
-    db().select().from(childSavingsGoals).where(eq(childSavingsGoals.familyId, familyId)),
-  ]);
+    tx.select({ childId: childImages.childId, version: childImages.version }).from(childImages).where(eq(childImages.familyId, familyId)),
+    tx.select().from(buddyEquipment).where(eq(buddyEquipment.familyId, familyId)),
+    tx.select().from(childSavingsGoals).where(eq(childSavingsGoals.familyId, familyId)),
+  ]), { isolationLevel: "repeatable read", accessMode: "read only" });
 
   const history = await rewardHistory(familyId);
   const imageUrls = new Map(images.map((image) => [image.childId, profileImageUrl(image.childId, image.version)]));
@@ -79,10 +84,10 @@ export async function getDayPlans(familyId: string, now = new Date()): Promise<D
     appointments: upcoming.filter((item) => item.childId === child.id).map((item) => ({ id: item.id, title: item.title, startsAt: item.startsAt.toISOString(), endsAt: item.endsAt?.toISOString() ?? null, icon: item.icon })),
     rewards: rewardOptions,
     savingsGoalId: savingsGoals.find((goal) => goal.childId === child.id)?.rewardId ?? null,
-    tasks: tasks.filter(({ task }) => task.childId === child.id).map(({ task, completedAt }) => ({
+    tasks: tasks.filter(({ task }) => task.childId === child.id).map(({ task, completedAt, correctedAt }) => ({
       id: task.id, routineId: task.templateId, routineTitle: task.routineTitle, title: task.title, description: task.description, icon: task.icon,
       section: task.section, time: task.scheduledTime?.slice(0, 5) ?? null,
-      points: task.points, completed: completedAt !== null, paused: task.pausedBy !== null && completedAt === null,
+      points: task.points, corrected: correctedAt !== null, completed: completedAt !== null && correctedAt === null, paused: task.pausedBy !== null && completedAt === null,
     })),
   }));
 }
@@ -90,14 +95,22 @@ export async function getDayPlans(familyId: string, now = new Date()): Promise<D
 export async function completeTask(familyId: string, taskId: string, now = new Date()) {
   const { date } = await familyDay(familyId, now);
   return db().transaction(async (tx) => {
+    const [identity] = await tx.select({ childId: dailyTasks.childId }).from(dailyTasks).where(and(eq(dailyTasks.id, taskId), eq(dailyTasks.familyId, familyId)));
+    if (!identity) throw new PlanError("Aufgabe nicht gefunden.", 404);
+    await lockWallet(tx, familyId, identity.childId, false);
     const [task] = await tx.select().from(dailyTasks).where(and(
       eq(dailyTasks.id, taskId), eq(dailyTasks.familyId, familyId), isNull(dailyTasks.cancelledAt),
     )).for("update");
     if (!task) throw new PlanError("Aufgabe nicht gefunden.", 404);
-    const [child] = await tx.select({ id: children.id }).from(children).where(and(eq(children.id, task.childId), eq(children.active, true))).for("share");
+    const [child] = await tx.select({ id: children.id }).from(children).where(and(eq(children.id, task.childId), eq(children.familyId, familyId), eq(children.active, true))).for("share");
     if (!child) throw new PlanError("Kinderprofil ist nicht aktiv.", 409);
     if (task.pausedBy) throw new PlanError("Diese Aufgabe hat heute Pause. Bitte den Plan neu laden.", 409);
     if (task.date !== date) throw new PlanError("Ein neuer Tag hat begonnen. Bitte den Plan neu laden.", 409);
+    const [original] = await tx.select({ id: pointEntries.id }).from(pointEntries).where(and(eq(pointEntries.taskId, task.id), eq(pointEntries.familyId, familyId)));
+    if (original) {
+      const [correction] = await tx.select({ id: pointEntries.id }).from(pointEntries).where(eq(pointEntries.correctionOf, original.id));
+      if (correction) throw new PlanError("Dieser Abschluss wurde durch Eltern korrigiert. Bitte den Plan neu laden.", 409);
+    }
     const inserted = await tx.insert(pointEntries).values({
       familyId, childId: task.childId, taskId: task.id, amount: task.points,
     }).onConflictDoNothing({ target: pointEntries.taskId }).returning({ id: pointEntries.id });

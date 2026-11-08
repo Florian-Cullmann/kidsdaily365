@@ -4,7 +4,7 @@ import { z } from "zod";
 import { db } from "./db/client";
 import { childSavingsGoals, rewards } from "./db/schema";
 import { ApiError } from "./errors";
-import { lockWallet } from "./rewards";
+import { lockWallet } from "./wallet";
 
 export async function setSavingsGoal(familyId: string, childId: string, input: unknown) {
   const { rewardId } = z.object({ rewardId: z.uuid().nullable() }).strict().parse(input);

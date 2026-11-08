@@ -99,6 +99,13 @@
       "when": 1794171404606,
       "tag": "0013_app_installation_status",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794171878230,
+      "tag": "0014_thin_sentinel",
+      "breakpoints": true
     }
   ]
 }

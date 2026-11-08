@@ -1,24 +1,28 @@
-# Entwurf: Aufgabenabschlüsse korrigieren (#52)
+# Aufgabenabschlüsse korrigieren (#52)
 
-Status: Vorschlag zur Abstimmung vor der Implementierung, keine verfügbare Funktion.
-Dieser Entwurf schließt [#52](https://github.com/Florian-Cullmann/kidsdaily365/issues/52) nicht.
+Implementierungsvertrag: Eltern finden die Aktion unter **Elternbereich → Tagesverlauf**.
+Eine Korrektur nimmt die ursprünglich vergebenen Sterne zurück und erhält den Abschluss.
+Sie öffnet die Aufgabe ausdrücklich nicht erneut.
 
-## Voraussetzungen und Reihenfolge
+## Gemeinsame Journalbasis und Integration
 
-Die Korrektur baut auf dem gemeinsamen Journal für
-[Belohnungseinlösungen #27](https://github.com/Florian-Cullmann/kidsdaily365/issues/27)
-und [Buddy-Käufe #3](https://github.com/Florian-Cullmann/kidsdaily365/issues/3)
-sowie dem [Tagesverlauf #30](https://github.com/Florian-Cullmann/kidsdaily365/issues/30)
-auf. Der Tagesverlauf liegt in [PR #36](https://github.com/Florian-Cullmann/kidsdaily365/pull/36).
-Stand 4. November 2026 sind diese Voraussetzungen nicht in `main` integriert.
-Das Journal auf `main` enthält ausschließlich positive Aufgabenbuchungen einschließlich
-Null-Sterne-Abschlüssen; ein zweites Journal nur für Korrekturen wäre die falsche Basis.
+Der Tagesverlauf (#30) ist integriert. Diese Implementierung erweitert das bestehende
+`point_entries`-Journal direkt; es entsteht kein zweites Punktejournal. `taskId` bleibt
+für ursprüngliche Aufgabenabschlüsse eindeutig. Ausgaben benutzen das eindeutige
+`expenseKey` aus dem Vertragsentwurf von #27. Korrekturen benutzen ein eindeutiges
+`correctionOf` auf die ursprüngliche Buchung sowie `correctedBy`, `correctionReason`
+und den serverseitigen Zeitstempel `createdAt`.
 
-Zuerst den gemeinsamen Vertrag für Buchungstypen, Guthaben und Sperrreihenfolge
-mit #27/#3 festlegen und die benötigte Journalbasis integrieren. Anschließend
-#52 auf den integrierten Tagesverlauf aufsetzen. Der gesamte Buddy-Shop muss dafür
-nicht fertig sein; seine späteren Ausgaben müssen denselben Vertrag verwenden.
-Konkrete Spaltennamen und Migrationen folgen dem dann integrierten Schema.
+Die Eltern-/Kinder-/Haushaltszuordnung ist durch zusammengesetzte Fremdschlüssel
+abgesichert. `src/server/wallet.ts` definiert die gemeinsame Kindersperre sowie
+Guthaben, gültigen Gesamtverdienst und Ausgaben. Abschluss und Korrektur sperren
+immer zuerst das Kind. Die integrierten Einlösungen (#27) und Sparziele verwenden
+jetzt dieselben Wallet-Helfer. Auch künftige Buddy-Käufe (#3) müssen diese Sperre
+vor dem Lesen des Guthabens nehmen.
+
+Die Korrektur-Migration baut auf den aktuellen Journal- und Einlösungsmigrationen
+auf. Ein Integrationstest führt eine echte Elternbestätigung einer Belohnung
+parallel zu einer Korrektur aus und prüft, dass das Guthaben nicht negativ wird.
 
 ## Fachliche Entscheidung zur erneuten Erledigung
 
@@ -95,9 +99,7 @@ bleibt bestätigt, beide ursprünglichen Vergütungen bleiben im Verlauf sichtba
 
 Belohnungsbestätigungen, Buddy-Käufe und Korrekturen müssen dieselbe Kindersperre
 vor der Guthabenprüfung verwenden. Alle Pfade, die Kind und Aufgabe sperren,
-benötigen dieselbe Reihenfolge **Kind vor Aufgabe**. Der bestehende Abschlussdienst
-sperrt derzeit erst die Aufgabe und danach das Kind; diese Reihenfolge muss vor
-Integration geprüft und angepasst werden, damit kein gegenseitiges Warten entsteht.
+benötigen dieselbe Reihenfolge **Kind vor Aufgabe**. Der Abschlussdienst verwendet dieselbe Reihenfolge, damit kein gegenseitiges Warten entsteht.
 Ein Unique-Konflikt darf keinen zweiten Abzug oder halben Auditdatensatz hinterlassen.
 
 Vergangene und aktuelle gespeicherte Tageskopien sind korrigierbar; der Lese- oder
@@ -110,10 +112,10 @@ der Familienzeitzone, nie dem Serverdatum.
 ## Eltern- und Kinderansicht
 
 Im Tagesverlauf aus #30 steht bei einem noch nicht korrigierten Abschluss die
-Aktion „Abschluss korrigieren“. Der Bestätigungsdialog nennt Kind, Aufgabentitel,
-Familientag, ursprünglichen Abschlusszeitpunkt, abzuziehende Sterne und die
-Folge „Diese Aufgabe wird nicht wieder geöffnet“. Begründung und ausdrückliche
-Bestätigung sind erforderlich; ein einzelnes Antippen führt keine Buchung aus.
+Aktion „Bestätigung zurückziehen“. Das bestehende Custom-Popup fragt
+„Bestätigung wirklich zurückziehen?“ mit „Abbrechen“ und „OK“. Erst „OK“ löst
+die Buchung aus. Der Vermerk „Bestätigung durch Eltern zurückgezogen.“ wird
+automatisch gespeichert; ein Begründungsfeld oder eine Checkbox ist nicht nötig.
 
 Danach zeigt der Verlauf sowohl „Abgeschlossen: +N Sterne“ als auch
 „Durch Eltern korrigiert: −N Sterne“, mit Elternidentität, Zeitpunkt und Begründung.
@@ -124,9 +126,9 @@ Aufgaben nicht als regulär erledigt; sie bleiben ohne offenen Abschlussbutton s
 
 ## Umsetzung und Nachweis
 
-Die Implementierung benötigt eine versionierte Migration des gemeinsamen Journals,
-einen Elternendpunkt, einen transaktionalen Serverdienst sowie Anpassungen an
-Tagesverlauf, Tagesplan, Guthaben- und Verdienstabfragen. Joins dürfen durch zusätzliche
+Die Implementierung enthält Migration `0014_thin_sentinel.sql`, den Elternendpunkt
+`POST /api/parent/task-completions/[id]/correct`, den transaktionalen Dienst sowie
+Anpassungen an Tagesverlauf, Tagesplan, Wochen-/Druckansicht und Guthabenabfragen. Joins dürfen durch zusätzliche
 Buchungen keine Tageskopien vervielfachen. Bestehende Daten werden nicht umgeschrieben.
 
 Integrationstests gegen eine migrierte disposable `*_test`-Datenbank müssen abdecken:
@@ -145,6 +147,4 @@ Integrationstests gegen eine migrierte disposable `*_test`-Datenbank müssen abd
 
 Danach `npm run check`, `npm run build` und `npm run test:integration` ausführen.
 Der Implementierungs-PR braucht einen Screenshot der tatsächlichen Elternansicht
-mit fiktiven Profilen als kanonischen GitHub-Anhang. Dieser Dokumentationsentwurf
-liefert weder Laufzeitnachweis noch UI-Screenshot und darf nicht als vollständige
-Umsetzung von #52 behandelt werden.
+mit fiktiven Profilen als kanonischen GitHub-Anhang. Prüfresultate und Screenshot werden im Implementierungs-PR dokumentiert.
