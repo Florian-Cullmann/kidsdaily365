@@ -6,7 +6,14 @@ export const usageEvent = z.object({
   kind: z.enum(["resume", "pause", "screen-on", "screen-off", "shutdown"]),
   packageName: z.string().max(255), label: z.string().max(120),
 }).strict();
+export const appStatus = z.object({
+  packageName: z.string().min(3).max(255),
+  status: z.enum(["launchable", "installed", "missing", "unknown"]),
+  checkedAt: z.iso.datetime(),
+}).strict();
+export type AppStatus = z.infer<typeof appStatus>;
 export const syncInput = z.object({
+  appStatuses: z.array(appStatus).max(200).optional(),
   revision: z.number().int().min(-1).max(2147483646), appliedLocked: z.boolean(),
   localRelease: z.boolean().default(false), ready: z.boolean(), usagePermission: z.boolean(),
   usageSince: z.iso.datetime().nullable(), usageThrough: z.iso.datetime().nullable(),

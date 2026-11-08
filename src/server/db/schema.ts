@@ -1,3 +1,4 @@
+import type { AppStatus } from "@/domain/device-management";
 import type { RoutineStep } from "@/domain/management";
 import { sql } from "drizzle-orm";
 import { boolean, check, customType, date, foreignKey, index, integer, jsonb, pgEnum, pgTable, text, time, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
@@ -272,6 +273,7 @@ export const deviceManagement = pgTable("device_management", {
   lastSeenAt: timestamp({ withTimezone: true }), ready: boolean().notNull().default(false),
   usagePermission: boolean().notNull().default(false), usageSince: timestamp({ withTimezone: true }),
   usageThrough: timestamp({ withTimezone: true }), error: text(),
+  appStatuses: jsonb().$type<AppStatus[]>().notNull().default([]),
 }, (t) => [
   foreignKey({ columns: [t.deviceId, t.familyId], foreignColumns: [devices.id, devices.familyId] }).onDelete("cascade"),
   foreignKey({ columns: [t.childId, t.familyId], foreignColumns: [children.id, children.familyId] }).onDelete("cascade"),

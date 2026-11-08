@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/server/db/client";
-import { children, devices, families, deviceManagement, childMessages, deviceUsageEvents } from "@/server/db/schema";
+import { allowedApps, children, devices, families, deviceManagement, childMessages, deviceUsageEvents } from "@/server/db/schema";
 import { createManagementCode, enrollManagement, getDeviceManagement, managedDevice, messagePage, readMessages, requireManagement, sendMessage, setDeviceLock, syncManagement } from "@/server/device-management";
 import { deviceFromToken, revokeDevice } from "@/server/devices";
 import { digestToken, newToken } from "@/server/auth/secrets";
@@ -24,7 +24,7 @@ beforeEach(async () => {
   await db().insert(devices).values({ id: deviceId, familyId, childId, kind: "android", label: "Test phone", tokenHash: digestToken(launcherToken), expiresAt: new Date(Date.now() + 86400000) });
 });
 afterAll(async () => {
-  for (const table of [devices, children]) await db().delete(table).where(inArray(table.familyId, familyIds));
+  for (const table of [allowedApps, devices, children]) await db().delete(table).where(inArray(table.familyId, familyIds));
   await db().delete(families).where(inArray(families.id, familyIds)); await db().$client.end();
 });
 async function enroll() { const code = await createManagementCode(parent, deviceId); return enrollManagement({ deviceId, code: code.code }); }
@@ -76,6 +76,37 @@ describe("separate device-management capability", () => {
     await syncManagement(actor, { ...sync, revision: 0, error: "Apps konnten nicht pausiert werden", events: [event] });
     expect(await db().select().from(deviceUsageEvents).where(eq(deviceUsageEvents.deviceId, deviceId))).toHaveLength(1);
     expect((await getDeviceManagement(parent, deviceId)).state?.acknowledgedRevision).toBe(-1);
+  });
+});
+describe("approved app reports", () => {
+  it("accepts legacy sync, scopes reports to approvals and replaces installation state", async () => {
+    await db().insert(allowedApps).values({ familyId: parent.familyId, childId, packageName: "test.allowed", label: "Approved" });
+    const actor = await requireManagement(request((await enroll()).token));
+    expect(await syncManagement(actor, sync)).toMatchObject({ schemaVersion: 1, appStatusVersion: 1, appStatusPackages: ["test.allowed"] });
+    expect((await getDeviceManagement(parent, deviceId)).apps[0]).toMatchObject({ status: "unknown", checkedAt: null });
+    const report = (status: string) => ({ ...sync, appStatuses: [{ packageName: "test.allowed", status, checkedAt: new Date().toISOString() }, { packageName: "private.unapproved", status, checkedAt: new Date().toISOString() }] });
+    for (const status of ["launchable", "installed", "missing", "unknown"]) {
+      await syncManagement(actor, report(status));
+      expect((await getDeviceManagement(parent, deviceId)).apps[0].status).toBe(status);
+      const [stored] = await db().select().from(deviceManagement).where(eq(deviceManagement.deviceId, deviceId));
+      expect(stored.appStatuses).toHaveLength(1);
+    }
+    await expect(syncManagement(actor, { ...sync, appStatuses: [{ packageName: "test.allowed", status: "missing", checkedAt: "2000-01-01T00:00:00Z" }] })).rejects.toMatchObject({ status: 400 });
+    const secondDevice = randomUUID();
+    await db().insert(devices).values({ id: secondDevice, familyId: parent.familyId, childId, kind: "android", label: "Other phone", tokenHash: digestToken(newToken()), expiresAt: new Date(Date.now() + 86400000) });
+    expect((await getDeviceManagement(parent, secondDevice)).apps[0]).toMatchObject({ status: "unknown", checkedAt: null });
+    await db().update(allowedApps).set({ active: false }).where(eq(allowedApps.childId, childId));
+    await syncManagement(actor, report("launchable"));
+    expect((await getDeviceManagement(parent, deviceId)).apps).toEqual([]);
+    expect((await db().select().from(deviceManagement).where(eq(deviceManagement.deviceId, deviceId)))[0].appStatuses).toEqual([]);
+  });
+  it("rejects reports without management approval and after revocation, including an already authenticated actor", async () => {
+    await expect(requireManagement(request(launcherToken))).rejects.toMatchObject({ status: 401 });
+    const actor = await requireManagement(request((await enroll()).token));
+    await expect(syncManagement(actor, { ...sync, deviceId: randomUUID(), appStatuses: [] })).rejects.toThrow();
+    await expect(getDeviceManagement({ ...parent, familyId: randomUUID() }, deviceId)).rejects.toMatchObject({ status: 404 });
+    await revokeDevice(parent, deviceId);
+    await expect(syncManagement(actor, { ...sync, appStatuses: [] })).rejects.toMatchObject({ status: 401 });
   });
 });
 describe("household chat", () => {
