@@ -1,4 +1,5 @@
 "use client";
+import { newRequestId } from "@/client/request-id";
 import { RewardHistory } from "./reward-history";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -118,7 +119,7 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
     try {
       // Retain this ID across failures and reloads, including a lost response after a decision.
       const storageKey = `reward-request:${key}`;
-      const requestId = rewardKeys.current.get(key) ?? sessionStorage.getItem(storageKey) ?? crypto.randomUUID();
+      const requestId = rewardKeys.current.get(key) ?? sessionStorage.getItem(storageKey) ?? newRequestId();
       rewardKeys.current.set(key, requestId); sessionStorage.setItem(storageKey, requestId);
       const result = await sync.requestReward(plan.child.id, rewardId, requestId);
       if (!result) return;

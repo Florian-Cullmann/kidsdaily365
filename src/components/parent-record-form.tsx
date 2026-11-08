@@ -1,4 +1,5 @@
 "use client";
+import { newRequestId } from "@/client/request-id";
 
 import { useLayoutEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { firstRoutineDate, type Resource, type RoutineStep } from "@/domain/management";
@@ -103,7 +104,7 @@ export function ParentRecordForm({ resource, data, record, defaultChildId, copyS
     } else if (resource === "appointments") {
       try {
         if (weekly && !record && onSaveSeries) {
-          seriesRequestId.current ??= crypto.randomUUID();
+          seriesRequestId.current ??= newRequestId();
           const series = createSeriesSchema.parse({ ...seriesDraft, requestId: seriesRequestId.current, childId: field("childId"), title: field("title"), icon: field("icon") });
           resolveSeries(series, data.family.timezone);
           await onSaveSeries(series);

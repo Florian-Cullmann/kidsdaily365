@@ -1,4 +1,5 @@
 "use client";
+import { newRequestId } from "@/client/request-id";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { CalendarDays, Pause, X } from "lucide-react";
@@ -22,7 +23,7 @@ export function RoutinePauses({ routine, childName, today, timezone, pauses, bus
     if (start < today) { setError("Die Pause kann frühestens heute beginnen."); return; }
     if (end < start) { setError("Das Enddatum darf nicht vor dem Startdatum liegen."); return; }
     if (!pending.current || pending.current.startsOn !== start || pending.current.endsOn !== end || pending.current.reason !== reason.trim()) {
-      pending.current = { requestId: crypto.randomUUID(), startsOn: start, endsOn: end, reason: reason.trim() };
+      pending.current = { requestId: newRequestId(), startsOn: start, endsOn: end, reason: reason.trim() };
     }
     await onCreate(pending.current);
   }
