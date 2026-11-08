@@ -126,7 +126,7 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
       : <span>{syncTime ? `Letzter Sync: ${syncTime}` : "Versuche Sync..."}</span>}
   </div>;
 
-  if (!plans.length) return <main className="center-page"><div className="setup-card"><h1>Hier ist Platz für eure Pläne.</h1><p>Noch kein Kinderprofil vorhanden. Bitte zuerst die Einrichtung auf dem Server abschließen.</p></div>{syncStatus}</main>;
+  if (!plans.length) return <main className="center-page"><div className="setup-card"><h1>Hier ist Platz für eure Pläne.</h1><p>Hier fehlt noch ein aktives Kinderprofil. Bitte deine Eltern, im Elternbereich unter „Kinderprofile“ ein Profil anzulegen oder wieder zu aktivieren.</p></div>{syncStatus}</main>;
 
   if (!plan) return <main className="profile-screen forest-world">
     <div className="brand profile-brand"><span className="brand-mark"><House size={27} /></span><span>kidsdaily<span className="brand-number">365</span></span></div>

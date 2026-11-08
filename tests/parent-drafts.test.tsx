@@ -152,3 +152,18 @@ describe("Elternentwürfe", () => {
     expect(screen.queryByLabelText("Bezeichnung")).toBeNull(); expect(screen.queryByRole("dialog")).toBeNull(); expect(unload()).toBe(false);
   });
 });
+
+
+describe("Einrichtung mit Kinderfilter", () => {
+  it("evaluates the household without discarding the selected child filter", async () => {
+    const fetch = vi.fn().mockResolvedValue(Response.json(data));
+    vi.stubGlobal("fetch", fetch);
+    const filtered = { ...data, childFilter: { id: "child", invalid: false }, routines: [] };
+    render(<ParentConsole parent={parent} initialData={filtered} />);
+    expect(screen.getByText("Einrichtungsstatus wird geladen …")).toBeTruthy();
+    expect(await screen.findByText("Eine aktive Routine mit Schritten gehört zu einem aktiven Kind.")).toBeTruthy();
+    expect(fetch).toHaveBeenCalledWith("/api/parent/data", expect.anything());
+    fireEvent.click(screen.getByRole("button", { name: "Routinen verwalten" }));
+    expect((screen.getByLabelText("Kind auswählen") as HTMLSelectElement).value).toBe("child");
+  });
+});

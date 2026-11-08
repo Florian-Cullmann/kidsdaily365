@@ -10,6 +10,7 @@ import type { Resource } from "@/domain/management";
 import { ParentRecordForm, type EditableRecord, type RecordDraft } from "./parent-record-form";
 import { UnsavedRecordDialog } from "./unsaved-record-dialog";
 import { RoutinePauses } from "./routine-pauses";
+import { ParentSetupChecklist } from "./parent-setup-checklist";
 import { BuddyWardrobe } from "./buddy-wardrobe";
 import { ProfilePicture } from "./profile-picture";
 import { ProfileImageEditor } from "./profile-image-editor";
@@ -79,6 +80,18 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
   }
   const [data, setData] = useState(initialData);
   const [tab, setTab] = useState<Tab>(tabs.find((item) => item.id === initialTab)?.id ?? "overview");
+  const [setupData, setSetupData] = useState<{ source: ManagementData; value: ManagementData } | null>(null);
+  const [setupError, setSetupError] = useState("");
+  useEffect(() => {
+    if (tab !== "overview" || !data.childFilter.id) return;
+    let cancelled = false;
+    request("/api/parent/data").then((next: ManagementData) => {
+      if (!cancelled) { setSetupData({ source: data, value: next }); setSetupError(""); }
+    }).catch((cause: unknown) => {
+      if (!cancelled) setSetupError(cause instanceof Error ? cause.message : "Einrichtungsstatus konnte nicht geladen werden.");
+    });
+    return () => { cancelled = true; };
+  }, [data, tab]);
   const [formVersion, setFormVersion] = useState(0);
   const [pauseRoutineId, setPauseRoutineId] = useState<string | null>(null);
   const pauseRoutine = data.routines.find(routine => routine.id === pauseRoutineId);
@@ -206,7 +219,11 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
       <div className="parent-feedback" aria-live="polite">{notice && <p className="parent-success"><Check size={19} />{notice}</p>}<p className="parent-error" role="alert">{error}</p></div>
 
       {tab === "overview" && <>
-        {!activeChildren && <section className="parent-panel"><h2>{data.children.length ? "Keine aktiven Kinderprofile vorhanden." : "Noch keine Kinderprofile vorhanden."}</h2><p>Lege ein Kinderprofil an, um Aufgaben und Termine zuzuordnen.</p><button className="parent-primary" onClick={() => createRecord("children")}>Kind hinzufügen</button></section>}
+        {data.childFilter.id && setupData?.source !== data ? <section className="parent-panel" aria-live="polite"><p>{setupError || "Einrichtungsstatus wird geladen …"}</p><button className="parent-secondary" disabled={busy} onClick={() => action(refresh)}>Status aktualisieren</button></section> : <ParentSetupChecklist data={data.childFilter.id ? setupData!.value : data} busy={busy}
+          onChild={() => activeChildren ? navigate("children") : createRecord("children")}
+          onRoutine={(complete) => complete ? navigate("routines") : createRecord("routines")}
+          onWall={() => { setDeviceKind("wall"); navigate("devices"); }}
+          onRefresh={() => action(refresh)} />}
         <div className="parent-overview-grid">{[
           { title: "Kinderprofile", text: `${activeChildren} ${activeChildren === 1 ? "aktives Profil" : "aktive Profile"}${activeChildren ? ` · ${data.children.filter((child) => child.active).map((child) => child.name).join(", ")}` : ""}`, view: "children" as Tab, icon: Users },
           { title: "Routinen", text: data.childFilter.id ? "Routinen für eure Kinder verwalten" : `${data.routines.filter((routine) => routine.active).length} aktive Routinen`, view: "routines" as Tab, icon: BookOpen },
