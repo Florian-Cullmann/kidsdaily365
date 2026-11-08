@@ -16,15 +16,13 @@ und den serverseitigen Zeitstempel `createdAt`.
 Die Eltern-/Kinder-/Haushaltszuordnung ist durch zusammengesetzte Fremdschlüssel
 abgesichert. `src/server/wallet.ts` definiert die gemeinsame Kindersperre sowie
 Guthaben, gültigen Gesamtverdienst und Ausgaben. Abschluss und Korrektur sperren
-immer zuerst das Kind. Auch künftige Einlösungen (#27) und Buddy-Käufe (#3) müssen
-diese Sperre vor dem Lesen des Guthabens nehmen.
+immer zuerst das Kind. Die integrierten Einlösungen (#27) und Sparziele verwenden
+jetzt dieselben Wallet-Helfer. Auch künftige Buddy-Käufe (#3) müssen diese Sperre
+vor dem Lesen des Guthabens nehmen.
 
-PR #73 (#27) ist noch nicht integriert. Bei seiner Integration die dortige
-Journalmigration auf dieses Schema neu aufbauen (kein erneutes Hinzufügen von
-`expenseKey`, keine Entfernung der Korrekturconstraints) und die Wallet-Helfer
-importieren. Der Ausgabenvertrag wird hier durch gleichzeitige Testbuchungen unter
-der gemeinsamen Sperre geprüft; der noch nicht integrierte Einlösungsendpunkt ist
-kein Bestandteil dieser Implementierung. Der Buddy-Shop muss dafür nicht fertig sein.
+Die Korrektur-Migration baut auf den aktuellen Journal- und Einlösungsmigrationen
+auf. Ein Integrationstest führt eine echte Elternbestätigung einer Belohnung
+parallel zu einer Korrektur aus und prüft, dass das Guthaben nicht negativ wird.
 
 ## Fachliche Entscheidung zur erneuten Erledigung
 
@@ -114,10 +112,10 @@ der Familienzeitzone, nie dem Serverdatum.
 ## Eltern- und Kinderansicht
 
 Im Tagesverlauf aus #30 steht bei einem noch nicht korrigierten Abschluss die
-Aktion „Abschluss korrigieren“. Der Bestätigungsdialog nennt Kind, Aufgabentitel,
-Familientag, ursprünglichen Abschlusszeitpunkt, abzuziehende Sterne und die
-Folge „Diese Aufgabe wird nicht wieder geöffnet“. Begründung und ausdrückliche
-Bestätigung sind erforderlich; ein einzelnes Antippen führt keine Buchung aus.
+Aktion „Bestätigung zurückziehen“. Das bestehende Custom-Popup fragt
+„Bestätigung wirklich zurückziehen?“ mit „Abbrechen“ und „OK“. Erst „OK“ löst
+die Buchung aus. Der Vermerk „Bestätigung durch Eltern zurückgezogen.“ wird
+automatisch gespeichert; ein Begründungsfeld oder eine Checkbox ist nicht nötig.
 
 Danach zeigt der Verlauf sowohl „Abgeschlossen: +N Sterne“ als auch
 „Durch Eltern korrigiert: −N Sterne“, mit Elternidentität, Zeitpunkt und Begründung.
@@ -128,7 +126,7 @@ Aufgaben nicht als regulär erledigt; sie bleiben ohne offenen Abschlussbutton s
 
 ## Umsetzung und Nachweis
 
-Die Implementierung enthält Migration `0011_noisy_iceman.sql`, den Elternendpunkt
+Die Implementierung enthält Migration `0014_thin_sentinel.sql`, den Elternendpunkt
 `POST /api/parent/task-completions/[id]/correct`, den transaktionalen Dienst sowie
 Anpassungen an Tagesverlauf, Tagesplan, Wochen-/Druckansicht und Guthabenabfragen. Joins dürfen durch zusätzliche
 Buchungen keine Tageskopien vervielfachen. Bestehende Daten werden nicht umgeschrieben.

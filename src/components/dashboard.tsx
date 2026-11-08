@@ -1,4 +1,5 @@
 "use client";
+import { RewardHistory } from "./reward-history";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CalendarDays, Check, ChevronRight, Heart, House, Maximize, Pause, Star, Users } from "lucide-react";
@@ -33,6 +34,8 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
   const [notice, setNotice] = useState<{ text: string } | null>(null);
   const noticeContext = useRef(0);
   const [error, setError] = useState("");
+  const [confirmReward, setConfirmReward] = useState<string | null>(null);
+  const rewardKeys = useRef(new Map<string, string>());
   const [previousPlans, setPreviousPlans] = useState(plans);
   if (previousPlans !== plans) {
     setPreviousPlans(plans);
@@ -80,7 +83,7 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
 
   function chooseProfile(id: string) {
     noticeContext.current += 1;
-    setChildId(id); setView("day"); setNotice(null); setError("");
+    setConfirmReward(null); setChildId(id); setView("day"); setNotice(null); setError("");
   }
 
   function openView(nextView: View) {
@@ -106,6 +109,42 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
     else if (!sync.getSnapshot().dayChanged) setNotice({ text: result.awarded ? `Geschafft! ${result.awarded} neue Sterne für dich.` : "Das hast du geschafft!" });
   }
 
+  async function askReward(rewardId: string) {
+    if (busy || !plan || demo) return;
+    setError("");
+    const context = noticeContext.current;
+    const key = `${plan.child.id}:${rewardId}`;
+    try {
+      // Retain this ID across failures and reloads, including a lost response after a decision.
+      const storageKey = `reward-request:${key}`;
+      const requestId = rewardKeys.current.get(key) ?? sessionStorage.getItem(storageKey) ?? crypto.randomUUID();
+      rewardKeys.current.set(key, requestId); sessionStorage.setItem(storageKey, requestId);
+      const result = await sync.requestReward(plan.child.id, rewardId, requestId);
+      if (!result) return;
+      if ("error" in result) throw new Error(result.error);
+      sessionStorage.removeItem(storageKey); rewardKeys.current.delete(key);
+      if (context === noticeContext.current) { setConfirmReward(null); setNotice({ text: "Deine Anfrage ist gespeichert. Den Stand siehst du im Verlauf." }); }
+    } catch (cause) { if (context === noticeContext.current) setError(cause instanceof Error && !(cause instanceof TypeError) ? cause.message : "Der Server ist gerade nicht erreichbar. Bitte erneut versuchen; deine Anfrage wird nicht doppelt gespeichert."); }
+  }
+
+  async function saveGoal(rewardId: string | null) {
+    if (busy || !plan) return;
+    const context = noticeContext.current;
+    setError(""); setNotice(null);
+    try {
+      if (demo) {
+        setDemoPlans((previous) => previous.map((item) => item.child.id === plan.child.id ? { ...item, savingsGoalId: rewardId } : item));
+      } else {
+        const result = await sync.saveGoal(plan.child.id, rewardId);
+        if (!result) return;
+        if ("error" in result) throw new Error(result.error);
+      }
+      if (context === noticeContext.current) setNotice({ text: rewardId ? "Dein Sparziel ist ausgewählt. Deine Sterne bleiben frei verfügbar." : "Dein Sparziel ist entfernt. Deine Sterne bleiben bei dir." });
+    } catch (cause) {
+      if (context === noticeContext.current) setError(cause instanceof Error && !(cause instanceof TypeError) ? cause.message : "Der Server ist gerade nicht erreichbar. Bitte versuche es erneut.");
+    }
+  }
+
   async function fullscreen() {
     try {
       if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
@@ -126,7 +165,7 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
       : <span>{syncTime ? `Letzter Sync: ${syncTime}` : "Versuche Sync..."}</span>}
   </div>;
 
-  if (!plans.length) return <main className="center-page"><div className="setup-card"><h1>Hier ist Platz für eure Pläne.</h1><p>Noch kein Kinderprofil vorhanden. Bitte zuerst die Einrichtung auf dem Server abschließen.</p></div>{syncStatus}</main>;
+  if (!plans.length) return <main className="center-page"><div className="setup-card"><h1>Hier ist Platz für eure Pläne.</h1><p>Hier fehlt noch ein aktives Kinderprofil. Bitte deine Eltern, im Elternbereich unter „Kinderprofile“ ein Profil anzulegen oder wieder zu aktivieren.</p></div>{syncStatus}</main>;
 
   if (!plan) return <main className="profile-screen forest-world">
     <div className="brand profile-brand"><span className="brand-mark"><House size={27} /></span><span>kidsdaily<span className="brand-number">365</span></span></div>
@@ -144,7 +183,8 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
   const next = plan.tasks.find((task) => !task.completed && !task.paused && !task.corrected);
   const appointments = now ? relevantAppointments(plan.appointments, plan.timezone, now) : plan.appointments;
   const nextAppointment = appointments[0];
-  const goal = plan.rewards.find((reward) => reward.cost > plan.balance) ?? plan.rewards[0];
+  const goal = plan.rewards.find((reward) => reward.id === plan.savingsGoalId);
+  const archivedGoal = !!plan.savingsGoalId && !goal;
   const dateLabel = new Intl.DateTimeFormat("de-DE", { weekday: "long", day: "numeric", month: "long", timeZone: plan.timezone }).format(new Date(`${plan.date}T12:00:00Z`));
 
   return <div className="child-world forest-world" data-calm={plan.child.reducedMotion}>
@@ -174,7 +214,7 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
 
         {view === "appointments" && <div className="detail-scroll">{appointments.length ? appointments.map((item) => <article className="appointment-row" key={item.id}><span className="detail-picture" aria-hidden="true">{appointmentPictures[item.icon]}</span><div><span className="appointment-date">{appointmentLabel(item, plan.timezone, now)}</span><h3>{item.title}</h3></div><time dateTime={item.startsAt}>{appointmentTime(item.startsAt, plan.timezone)}</time></article>) : <div className="empty-state"><span aria-hidden="true">🌻</span><h3>Gerade ist nichts geplant.</h3></div>}</div>}
 
-        {view === "rewards" && <div className="detail-scroll"><p className="wishes-intro">Plant zusammen etwas, worauf du dich freust.</p>{plan.rewards.length ? plan.rewards.map((reward, index) => <article className="wish-card" key={reward.id}><span className="detail-picture" aria-hidden="true">{rewardPictures[index % rewardPictures.length]}</span><div><h3>{reward.title}</h3><p>{plan.balance >= reward.cost ? "Du hast genug Sterne!" : `Noch ${reward.cost - plan.balance} Sterne`}</p><progress value={Math.min(plan.balance, reward.cost)} max={reward.cost} aria-label={`Fortschritt für ${reward.title}`} /><span className="wish-count">{plan.balance} / {reward.cost} Sterne</span></div></article>) : <div className="empty-state"><span aria-hidden="true">🎁</span><h3>Was wünschst du dir?</h3><p>Hier ist Platz für eure gemeinsamen Ideen.</p></div>}<p className="wishes-note">Das Einlösen kommt später dazu.</p></div>}
+        {view === "rewards" && <div className="detail-scroll"><p className="wishes-intro">Plant zusammen etwas, worauf du dich freust. Wenn du magst, wähle einen Wunsch als dein Sparziel. Dabei bleiben alle Sterne frei verfügbar.</p>{archivedGoal && <div className="savings-fallback"><p>Dein bisheriges Sparziel ist nicht mehr verfügbar. Du kannst einen anderen Wunsch wählen oder ohne Sparziel weitermachen.</p><button className="reward-action" disabled={!!busy || (!demo && live.phase !== "connected")} onClick={() => saveGoal(null)}>Sparziel entfernen</button></div>}{plan.rewards.length ? plan.rewards.map((reward, index) => <article className="wish-card" key={reward.id}><span className="detail-picture" aria-hidden="true">{rewardPictures[index % rewardPictures.length]}</span><div><h3>{reward.title}</h3><p>{plan.balance >= reward.cost ? "Du hast genug Sterne!" : `Noch ${reward.cost - plan.balance} Sterne`}</p><progress value={Math.min(plan.balance, reward.cost)} max={reward.cost} aria-label={`Fortschritt für ${reward.title}`} /><span className="wish-count">{plan.balance} / {reward.cost} Sterne</span><button className="reward-action savings-action" aria-pressed={plan.savingsGoalId === reward.id} disabled={!!busy || (!demo && live.phase !== "connected")} onClick={() => saveGoal(plan.savingsGoalId === reward.id ? null : reward.id)}>{plan.savingsGoalId === reward.id ? "Sparziel entfernen" : "Als Sparziel wählen"}</button>{plan.rewardRequests?.some((item) => item.rewardId === reward.id && item.status === "pending") ? <p>Bei deinen Eltern angefragt</p> : <button className="reward-action" disabled={!!busy || demo || live.phase !== "connected" || plan.balance < reward.cost} onClick={() => setConfirmReward(reward.id)}>Einlösen anfragen · {reward.cost} Sterne</button>}{confirmReward === reward.id && <div className="reward-confirm" role="group" aria-label="Anfrage bestätigen"><p>„{reward.title}“ für {reward.cost} Sterne anfragen? Erst wenn deine Eltern bestätigen, werden die Sterne abgezogen.</p><button className="reward-action" disabled={!!busy || live.phase !== "connected"} onClick={() => askReward(reward.id)}>Ja, bei meinen Eltern anfragen</button><button className="reward-action" disabled={!!busy} onClick={() => setConfirmReward(null)}>Zurück</button></div>}</div></article>) : <div className="empty-state"><span aria-hidden="true">🎁</span><h3>Was wünschst du dir?</h3><p>Hier ist Platz für eure gemeinsamen Ideen.</p></div>}<p className="wishes-note">{plan.balance} Sterne verfügbar · {plan.earnedTotal ?? plan.balance} insgesamt verdient{demo ? " · Anfragen sind nur am gekoppelten Wandbildschirm möglich." : ""}</p><RewardHistory items={plan.rewardRequests ?? []} timezone={plan.timezone} /></div>}
 
         <div className="paper-footer"><Heart size={19} /><span>Pausen gehören auch dazu.</span></div>
       </section>
@@ -184,7 +224,7 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
           <button className="star-treasure" onClick={() => openView("rewards")} aria-label={`${plan.balance} Sterne gesammelt. Deine Wünsche ansehen.`}><span aria-hidden="true">⭐</span><div><strong>{plan.balance}</strong><span>deine Sterne</span></div><ChevronRight size={27} /></button>
         </div>
         <button className="peek-card appointment-peek" onClick={() => openView("appointments")}><span className="peek-picture" aria-hidden="true">📅</span><span className="peek-copy"><span>{nextAppointment && now && appointmentLabel(nextAppointment, plan.timezone, now) === "Jetzt" ? "Dein Termin läuft gerade" : "Dein nächster Termin"}</span><strong>{nextAppointment?.title ?? "Gerade nichts geplant"}</strong>{nextAppointment && <span>{appointmentLabel(nextAppointment, plan.timezone, now)} · {appointmentTime(nextAppointment.startsAt, plan.timezone)} Uhr</span>}</span><ChevronRight size={25} /></button>
-        <button className="peek-card reward-peek" onClick={() => openView("rewards")}><span className="peek-picture" aria-hidden="true">🎁</span><span className="peek-copy"><span>Darauf kannst du dich freuen</span><strong>{goal?.title ?? "Dein nächster Wunsch"}</strong>{goal && <progress value={Math.min(plan.balance, goal.cost)} max={goal.cost} aria-label={`Fortschritt für ${goal.title}`} />}</span><ChevronRight size={25} /></button>
+        <button className="peek-card reward-peek" onClick={() => openView("rewards")}><span className="peek-picture" aria-hidden="true">🎁</span><span className="peek-copy"><span>{goal ? "Dein Sparziel" : "Deine Wünsche"}</span><strong>{goal?.title ?? (archivedGoal ? "Dein Sparziel ist nicht mehr verfügbar" : "Magst du ein Sparziel wählen?")}</strong>{goal ? <><progress value={Math.min(plan.balance, goal.cost)} max={goal.cost} aria-label={`Fortschritt für ${goal.title}`} /><span>{plan.balance} Sterne verfügbar · {Math.max(0, goal.cost - plan.balance)} Sterne fehlen</span></> : <span>{archivedGoal ? "Anderen Wunsch wählen oder Sparziel entfernen" : "Ganz freiwillig – deine Sterne bleiben frei verfügbar"}</span>}</span><ChevronRight size={25} /></button>
       </aside>
     </main>
 

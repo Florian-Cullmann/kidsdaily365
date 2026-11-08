@@ -1,0 +1,1 @@
+ALTER TABLE "device_management" ADD COLUMN "appStatuses" jsonb DEFAULT '[]'::jsonb NOT NULL;

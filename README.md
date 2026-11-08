@@ -20,7 +20,7 @@ Eine selbst gehostete Familien-App für neurodivergente Kinder: eigener Buddy, �
 - App-Freigaben je Kind im Elternbereich; Audible als erste Freigabe bei neuen Profilen.
 - Launcher-API für Buddy, Sternestand und App-Liste. Das native Projekt unter `apps/android/` bleibt ohne Provisionierung ungeschützt. Auf ausdrücklich eingerichteten Device-Owner-Geräten stehen Lock Task, Kamera-/Systemleisten-Sperren und Offline-Wartung bereit; die physische Geräteabnahme aus [Issue #2](https://github.com/Florian-Cullmann/kidsdaily365/issues/2) steht noch aus. [Provisionierung und Recovery](apps/android/README.md#device-owner-bewusst-provisionieren).
 
-Belohnungseinlösung und [Buddy-Kosmetik](https://github.com/Florian-Cullmann/kidsdaily365/issues/3) sind noch nicht umgesetzt. Es gibt keine Werbung, zufälligen Belohnungen, Streak-Strafen, externen Fonts oder automatisch gestarteten Sounds. [Illustrationen und Prompts](docs/illustrations.md) liegen im Projekt.
+Belohnungen können am gekoppelten Wandbildschirm angefragt und im Elternbereich bestätigt oder abgelehnt werden. Erst die Bestätigung zieht die angebotenen Sternkosten ab; Anfragen und Entscheidungen bleiben im Verlauf. [Buddy-Kosmetik](https://github.com/Florian-Cullmann/kidsdaily365/issues/3) ist noch nicht umgesetzt. Es gibt keine Werbung, zufälligen Belohnungen, Streak-Strafen, externen Fonts oder automatisch gestarteten Sounds. [Illustrationen und Prompts](docs/illustrations.md) liegen im Projekt.
 
 ## Lokal als Demo starten
 
@@ -60,6 +60,12 @@ tests/                    Unit-, API-Grenz- und Datenbanktests
 ```
 
 Next.js/TypeScript und PostgreSQL/Drizzle bilden einen modularen Monolithen. Der Wandbildschirm verwendet ein eigenes Gerätecookie; Eltern erhalten ein getrenntes Sitzungscookie; Android verwendet einen kindgebundenen Bearer-Token. [Architektur](docs/architecture.md) und [Android-Konzept](docs/android.md) erklären die Sicherheitsgrenzen und den aktuellen Umsetzungsstand.
+
+## Konfiguration vor dem Start prüfen
+
+Nach `npm ci` prüft `npm run config:check` die lokale `.env`. Bereits gesetzte Umgebungsvariablen haben Vorrang. Im Demo-Modus sind keine Live-Zugangsdaten nötig; im Live-Modus gelten dieselben Regeln wie im Server. Ohne `APP_MODE` gilt bei `NODE_ENV=production` Live, sonst Demo. Der Befehl meldet nur Variablennamen, keine Werte oder Geheimnisse, und endet bei Fehlern mit Exitcode 1.
+
+Ein Erfolg bestätigt ausschließlich die App-Konfiguration: keine Datenbankverbindung, Migration oder Netzwerkprüfung. Docker-/Postgres-Parameter wie `POSTGRES_PASSWORD` werden nicht geprüft. Im Compose-Betrieb wird `DATABASE_URL` gesondert gesetzt; ein lokaler Check prüft die lokale Umgebung, nicht die spätere Containerkonfiguration.
 
 ## Prüfen
 

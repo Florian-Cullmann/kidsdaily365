@@ -1,5 +1,6 @@
 import "server-only";
 import { alias } from "drizzle-orm/pg-core";
+import { rewardHistory } from "./rewards";
 import { editAppointment } from "./appointment-series";
 import { profileImageUrl } from "@/domain/profile-image";
 import { and, asc, desc, eq, gte, isNull, sql } from "drizzle-orm";
@@ -50,6 +51,8 @@ export async function getManagementData(parent: ParentActor, childId = "") {
     children: kids.map((child) => ({ ...child, equippedAccessories: equipment.filter((item) => item.childId === child.id).map((item) => item.accessoryId), ownedAccessories: ownership.filter((item) => item.childId === child.id).map((item) => item.accessoryId), imageUrl: imageUrls.get(child.id) ?? null })), routines: routines.map((routine) => ({ ...routine, steps: routine.steps ?? [{ title: routine.title, description: routine.description, icon: routine.icon, points: routine.points }] })), tasks: tasks.slice(0, 1000).map(({ task, completed, corrected }) => ({ ...task, completed, corrected })),
     appointments: dates.slice(0, 1000).map((item) => ({ ...item, startsAt: item.startsAt.toISOString(), endsAt: item.endsAt?.toISOString() ?? null })),
     rewards: goals, apps,
+    rewardRequests: await rewardHistory(familyId),
+    wallets: await db().select({ childId: pointEntries.childId, balance: sql`sum(${pointEntries.amount})`.mapWith(Number), earnedTotal: sql`sum(case when ${pointEntries.expenseKey} is null then ${pointEntries.amount} else 0 end)`.mapWith(Number) }).from(pointEntries).where(eq(pointEntries.familyId, familyId)).groupBy(pointEntries.childId),
     devices: deviceRows.map((item) => ({ ...item, expiresAt: item.expiresAt.toISOString(), revokedAt: item.revokedAt?.toISOString() ?? null })),
     parents: adults,
   };

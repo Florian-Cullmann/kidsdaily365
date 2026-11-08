@@ -17,6 +17,7 @@ class DeviceManagementClient(private val context: Context, private val app: Laun
     private val usage = UsageCollector(context)
     private val mutex = Mutex()
     @Volatile var initialized = false; private set
+    private var statusPackages: List<String>? = null
     private var state = JSONObject()
     @Volatile var locked = false; private set
     @Volatile var connected = false; private set
@@ -49,6 +50,7 @@ class DeviceManagementClient(private val context: Context, private val app: Laun
         state.put("token", token).put("server", target.server.origin).put("deviceId", target.deviceId)
             .put("childId", response.getString("childId"))
         if (!state.has("cursor")) state.put("cursor", now).put("since", now)
+        statusPackages = null
         save(); connected = true; status = "Dashboard verbunden"
     } }
     suspend fun localRelease() = withContext(Dispatchers.IO) { mutex.withLock {
@@ -65,6 +67,7 @@ class DeviceManagementClient(private val context: Context, private val app: Laun
         return bound.server
     }
     private fun clearAccess() {
+        statusPackages = null
         state.remove("token"); state.remove("messages"); state.remove("draft"); state.remove("pending");
         save(); connected = false; unread = 0
     }
@@ -93,8 +96,19 @@ class DeviceManagementClient(private val context: Context, private val app: Laun
                 .put("usageSince", Instant.ofEpochMilli(state.optLong("since", batch.cursor)).toString())
                 .put("usageThrough", if (usage.permitted()) Instant.ofEpochMilli(batch.through).toString() else JSONObject.NULL)
                 .put("error", app.policy.error ?: JSONObject.NULL).put("events", batch.events)
+            statusPackages?.let { packages ->
+                data.put("appStatuses", JSONArray(packages.map { name ->
+                    JSONObject().put("packageName", name).put("status", ApprovedAppStatus.check(context, name))
+                        .put("checkedAt", Instant.now().toString())
+                }))
+            }
             val response = JSONObject(request(server, "/api/device/manage/sync", state.getString("token"), data.toString()))
             check(response.getInt("schemaVersion") == 1)
+            statusPackages = if (response.optInt("appStatusVersion") == 1) {
+                val packages = response.getJSONArray("appStatusPackages")
+                check(packages.length() <= 200)
+                (0 until packages.length()).map { packages.getString(it) }
+            } else null
             val revision = response.getInt("revision"); check(revision >= state.optInt("revision", -1))
             val nextLocked = response.getBoolean("locked")
             state.put("revision", revision).put("locked", nextLocked).put("localRelease", false)
@@ -104,7 +118,7 @@ class DeviceManagementClient(private val context: Context, private val app: Laun
             fetchMessages(server); status = "Mit deinen Eltern verbunden"
         } catch (e: kotlinx.coroutines.CancellationException) { throw e }
         catch (_: AccessRevoked) { clearAccess(); status = "Dashboard-Zugang beendet. Elternzugang verwenden." }
-        catch (_: Exception) { status = "Offline · Nachrichten bleiben gespeichert" }
+        catch (_: Exception) { statusPackages = null; status = "Offline · Nachrichten bleiben gespeichert" }
     } }
     private fun fetchMessages(server: ServerAddress): JSONObject {
         val response = JSONObject(request(server, "/api/device/manage/messages", state.getString("token"), null))

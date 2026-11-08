@@ -2,14 +2,15 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { db } from "@/server/db/client";
-import { children, dailyTasks, families, parents, parentSessions, pointEntries } from "@/server/db/schema";
+import { children, dailyTasks, families, parents, parentSessions, pointEntries, rewards, rewardRequests, rewardRequestKeys } from "@/server/db/schema";
+import { requestReward, decideReward } from "@/server/rewards";
 import { correctTaskCompletion } from "@/server/task-corrections";
 import { lockWallet, walletBalance, walletTotals } from "@/server/wallet";
 import { completeTask, getDayPlans } from "@/server/plans";
 import { getDayHistory } from "@/server/history";
 import { getWeekPreview } from "@/server/week-preview";
 import { launcherSnapshot } from "@/server/launcher";
-import { archiveRecord, saveRecord } from "@/server/management";
+import { archiveRecord, saveRecord, getManagementData } from "@/server/management";
 import { POST } from "@/app/api/parent/task-completions/[id]/correct/route";
 import { digestToken } from "@/server/auth/secrets";
 import type { ParentActor } from "@/server/auth/parent";
@@ -37,7 +38,9 @@ beforeEach(async () => {
   [childId, sibling] = profiles.map(child => child.id);
 });
 afterAll(async () => {
-  for (const table of [pointEntries, dailyTasks, parents, children]) await db().delete(table).where(inArray(table.familyId, createdFamilies));
+  const requests = await db().select({ id: rewardRequests.id }).from(rewardRequests).where(inArray(rewardRequests.familyId, createdFamilies));
+  if (requests.length) await db().delete(rewardRequestKeys).where(inArray(rewardRequestKeys.requestId, requests.map(row => row.id)));
+  for (const table of [rewardRequests, rewards, pointEntries, dailyTasks, parents, children]) await db().delete(table).where(inArray(table.familyId, createdFamilies));
   await db().delete(families).where(inArray(families.id, createdFamilies));
   await db().$client.end();
 });
@@ -72,6 +75,8 @@ it("keeps corrected tasks visible without multiplying them or exposing the paren
   await correctTaskCompletion(parent, entry.id, input);
   const plan = (await getDayPlans(parent.familyId, now)).find(p => p.child.id === childId)!;
   expect(plan.balance).toBe(3);
+  expect(plan.earnedTotal).toBe(3);
+  expect((await getManagementData(parent)).wallets.find(row => row.childId === childId)?.earnedTotal).toBe(3);
   expect(plan.tasks).toHaveLength(2);
   expect(plan.tasks.filter(t => t.corrected)).toHaveLength(1);
   expect(plan.tasks.find(t => t.corrected)?.completed).toBe(false);
@@ -104,6 +109,19 @@ it("serializes corrections with spending through the shared child lock without n
   const outcomes = await Promise.allSettled([correctTaskCompletion(parent, entry.id, input), spend(5)]);
   expect(outcomes.filter(r => r.status === "fulfilled")).toHaveLength(1);
   expect((await walletTotals(db(), parent.familyId, childId)).balance).toBe(0);
+});
+it("serializes an actual reward approval with a correction", async () => {
+  const { entry } = await completion(5);
+  const [reward] = await db().insert(rewards).values({ familyId: parent.familyId, title: "Testwunsch", cost: 5 }).returning();
+  const request = await requestReward(parent.familyId, childId, { requestId: randomUUID(), rewardId: reward.id });
+  const outcomes = await Promise.allSettled([
+    correctTaskCompletion(parent, entry.id, input),
+    decideReward(parent, request.id, { decision: "approved" }),
+  ]);
+  expect(outcomes.filter(result => result.status === "fulfilled")).toHaveLength(1);
+  expect((await walletTotals(db(), parent.familyId, childId)).balance).toBe(0);
+  const [saved] = await db().select().from(rewardRequests).where(eq(rewardRequests.id, request.id));
+  expect(saved.status).toBe(outcomes[1].status === "fulfilled" ? "approved" : "pending");
 });
 it("serializes repeated completion with correction and never awards the corrected copy again", async () => {
   const { task, entry } = await completion(5);

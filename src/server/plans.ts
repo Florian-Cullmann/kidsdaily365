@@ -1,11 +1,12 @@
 import "server-only";
 import { alias } from "drizzle-orm/pg-core";
 import { lockWallet } from "./wallet";
+import { rewardHistory } from "./rewards";
 import { profileImageUrl } from "@/domain/profile-image";
 import { and, asc, eq, gt, gte, lte, isNull, or, sql } from "drizzle-orm";
 import { localDate, type DayPlan } from "@/domain/plan";
 import { db } from "./db/client";
-import { buddyEquipment, appointments, childImages, children, dailyTasks, families, pointEntries, rewards, routinePauses, taskTemplates } from "./db/schema";
+import { childSavingsGoals, buddyEquipment, appointments, childImages, children, dailyTasks, families, pointEntries, rewards, routinePauses, taskTemplates } from "./db/schema";
 
 const corrections = alias(pointEntries, "task_corrections");
 
@@ -52,14 +53,14 @@ export async function getDayPlans(familyId: string, now = new Date()): Promise<D
     }
   });
 
-  const [profiles, tasks, balances, upcoming, rewardOptions, images, equipment] = await db().transaction(async (tx) => Promise.all([
+  const [profiles, tasks, balances, upcoming, rewardOptions, images, equipment, savingsGoals] = await db().transaction(async (tx) => Promise.all([
     tx.select().from(children).where(and(eq(children.familyId, familyId), eq(children.active, true))).orderBy(asc(children.name)),
     tx.select({ task: dailyTasks, completedAt: pointEntries.createdAt, correctedAt: corrections.createdAt })
       .from(dailyTasks).leftJoin(pointEntries, eq(dailyTasks.id, pointEntries.taskId))
       .leftJoin(corrections, eq(corrections.correctionOf, pointEntries.id))
       .where(and(eq(dailyTasks.familyId, familyId), eq(dailyTasks.date, date), isNull(dailyTasks.cancelledAt)))
       .orderBy(asc(dailyTasks.sortOrder), asc(dailyTasks.templateId), asc(dailyTasks.stepIndex), asc(dailyTasks.id)),
-    tx.select({ childId: pointEntries.childId, balance: sql`sum(${pointEntries.amount})`.mapWith(Number) })
+    tx.select({ childId: pointEntries.childId, balance: sql`sum(${pointEntries.amount})`.mapWith(Number), earnedTotal: sql`sum(case when ${pointEntries.expenseKey} is null then ${pointEntries.amount} else 0 end)`.mapWith(Number) })
       .from(pointEntries).where(eq(pointEntries.familyId, familyId)).groupBy(pointEntries.childId),
     tx.select().from(appointments).where(and(eq(appointments.familyId, familyId), eq(appointments.active, true), or(
       gte(appointments.startsAt, now), gt(appointments.endsAt, now),
@@ -69,15 +70,20 @@ export async function getDayPlans(familyId: string, now = new Date()): Promise<D
       .where(and(eq(rewards.familyId, familyId), eq(rewards.active, true))).orderBy(asc(rewards.cost)),
     tx.select({ childId: childImages.childId, version: childImages.version }).from(childImages).where(eq(childImages.familyId, familyId)),
     tx.select().from(buddyEquipment).where(eq(buddyEquipment.familyId, familyId)),
+    tx.select().from(childSavingsGoals).where(eq(childSavingsGoals.familyId, familyId)),
   ]), { isolationLevel: "repeatable read", accessMode: "read only" });
 
+  const history = await rewardHistory(familyId);
   const imageUrls = new Map(images.map((image) => [image.childId, profileImageUrl(image.childId, image.version)]));
   return profiles.map((child) => ({
     date, timezone,
     child: { id: child.id, name: child.name, avatar: child.avatar, equippedAccessories: equipment.filter((item) => item.childId === child.id).map((item) => item.accessoryId), imageUrl: imageUrls.get(child.id) ?? null, reducedMotion: child.reducedMotion, buddyKind: child.buddyKind, buddyName: child.buddyName },
     balance: balances.find((row) => row.childId === child.id)?.balance ?? 0,
+    earnedTotal: balances.find((row) => row.childId === child.id)?.earnedTotal ?? 0,
+    rewardRequests: history.filter((row) => row.childId === child.id),
     appointments: upcoming.filter((item) => item.childId === child.id).map((item) => ({ id: item.id, title: item.title, startsAt: item.startsAt.toISOString(), endsAt: item.endsAt?.toISOString() ?? null, icon: item.icon })),
     rewards: rewardOptions,
+    savingsGoalId: savingsGoals.find((goal) => goal.childId === child.id)?.rewardId ?? null,
     tasks: tasks.filter(({ task }) => task.childId === child.id).map(({ task, completedAt, correctedAt }) => ({
       id: task.id, routineId: task.templateId, routineTitle: task.routineTitle, title: task.title, description: task.description, icon: task.icon,
       section: task.section, time: task.scheduledTime?.slice(0, 5) ?? null,

@@ -119,6 +119,49 @@ Screenshots mit ausschließlich fiktiven Daten: [Elterneditor](proof/routine-edi
 
 Automatisierte Bildtests prüfen echte Dekodierung, Größenlimits, Ausschnitt, EXIF-Ausrichtung und entfernte Metadaten. Die Datenbanktests prüfen Ersetzen/Entfernen, Rechte, Profiltrennung und unabhängigen Punktestand. Keine echten Kinderfotos in Tests oder Nachweisen verwenden.
 
+
+## Belohnungen einlösen
+
+Mit fiktiven Profilen am gekoppelten Wandbildschirm einen erreichbaren Wunsch öffnen und „Einlösen anfragen“ bewusst bestätigen. Die Anfrage muss ohne Abbuchung beim Kind und im Elternbereich erscheinen. Eltern bestätigen einen Wunsch und lehnen einen zweiten ab: Nur die Bestätigung reduziert das verfügbare Guthaben, die insgesamt verdienten Sterne und abgeschlossenen Aufgaben bleiben erhalten. Nach Neuladen müssen beide Entscheidungen mit Angebotspreis und Zeitpunkten sichtbar sein.
+
+Zwischen Anfrage und Bestätigung den Preis ändern (der angefragte Preis bleibt bestehen) bzw. den Wunsch archivieren (Bestätigung muss scheitern; Ablehnung bleibt möglich). Offline darf keine Erfolgsmeldung erscheinen. Eine nach dem Speichern verlorene Antwort erneut versuchen: gleiche Anfrage-ID und nur eine persistierte Anfrage. Die Kinderansicht aktualisiert den Serverstand über den gemeinsamen Wandabgleich alle 10 Sekunden im Vordergrund.
+
+`tests/rewards.integration.test.ts` prüft auf einer migrierten disposable `*_test`-Datenbank parallele Anfragen, alternative Wiederholungs-IDs nach einer Entscheidung, konkurrierende Ausgaben bei knappem Guthaben, gegensätzliche Elternentscheidungen, archivierte Wünsche, Preisänderungen, manipulierte Eingaben und Haushalts-/Geschwistergrenzen. Die echten Route-Handler prüfen fehlende, native und widerrufene Gerätezugänge, getrennte Elternsitzungen und falsche Origins. Browserprüfungen ergänzen dies um bewusste Bestätigung, Offline-/Antwortverlust und den sichtbaren Verlauf.
+
+## Persönliches Sparziel
+
+Am gekoppelten Wandbildschirm unter „Sterne“ einen Wunsch als Sparziel wählen, zur Tagesansicht zurückkehren und neu laden: Ziel, verfügbares Guthaben und fehlende Sterne bleiben sichtbar. Ein anderes Kind behält seine eigene Auswahl. Ziel wechseln und entfernen: Guthaben und Einlösungsverlauf bleiben unverändert. Einen gewählten Wunsch im Elternbereich archivieren: Das Kind erhält einen verständlichen Hinweis und kann einen anderen Wunsch wählen oder die Auswahl entfernen. Ohne Auswahl wird kein Wunsch automatisch zum Ziel. Im Demo-Modus ist die Auswahl nur lokal zum Ausprobieren.
+
+`tests/savings-goals.integration.test.ts` prüft Persistenz, Profiltrennung, Archivierung, unveränderte Sterne und den bestehenden Einlöseweg sowie Haushaltsbindung, manipulierte Eingaben, Origins, fehlende/widerrufene Wandkopplung und ausgeschlossene Android-/Setup-Tokens.
+## Ersteinrichtung in der Elternübersicht (#51)
+
+Die Checkliste wird aus den gespeicherten Haushaltsdaten abgeleitet. Es gibt keine
+manuell abhakbaren Schritte und keine lokale Erledigt-Ablage. „Status aktualisieren“
+lädt den Stand neu, etwa nach dem Einlösen eines Gerätecodes auf einem anderen
+Bildschirm. Neuladen setzt den Einstieg ebenfalls anhand der aktuellen Daten fort.
+Geräteablauf wird bei sichtbarer Übersicht alle 30 Sekunden und bei Fensterfokus
+neu bewertet; ein erzeugter, noch nicht eingelöster Code zählt nicht als Gerät.
+
+Mit fiktiven Daten prüfen:
+
+1. Neuer Haushalt: alle drei Schritte offen; „Kind hinzufügen“ öffnet das bestehende
+   Profilformular. Ohne aktives Kind ist „Routine anlegen“ noch nicht verfügbar.
+2. Aktives Kind speichern: Übersicht zeigt den ersten Schritt erfüllt. „Routine
+   anlegen“ öffnet das vorhandene Routineformular mit aktivem Kind als Vorauswahl.
+3. Aktive Routine mit Schritten speichern: zweiter Schritt erfüllt. „Wandbildschirm
+   verbinden“ öffnet die Geräteverwaltung mit Gerätetyp Wandbildschirm, auch wenn
+   vorher Android ausgewählt war. Code erstellen allein erfüllt den Schritt nicht.
+4. Code am Wandbildschirm einlösen, Status aktualisieren: fertiger Zustand.
+   Seite neu laden: Zustand bleibt korrekt. Android und Buddy-Ausstattung sind optional.
+5. Kind archivieren: Kind und zugehörige Routine zählen nicht mehr. Routine
+   deaktivieren: Routine wieder offen. Wandgerät widerrufen oder ablaufen lassen:
+   Geräteschritt wieder offen. Ein Android-Gerät ersetzt kein Wandgerät.
+6. Gekoppelten Wandbildschirm ohne aktive Kinder öffnen: verständlicher Hinweis auf
+   Kinderprofile im Elternbereich, keine Verwaltungsaktionen und keine Gerätecodes.
+
+`tests/setup.test.ts` deckt Ableitung, Teilzustände, Archivierung, leere/deaktivierte
+Routinen, falsche Kindzuordnung, Widerruf und Ablauf einschließlich Grenzzeitpunkt ab.
+
 ### Kinderfilter in der Elternverwaltung
 
 Unter Routinen, Einzelaufgaben, Terminen und Android-Apps begrenzt „Kind auswählen“

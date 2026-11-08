@@ -61,6 +61,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - name: Verify deployment failure boundaries
+        run: |
+          bash -n scripts/deploy-unraid.sh scripts/unraid-release.sh
+          python3 -m unittest discover -s tests -p unraid_deploy_test.py
       - run: npm run db:migrate
       - run: npm run test:integration
       - name: Verify backup failures, rotation and isolated restore with fictional data

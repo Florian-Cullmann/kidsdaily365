@@ -8,6 +8,7 @@ export type ChildProfile = {
   buddyKind: BuddyKind; buddyName: string;
 };
 export type Appointment = { id: string; title: string; startsAt: string; endsAt?: string | null; icon: "calendar" | "tooth" | "ball" | "heart" };
+export type RewardRequest = { id: string; childId: string; rewardId: string; title: string; cost: number; status: "pending" | "approved" | "rejected"; createdAt: string; decidedAt: string | null };
 export type Reward = { id: string; title: string; cost: number };
 export type Task = {
   routineId?: string | null;
@@ -29,8 +30,11 @@ export type DayPlan = {
   child: ChildProfile;
   tasks: Task[];
   balance: number;
+  earnedTotal?: number;
+  rewardRequests?: RewardRequest[];
   appointments: Appointment[];
   rewards: Reward[];
+  savingsGoalId?: string | null;
 };
 
 export const sections: { id: DaySection; label: string; caption: string }[] = [
@@ -69,6 +73,7 @@ export function completeDemoTask(plan: DayPlan, taskId: string): DayPlan {
   return {
     ...plan,
     balance: plan.balance + task.points,
+    earnedTotal: (plan.earnedTotal ?? plan.balance) + task.points,
     tasks: plan.tasks.map((item) => item.id === taskId ? { ...item, completed: true } : item),
   };
 }

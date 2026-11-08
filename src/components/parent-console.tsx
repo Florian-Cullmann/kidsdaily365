@@ -1,4 +1,5 @@
 "use client";
+import { RewardHistory } from "./reward-history";
 
 import { EndAppointmentSeries, type EndSeriesPreview } from "./end-appointment-series";
 import Link from "next/link";
@@ -7,9 +8,11 @@ import { BookOpen, CalendarDays, Check, ClipboardList, Gift, House, LayoutGrid, 
 import type { ParentActor } from "@/server/auth/parent";
 import type { ManagementData } from "@/server/management";
 import type { Resource } from "@/domain/management";
+import { RoutineSchedule } from "./routine-schedule";
 import { ParentRecordForm, type EditableRecord, type RecordDraft } from "./parent-record-form";
 import { UnsavedRecordDialog } from "./unsaved-record-dialog";
 import { RoutinePauses } from "./routine-pauses";
+import { ParentSetupChecklist } from "./parent-setup-checklist";
 import { BuddyWardrobe } from "./buddy-wardrobe";
 import { ProfilePicture } from "./profile-picture";
 import { ProfileImageEditor } from "./profile-image-editor";
@@ -79,6 +82,18 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
   }
   const [data, setData] = useState(initialData);
   const [tab, setTab] = useState<Tab>(tabs.find((item) => item.id === initialTab)?.id ?? "overview");
+  const [setupData, setSetupData] = useState<{ source: ManagementData; value: ManagementData } | null>(null);
+  const [setupError, setSetupError] = useState("");
+  useEffect(() => {
+    if (tab !== "overview" || !data.childFilter.id) return;
+    let cancelled = false;
+    request("/api/parent/data").then((next: ManagementData) => {
+      if (!cancelled) { setSetupData({ source: data, value: next }); setSetupError(""); }
+    }).catch((cause: unknown) => {
+      if (!cancelled) setSetupError(cause instanceof Error ? cause.message : "Einrichtungsstatus konnte nicht geladen werden.");
+    });
+    return () => { cancelled = true; };
+  }, [data, tab]);
   const [formVersion, setFormVersion] = useState(0);
   const [pauseRoutineId, setPauseRoutineId] = useState<string | null>(null);
   const pauseRoutine = data.routines.find(routine => routine.id === pauseRoutineId);
@@ -206,7 +221,11 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
       <div className="parent-feedback" aria-live="polite">{notice && <p className="parent-success"><Check size={19} />{notice}</p>}<p className="parent-error" role="alert">{error}</p></div>
 
       {tab === "overview" && <>
-        {!activeChildren && <section className="parent-panel"><h2>{data.children.length ? "Keine aktiven Kinderprofile vorhanden." : "Noch keine Kinderprofile vorhanden."}</h2><p>Lege ein Kinderprofil an, um Aufgaben und Termine zuzuordnen.</p><button className="parent-primary" onClick={() => createRecord("children")}>Kind hinzufügen</button></section>}
+        {data.childFilter.id && setupData?.source !== data ? <section className="parent-panel" aria-live="polite"><p>{setupError || "Einrichtungsstatus wird geladen …"}</p><button className="parent-secondary" disabled={busy} onClick={() => action(refresh)}>Status aktualisieren</button></section> : <ParentSetupChecklist data={data.childFilter.id ? setupData!.value : data} busy={busy}
+          onChild={() => activeChildren ? navigate("children") : createRecord("children")}
+          onRoutine={(complete) => complete ? navigate("routines") : createRecord("routines")}
+          onWall={() => { setDeviceKind("wall"); navigate("devices"); }}
+          onRefresh={() => action(refresh)} />}
         <div className="parent-overview-grid">{[
           { title: "Kinderprofile", text: `${activeChildren} ${activeChildren === 1 ? "aktives Profil" : "aktive Profile"}${activeChildren ? ` · ${data.children.filter((child) => child.active).map((child) => child.name).join(", ")}` : ""}`, view: "children" as Tab, icon: Users },
           { title: "Routinen", text: data.childFilter.id ? "Routinen für eure Kinder verwalten" : `${data.routines.filter((routine) => routine.active).length} aktive Routinen`, view: "routines" as Tab, icon: BookOpen },
@@ -218,6 +237,7 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
         <div className="parent-callout">Auf dem Wandbildschirm können eure Kinder Aufgaben abhaken. Der Android-Launcher zeigt Buddy, Sterne und freigegebene Apps; er kann keine Aufgaben abhaken. Neue Kinderprofile starten mit Audible in der App-Liste.</div>
       </>}
 
+      {(tab === "overview" || tab === "rewards") && <section className="parent-panel"><h2>Belohnungsanfragen</h2><p>Bestätigen bedeutet eingelöst: Die angefragten Kosten werden einmalig abgezogen, auch wenn der Preis inzwischen geändert wurde.</p>{data.children.map((child) => { const wallet = data.wallets.find((w) => w.childId === child.id); return <p key={child.id}>{child.name}: {wallet?.balance ?? 0} Sterne verfügbar · {wallet?.earnedTotal ?? 0} insgesamt verdient</p>; })}<button className="parent-secondary" disabled={busy} onClick={() => action(refresh)}>Aktualisieren</button><RewardHistory items={data.rewardRequests} timezone={data.family.timezone} childName={childName} renderActions={(item) => item.status === "pending" && <div className="record-actions"><button className="parent-primary" disabled={busy} onClick={() => action(async () => { await request(`/api/parent/reward-requests/${item.id}`, "POST", { decision: "approved" }); await refresh(); setNotice("Wunsch eingelöst."); })}>Bestätigen · {item.cost} Sterne abbuchen</button><button className="parent-secondary" disabled={busy} onClick={() => action(async () => { await request(`/api/parent/reward-requests/${item.id}`, "POST", { decision: "rejected" }); await refresh(); setNotice("Anfrage abgelehnt. Keine Sterne abgezogen."); })}>Ablehnen</button></div>} /></section>}
       {isResource && <>
         {childFiltered && <section className="parent-child-filter" aria-label="Liste nach Kind filtern">
           <label htmlFor="child-filter">Kind auswählen<select id="child-filter" value={data.childFilter.id} disabled={busy} onChange={(event) => { const childId = event.target.value; leave(() => { void filterByChild(childId); }); }}>
@@ -231,7 +251,7 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
         {(tab === "tasks" || tab === "appointments") && data.limited[tab] && <p className="parent-callout" role="status">Die Liste ist auf 1.000 Einträge begrenzt. {data.childFilter.id ? "Auch für dieses Kind gibt es weitere Einträge, die hier nicht angezeigt werden." : "Wähle ein Kind, um dessen Einträge gezielt zu laden."}</p>}
         {tab === "routines" && <div className="parent-callout">Änderungen gelten für neue Tagespläne. Pausen sind für einzelne Tage oder Ferien möglich. Bestehende Aufgaben bearbeitest du unter Einzelaufgaben.</div>}
         {tab === "apps" && <div className="parent-callout">Diese Liste legt die erlaubten Apps je Kind fest. Die echte Sperre auf dem Handy benötigt später den verwalteten Android-Launcher. Ein normaler Startbildschirm allein schützt das Gerät nicht.</div>}
-        {tab === "rewards" && <div className="parent-callout">Das Einlösen von Wünschen und der Kauf von Buddy-Accessoires sind noch nicht verfügbar. Hier werden keine Sterne abgezogen.</div>}
+        {tab === "rewards" && <div className="parent-callout">Kinder fragen Wünsche am Wandbildschirm an. Du entscheidest hier über die Einlösung. Archivierte Wünsche können nicht mehr bestätigt werden.</div>}
         {tab === "routines" && pauseRoutine && <RoutinePauses key={pauseRoutine.id} routine={pauseRoutine} childName={childName(pauseRoutine.childId)} today={data.today} timezone={data.family.timezone} pauses={data.pauses.filter(pause => pause.routineId === pauseRoutine.id)} busy={busy} onClose={() => setPauseRoutineId(null)} onCreate={input => action(async () => {
           await request(`/api/parent/routines/${pauseRoutine.id}/pauses`, "POST", input); await refresh(); setNotice("Pause gespeichert. Erledigte Schritte und Sterne bleiben erhalten.");
         })} onRevoke={id => action(async () => {
@@ -243,7 +263,7 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
         {formOpen && <ParentRecordForm key={`${tab}-${copySource?.requestId ?? editing?.id ?? "new"}-${formVersion}`} copySource={copySource?.childName} resource={tab as Resource} data={data} record={editing} defaultChildId={filterChild?.active ? filterChild.id : data.childFilter.id ? "" : undefined} busy={busy} draftRef={draftRef} onSave={save} onSaveSeries={saveSeries} onCancel={() => leave(clearDraft)} />}
         <div className="parent-records">{(data[tab as Resource] as unknown as EditableRecord[]).map((record) => <article key={record.id} className={`parent-record ${record.active === false ? "is-archived" : ""}`}>
           {tab === "children" && <div className="record-buddy"><ProfilePicture imageUrl={record.imageUrl as string | null} buddyKind={record.buddyKind as "fox" | "rabbit" | "bear"} equipped={record.equippedAccessories as string[]} /></div>}
-          <div className="record-description"><h3>{String(record.name ?? record.title ?? record.label)}</h3><p>{tab === "children" ? (record.buddyInitialized === false ? "Buddy wählt das Kind auf Android" : `Buddy: ${record.buddyName}`) : tab === "apps" ? `${childName(record.childId)} · ${record.packageName}` : tab === "appointments" ? `${childName(record.childId)} · ${new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short", timeZone: data.family.timezone }).format(new Date(String(record.startsAt)))}` : tab === "routines" ? `${childName(record.childId)} · ${(record.steps as unknown[]).length} Schritte` : tab === "rewards" ? `${record.cost} Sterne` : `${childName(record.childId)} · ${record.points} Sterne${tab === "tasks" ? ` · ${record.date}` : ""}`}</p>{record.seriesId ? <span className="archive-label">Wöchentliche Serie · einzelnes Vorkommen</span> : null}{record.active === false && <span className="archive-label">Archiviert</span>}{tab === "routines" && data.pauses.some(pause => pause.routineId === record.id) && <span className="routine-pause-badge">{data.pauses.some(pause => pause.routineId === record.id && pause.startsOn <= data.today) ? "Heute pausiert" : "Pause geplant"}</span>}{tab === "tasks" && !!record.pausedBy && record.completed !== true && <span className="routine-pause-badge">Ausgesetzt · Routine-Pause</span>}{record.completed === true && <span className="archive-label">{record.corrected === true ? "Abschluss korrigiert · Verlauf geschützt" : "Erledigt · Verlauf geschützt"}</span>}</div>
+          <div className="record-description"><h3>{String(record.name ?? record.title ?? record.label)}</h3><p>{tab === "children" ? (record.buddyInitialized === false ? "Buddy wählt das Kind auf Android" : `Buddy: ${record.buddyName}`) : tab === "apps" ? `${childName(record.childId)} · ${record.packageName}` : tab === "appointments" ? `${childName(record.childId)} · ${new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short", timeZone: data.family.timezone }).format(new Date(String(record.startsAt)))}` : tab === "routines" ? `${childName(record.childId)} · ${(record.steps as unknown[]).length} ${(record.steps as unknown[]).length === 1 ? "Schritt" : "Schritte"}` : tab === "rewards" ? `${record.cost} Sterne` : `${childName(record.childId)} · ${record.points} Sterne${tab === "tasks" ? ` · ${record.date}` : ""}`}</p>{tab === "routines" && <RoutineSchedule routine={record as unknown as ManagementData["routines"][number]} />}{record.seriesId ? <span className="archive-label">Wöchentliche Serie · einzelnes Vorkommen</span> : null}{record.active === false && <span className="archive-label">Archiviert</span>}{tab === "routines" && data.pauses.some(pause => pause.routineId === record.id) && <span className="routine-pause-badge">{data.pauses.some(pause => pause.routineId === record.id && pause.startsOn <= data.today) ? "Heute pausiert" : "Pause geplant"}</span>}{tab === "tasks" && !!record.pausedBy && record.completed !== true && <span className="routine-pause-badge">Ausgesetzt · Routine-Pause</span>}{record.completed === true && <span className="archive-label">{record.corrected === true ? "Abschluss korrigiert · Verlauf geschützt" : "Erledigt · Verlauf geschützt"}</span>}</div>
           <div className="record-actions">{tab === "appointments" && typeof record.seriesId === "string" && <button disabled={busy} onClick={() => leave(() => { void showSeriesEnd(String(record.seriesId)); })}>Serie beenden …</button>}{tab === "routines" && <button disabled={busy} onClick={() => leave(() => { setPauseRoutineId(record.id); setFormOpen(false); setError(""); setNotice(""); })}>Pausen verwalten</button>}{tab === "routines" && <button disabled={busy || !activeChildren} onClick={() => copyRecord(record)}>Routine kopieren</button>}{tab === "children" && record.active !== false && <button disabled={busy} onClick={() => leave(() => { setBuddyChildId(record.id); setImageChildId(null); setFormOpen(false); setError(""); })}>Ausstattung</button>}{tab === "children" && record.active !== false && <button disabled={busy} onClick={() => leave(() => { setBuddyChildId(null); setImageChildId(record.id); setFormOpen(false); setError(""); })}>Profilbild</button>}<button disabled={busy || record.completed === true} onClick={() => leave(() => { setBuddyChildId(null); setImageChildId(null); setCopySource(null); setSeriesPreview(null); setEditing(record); setFormOpen(true); setError(""); })}>Bearbeiten</button>{record.active !== false && record.completed !== true && <button className="quiet-danger" disabled={busy} onClick={() => archive(record)}>{tab === "tasks" ? "Aus Plan nehmen" : tab === "appointments" ? "Termin absagen" : "Archivieren"}</button>}</div>
         </article>)}{!formOpen && !data[tab as Resource].length && <div className="parent-empty"><selected.icon size={35} /><h3>{childFiltered && data.childFilter.id ? data.childFilter.invalid ? "Keine Einträge: Kind nicht verfügbar." : "Keine Einträge für dieses Kind in dieser Liste." : emptyMessages[tab as Resource]}</h3></div>}</div>
       </>}
