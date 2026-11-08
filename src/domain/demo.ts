@@ -9,7 +9,7 @@ export function demoPlans(now = new Date()): DayPlan[] {
     timezone: "Europe/Berlin",
     child,
     balance: 0,
-    appointments: [{ id: `${child.id}-visit`, title: child.id === "demo-mika" ? "Fußball" : "Musikstunde", startsAt: new Date(now.getTime() + 3_600_000).toISOString(), icon: "calendar" }],
+    appointments: [{ id: `${child.id}-visit`, title: child.id === "demo-mika" ? "Fußball" : "Musikstunde", startsAt: new Date(now.getTime() + 3_600_000).toISOString(), endsAt: null, icon: "calendar" }],
     rewards: [{ id: "demo-reward-1", title: "Gemeinsame Spielzeit", cost: 50 }, { id: "demo-reward-2", title: "Ausflug zum Spielplatz", cost: 100 }],
     tasks: [
       { id: `${child.id}-1`, routineId: `${child.id}-morning`, routineTitle: "Morgenroutine", title: "In Ruhe frühstücken", description: "Such dir etwas Leckeres aus und tanke Energie.", icon: "sun", section: "morning", time: "07:00", points: 5, completed: false },

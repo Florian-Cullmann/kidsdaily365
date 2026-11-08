@@ -285,8 +285,8 @@ progress::-moz-progress-bar { background: #efb832; border-radius: 20px; }
   .setup-card { padding: 26px; }
 }
 
-.routine-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px; color: #36553d; }
-.routine-heading h3 { margin: 0; font-size: 1.2rem; }
+.routine-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; padding: 14px 18px; color: #36553d; }
+.routine-heading h4 { margin: 0; font-size: 1.2rem; }
 .routine-heading span { font-size: .95rem; }
 .routine-group + .routine-group { margin-top: 18px; }
 .routine-group { display: grid; gap: 10px; }
@@ -311,4 +311,32 @@ progress::-moz-progress-bar { background: #efb832; border-radius: 20px; }
   .setup-checklist li { flex-wrap: wrap; }
   .setup-step-text { min-width: calc(100% - 60px); }
   .setup-checklist li button { margin-left: 58px; }
+}
+.day-section { flex-shrink: 0; min-width: 0; }
+.day-section + .day-section { margin-top: 18px; }
+.day-section-heading { padding: 12px 14px; margin-bottom: 10px; border-radius: 16px; background: #f1f4ec; color: #36553d; }
+.day-section-heading h3 { margin: 0; font-size: 1.35rem; }
+.day-section-heading p { margin: 4px 0 0; font-size: .95rem; }
+.unsaved-record-dialog { width: min(540px, calc(100% - 32px)); padding: 28px; border: 1px solid #ded9e8; border-radius: 24px; color: #302b43; background: #fff; box-shadow: 0 20px 80px #21182d40; }
+.unsaved-record-dialog::backdrop { background: #21182d80; }
+.unsaved-record-dialog h2 { margin-top: 0; }
+.unsaved-record-dialog p { line-height: 1.6; }
+.unsaved-record-dialog button { min-height: 48px; }
+
+.task-row.is-paused{background:#f1f5ed;border-color:#dce6d5;color:#65755d;opacity:1}
+.task-row.is-paused .check-circle{border:2px dashed #9aac8c;background:#e6eddf;color:#7b916c}
+.task-row.is-paused .task-words>span{color:#7d8b74}
+.task-row.is-paused .task-picture{opacity:.65}
+.done-badge:has(span){white-space:normal}.routine-heading>span{text-align:right}
+/* Small footer status stays clear of navigation and touch controls. */
+.wall-sync-status { display: flex; align-items: center; justify-content: flex-end; gap: 12px; justify-self: end; align-self: end; max-width: 100%; min-height: 44px; color: #fff; text-shadow: 0 1px 3px #000b; font-size: 12px; line-height: 1.4; text-align: right; }
+.wall-sync-status button { min-height: 44px; padding: 4px; border: 0; background: transparent; color: inherit; font-size: inherit; text-shadow: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.profile-screen > .wall-sync-status { align-self: flex-end; margin-top: auto; padding-top: 12px; }
+.center-page > .wall-sync-status { position: absolute; right: 16px; bottom: 12px; max-width: calc(100% - 32px); }
+.child-world:has(> .wall-sync-status) { grid-template-rows: auto minmax(0, 1fr) auto auto; }
+@media (max-width: 600px) { .wall-sync-status { flex-wrap: wrap; gap: 4px 12px; } }
+@media (min-width: 761px) and (orientation: landscape) {
+  .child-world:has(> .wall-sync-status) { grid-template-rows: auto minmax(0, 1fr) auto; padding-bottom: 52px; }
+  .child-world > .wall-sync-status { position: absolute; right: 8px; bottom: 8px; align-items: flex-end; }
+  .child-world > .wall-sync-status button { padding: 24px 0 0; }
 }

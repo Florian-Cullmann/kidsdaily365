@@ -6,5 +6,5 @@ export default defineConfig({
     "@": fileURLToPath(new URL("./src", import.meta.url)),
     "server-only": fileURLToPath(new URL("./tests/server-only.ts", import.meta.url)),
   } },
-  test: { include: ["tests/**/*.test.ts"], exclude: ["tests/**/*.integration.test.ts"] },
+  test: { include: ["tests/**/*.test.{ts,tsx}"], exclude: ["tests/**/*.integration.test.ts"] },
 });
