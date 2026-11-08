@@ -29,6 +29,12 @@ Die IP-Adresse ersetzen. Jedes der drei Secrets separat mit `openssl rand -hex 3
 
 `APP_ORIGIN` ist exakt die Adresse, die der Browser aufruft, inklusive Schema und gegebenenfalls Port. Nicht `localhost`, wenn der Bildschirm über die Server-IP zugreift. Bei Reverse Proxy z. B. `https://kidsdaily.home.example` setzen. So stimmen Origin-Prüfung und Cookie-Einstellungen.
 
+### Optionaler lokaler Konfigurationscheck
+
+Mit Node.js 24 LTS und nach `npm ci` lässt sich vor dem Start `npm run config:check` ausführen. Der Befehl lädt `.env`, wobei bereits gesetzte Umgebungsvariablen Vorrang haben. Für den Live-Check muss `APP_MODE=live` gesetzt sein. Fehler nennen nur die betroffenen Variablen und liefern Exitcode 1; Erfolg liefert 0. Es werden keine Daten verändert und weder Netzwerk noch Datenbank kontaktiert.
+
+Der Check verwendet die App-Validierung und prüft die lokale `DATABASE_URL`, nicht die von Compose ersetzte Containeradresse. Er ersetzt weder `docker compose config --quiet` noch die Prüfung von `POSTGRES_PASSWORD`, laufender Datenbank oder Migrationen. Die beiden folgenden Compose-Befehle bleiben erforderlich.
+
 ## 2. Bauen und einrichten
 
 ```sh
