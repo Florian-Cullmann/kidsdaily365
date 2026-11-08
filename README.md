@@ -90,3 +90,9 @@ Der HTTP-Smoke-Test braucht zusätzlich die Live-Konfiguration und dieselbe `DAT
 ## Entwicklung
 
 Wir arbeiten issuebasiert nach den aus `openwebprint` übernommenen Regeln: Features und größere Änderungen brauchen ein Issue, jede Änderung einen eigenen Branch und Pull Request. Kein direkter Push nach `main`. Jeder PR enthält **Proof of Done** mit Screenshot des tatsächlichen Ergebnisses oder begründetem alternativen Nachweis. Details in [CONTRIBUTING.md](CONTRIBUTING.md) und [AGENTS.md](AGENTS.md). Sicherheitsprobleme bitte [privat melden](SECURITY.md).
+
+### Archivierte Kinder wieder aktivieren
+
+Unter **Eltern → Kinderprofile → Wieder aktivieren** werden die Folgen erklärt; erst **Profil wieder aktivieren** bestätigt die Änderung. Bearbeiten ändert den Archivstatus eines Kinderprofils nicht.
+
+Aufgaben- und Sternehistorie, Buddy und Ausstattung bleiben erhalten. Aktive Routinen werden nach ihrem Zeitplan wieder berücksichtigt, einschließlich heute; bestehende Tages-Snapshots und Routine-Pausen bleiben geschützt. Ausgelassene Tage werden nicht nachträglich materialisiert, archivierte Routinen bleiben archiviert. Vorhandene App-Freigaben gelten nach erneuter Android-Kopplung wieder, gesperrte Apps bleiben gesperrt. Widerrufene Geräte und alte Tokens bleiben ungültig und benötigen eine neue Kopplung. Ein weiterhin gekoppelter gemeinsamer Wandbildschirm zeigt das aktive Profil wieder an. Nur angemeldete Eltern können Profile wieder aktivieren.
