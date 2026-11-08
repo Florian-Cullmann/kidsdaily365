@@ -1,4 +1,5 @@
 "use client";
+import { newRequestId } from "@/client/request-id";
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
@@ -33,7 +34,7 @@ export function DeviceManager({ initialData }: { initialData: DeviceManagementDa
   async function action(work: () => Promise<void>) { setBusy(true); setNotice(""); try { await work(); } catch (e) { setNotice((e as Error).message); } finally { setBusy(false); } }
   async function send(event: FormEvent) {
     event.preventDefault(); if (!draft.trim()) return;
-    if (!pending.current || pending.current.body !== draft.trim()) pending.current = { body: draft.trim(), requestId: crypto.randomUUID() };
+    if (!pending.current || pending.current.body !== draft.trim()) pending.current = { body: draft.trim(), requestId: newRequestId() };
     const message = pending.current;
     await action(async () => { await request(endpoint, { action: "message", data: message }); pending.current = null; setDraft(""); stickToEnd.current = true; await refresh(); });
   }

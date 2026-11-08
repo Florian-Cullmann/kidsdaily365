@@ -1,4 +1,5 @@
 "use client";
+import { newRequestId } from "@/client/request-id";
 import { RewardHistory } from "./reward-history";
 
 import { EndAppointmentSeries, type EndSeriesPreview } from "./end-appointment-series";
@@ -135,12 +136,7 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
   function copyRecord(record: EditableRecord) {
     leave(() => {
       setPauseRoutineId(null);
-      // getRandomValues also works on a household LAN served over HTTP.
-      const bytes = crypto.getRandomValues(new Uint8Array(16));
-      bytes[6] = (bytes[6] & 15) | 64;
-      bytes[8] = (bytes[8] & 63) | 128;
-      const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-      const requestId = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+      const requestId = newRequestId();
       setCopySource({ id: record.id, childName: childName(record.childId), requestId });
       setEditing({ ...record, childId: data.children.find((child) => child.active && child.id !== record.childId)?.id ?? data.children.find((child) => child.active)?.id, active: true });
       setFormOpen(true); setError(""); setNotice("");
