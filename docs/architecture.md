@@ -54,7 +54,7 @@ Beim ersten Laden entstehen Aufgabenkopien aktiver Routinen für den jeweiligen 
 
 Beim Abhaken prüft der Server Wandgerät, Familienzugehörigkeit, aktives Kinderprofil und aktuelles Familiendatum. Der Punktewert kommt aus der gespeicherten Aufgabenkopie. Ein eindeutiger Journalschlüssel auf `task_id` verhindert doppelte Punkte. Abschluss und elterliche Aufgabenänderung sperren dieselbe Aufgabenzeile; nach einer Punktebuchung kann die Aufgabe nicht mehr geändert oder storniert werden. Wiederholte Abschlüsse sind wirkungslos. [Drizzle-Transaktionen](https://orm.drizzle.team/docs/transactions) und Datenbankconstraints sichern diese Abläufe gemeinsam.
 
-Der Kontostand ist momentan die Summe verdienter Sterne. Einlösung, Korrektur und Kosmetikkäufe brauchen später ein erweitertes Journal mit Gegenbuchungen und eigener Berechtigung; sie sind noch nicht vorhanden. Das Journal ist auf Anwendungsebene append-only, nicht durch getrennte SQL-Rollen gegen einen Datenbankadministrator geschützt.
+Das gemeinsame Journal enthält Aufgabenvergütungen, elterliche Korrekturen und den Vertrag für spätere Ausgaben. Guthaben ist die Summe aller Buchungen; gültiger Gesamtverdienst umfasst Vergütungen und Korrekturen, Ausgaben nur Einlösungen/Käufe. Korrekturen referenzieren eindeutig die ursprüngliche Buchung, erhalten Elternidentität und Begründung und dürfen das Guthaben nicht unter null senken. Kind vor Aufgabe ist die gemeinsame Sperrreihenfolge. Einlösung und Kosmetikkäufe sind noch nicht integriert. Das Journal ist auf Anwendungsebene append-only, nicht durch getrennte SQL-Rollen gegen einen Datenbankadministrator geschützt.
 
 ## API-Übersicht
 

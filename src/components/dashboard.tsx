@@ -141,7 +141,7 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
 
   const progress = taskProgress(plan.tasks);
   const daySections = groupTasksBySection(plan.tasks);
-  const next = plan.tasks.find((task) => !task.completed && !task.paused);
+  const next = plan.tasks.find((task) => !task.completed && !task.paused && !task.corrected);
   const appointments = now ? relevantAppointments(plan.appointments, plan.timezone, now) : plan.appointments;
   const nextAppointment = appointments[0];
   const goal = plan.rewards.find((reward) => reward.cost > plan.balance) ?? plan.rewards[0];
@@ -163,9 +163,9 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
           <div className="day-section-heading"><h3 id={`section-${section.id}`}>{section.label}</h3><p>{section.caption}</p></div>
           {section.groups.map((group) => <section key={group.id} className="routine-group" aria-label={group.tasks[0].routineTitle ?? "Einzelaufgabe"}>
           {group.tasks[0].routineTitle && <div className="routine-heading"><h4>{group.tasks[0].routineTitle}</h4><span>{taskProgress(group.tasks).label}</span></div>}
-          {group.tasks.map((task) => <button key={task.id} className={`task-row ${task.completed ? "is-done" : task.paused ? "is-paused" : ""} ${next?.id === task.id ? "is-next" : ""}`} disabled={task.completed || task.paused || !!busy || (!demo && live.phase !== "connected")} aria-label={`${task.title}${task.time ? `, ${task.time} Uhr` : ""}, ${task.points} Sterne${task.completed ? ", erledigt" : task.paused ? ", heute Pause" : ", abhaken"}`} onClick={() => complete(task.id)}>
+          {group.tasks.map((task) => <button key={task.id} className={`task-row ${task.completed ? "is-done" : (task.paused || task.corrected) ? "is-paused" : ""} ${next?.id === task.id ? "is-next" : ""}`} disabled={task.completed || task.paused || task.corrected || !!busy || (!demo && live.phase !== "connected")} aria-label={`${task.title}${task.time ? `, ${task.time} Uhr` : ""}, ${task.points} Sterne${task.corrected ? ", Abschluss korrigiert" : task.completed ? ", erledigt" : task.paused ? ", heute Pause" : ", abhaken"}`} onClick={() => complete(task.id)}>
             <span className="task-picture" aria-hidden="true">{taskPictures[task.icon]}</span>
-            <span className="task-words"><strong>{task.title}</strong><span>{task.completed ? "Geschafft!" : task.paused ? "Heute Pause" : task.time ? `${task.time} Uhr` : "In deinem Tempo"}{!task.paused && <span className="row-stars"><Star size={15} fill="currentColor" />{task.completed ? "" : "+"}{task.points}</span>}</span></span>
+            <span className="task-words"><strong>{task.title}</strong><span>{task.corrected ? "Abschluss korrigiert" : task.completed ? "Geschafft!" : task.paused ? "Heute Pause" : task.time ? `${task.time} Uhr` : "In deinem Tempo"}{!task.paused && !task.corrected && <span className="row-stars"><Star size={15} fill="currentColor" />{task.completed ? "" : "+"}{task.points}</span>}</span></span>
             <span className="check-circle" aria-hidden="true">{busy === task.id ? <span className="saving-dots">•••</span> : task.completed ? <Check size={30} strokeWidth={3.5} /> : task.paused ? <Pause size={24} /> : null}</span>
           </button>)}</section>)}
           </section>)}

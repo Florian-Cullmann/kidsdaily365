@@ -321,3 +321,18 @@ progress::-moz-progress-bar { background: #efb832; border-radius: 20px; }
   .child-world > .wall-sync-status { position: absolute; right: 8px; bottom: 8px; align-items: flex-end; }
   .child-world > .wall-sync-status button { padding: 24px 0 0; }
 }
+
+.history-totals { display: flex; flex-wrap: wrap; gap: 1rem 2rem; padding: 1.2rem 0; color: #514567; }
+.history-totals strong { display: block; font-size: 1.4rem; }
+.task-correction { margin-top: 1rem; }
+.correction-dialog { max-width: min(36rem, calc(100vw - 2rem)); border: 1px solid #d6c9e7; border-radius: 1.25rem; padding: 1.6rem; color: #302646; background: #fff; }
+.correction-dialog::backdrop { background: #261d3b80; }
+.correction-dialog form { display: grid; gap: 1rem; }
+.correction-dialog h2, .correction-dialog p { margin: 0; }
+.correction-dialog label { display: grid; gap: .5rem; }
+.correction-dialog textarea { min-height: 7rem; width: 100%; padding: .7rem; border: 1px solid #cab9df; border-radius: .6rem; font: inherit; }
+.correction-dialog .correction-confirm { display: flex; align-items: start; gap: .7rem; padding: .5rem 0; }
+.correction-confirm input { min-width: 1.5rem; height: 1.5rem; }
+.correction-consequence, .history-correction { padding: 1rem; border-radius: .7rem; background: #f5f1fa; }
+.history-correction { margin-top: 1rem; }
+.correction-reason { white-space: pre-wrap; overflow-wrap: anywhere; }

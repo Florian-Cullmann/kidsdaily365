@@ -21,6 +21,7 @@ export type Task = {
   points: number;
   completed: boolean;
   paused?: boolean;
+  corrected?: boolean;
 };
 export type DayPlan = {
   date: string;
@@ -64,7 +65,7 @@ export function localDate(now: Date, timezone: string): string {
 // Also used by demo mode. Completing the same task twice must be a no-op.
 export function completeDemoTask(plan: DayPlan, taskId: string): DayPlan {
   const task = plan.tasks.find((item) => item.id === taskId);
-  if (!task || task.completed || task.paused) return plan;
+  if (!task || task.completed || task.paused || task.corrected) return plan;
   return {
     ...plan,
     balance: plan.balance + task.points,
@@ -76,10 +77,12 @@ export function completeDemoTask(plan: DayPlan, taskId: string): DayPlan {
 export function taskProgress(tasks: Task[]) {
   const done = tasks.filter(task => task.completed).length;
   const paused = tasks.filter(task => task.paused && !task.completed).length;
-  const total = tasks.length - paused;
+  const corrected = tasks.filter(task => task.corrected).length;
+  const total = tasks.length - paused - corrected;
   const open = total - done;
-  const label = total === 0 && paused > 0 ? "Heute Pause" : paused > 0
+  const baseLabel = total === 0 && paused > 0 ? "Heute Pause" : paused > 0
     ? `${done} geschafft${open ? ` · ${open} offen` : ""} · ${paused} mit Pause`
     : `${done} von ${total} geschafft`;
+  const label = corrected ? `${baseLabel} · ${corrected} korrigiert` : baseLabel;
   return { done, paused, total, label };
 }

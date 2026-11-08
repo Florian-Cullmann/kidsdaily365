@@ -1,4 +1,5 @@
 import "server-only";
+import { alias } from "drizzle-orm/pg-core";
 import { and, asc, eq, gte, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { localDate, type DaySection } from "@/domain/plan";
@@ -8,7 +9,9 @@ import { db } from "./db/client";
 import { appointments, children, dailyTasks, families, pointEntries, taskTemplates } from "./db/schema";
 import { ApiError } from "./errors";
 
-type PreviewTask = { id: string; routineId: string | null; routineTitle: string | null; title: string; description: string; section: DaySection; time: string | null; source: "saved" | "preview"; completed: boolean; cancelled: boolean; paused: boolean; sortOrder: number; stepIndex: number };
+const corrections = alias(pointEntries, "week_corrections");
+
+type PreviewTask = { id: string; routineId: string | null; routineTitle: string | null; title: string; description: string; section: DaySection; time: string | null; source: "saved" | "preview"; completed: boolean; corrected: boolean; cancelled: boolean; paused: boolean; sortOrder: number; stepIndex: number };
 
 // Deliberately independent of getDayPlans: a planning read must never materialize tasks.
 export async function getWeekPreview(parent: ParentActor, input: { childId?: string; date?: string }, now = new Date()) {
@@ -25,11 +28,12 @@ export async function getWeekPreview(parent: ParentActor, input: { childId?: str
     const child = requestedChild ? profiles.find((profile) => profile.id === requestedChild) : profiles.find((profile) => profile.active) ?? profiles[0];
     if (requestedChild && !child) throw new ApiError("Kinderprofil nicht gefunden.", 404);
     if (!child) return { profiles, child: null, today, start, end, timezone: family.timezone, days: [] };
-    const snapshots = await tx.select({ task: dailyTasks, completedAt: pointEntries.createdAt,
+    const snapshots = await tx.select({ task: dailyTasks, completedAt: pointEntries.createdAt, correctedAt: corrections.createdAt,
       // #28 is developed independently: JSON extraction also works before its additive migration.
       paused: sql<boolean>`coalesce(to_jsonb(${dailyTasks})->>'pausedBy', '') <> ''`,
     }).from(dailyTasks)
       .leftJoin(pointEntries, and(eq(pointEntries.taskId, dailyTasks.id), eq(pointEntries.familyId, parent.familyId)))
+      .leftJoin(corrections, eq(corrections.correctionOf, pointEntries.id))
       .where(and(eq(dailyTasks.familyId, parent.familyId), eq(dailyTasks.childId, child.id), gte(dailyTasks.date, start), lte(dailyTasks.date, end)));
     const templates = child.active ? await tx.select().from(taskTemplates).where(and(eq(taskTemplates.familyId, parent.familyId), eq(taskTemplates.childId, child.id), eq(taskTemplates.active, true))) : [];
     // Consume #28's existing model when installed; do not introduce a second pause schema.
@@ -47,9 +51,9 @@ export async function getWeekPreview(parent: ParentActor, input: { childId?: str
     const days = Array.from({ length: 7 }, (_, index) => {
       const date = shiftDate(start, index);
       const saved = snapshots.filter(({ task }) => task.date === date);
-      const tasks: PreviewTask[] = saved.map(({ task, completedAt, paused }) => ({
+      const tasks: PreviewTask[] = saved.map(({ task, completedAt, correctedAt, paused }) => ({
         id: task.id, routineId: task.templateId, routineTitle: task.routineTitle, title: task.title, description: task.description,
-        section: task.section, time: task.scheduledTime?.slice(0, 5) ?? null, source: "saved", completed: completedAt !== null,
+        section: task.section, time: task.scheduledTime?.slice(0, 5) ?? null, source: "saved", completed: completedAt !== null && correctedAt === null, corrected: correctedAt !== null,
         cancelled: task.cancelledAt !== null, paused: paused && completedAt === null, sortOrder: task.sortOrder, stepIndex: task.stepIndex,
       }));
       // Snapshot identity is per routine/day, including cancelled steps. Never refill a saved group.
@@ -60,7 +64,7 @@ export async function getWeekPreview(parent: ParentActor, input: { childId?: str
         for (const [stepIndex, step] of (template.steps ?? [template]).entries()) tasks.push({
           id: `${date}-${template.id}-${stepIndex}`, routineId: template.id, routineTitle: template.title,
           title: step.title, description: step.description, section: template.section, time: template.scheduledTime?.slice(0, 5) ?? null,
-          source: "preview", completed: false, cancelled: false, paused: pauses.some((pause) => pause.routineId === template.id && pause.startsOn <= date && pause.endsOn >= date), sortOrder: template.sortOrder, stepIndex,
+          source: "preview", completed: false, corrected: false, cancelled: false, paused: pauses.some((pause) => pause.routineId === template.id && pause.startsOn <= date && pause.endsOn >= date), sortOrder: template.sortOrder, stepIndex,
         });
       }
       tasks.sort((a, b) => (a.time ?? "99:99").localeCompare(b.time ?? "99:99") || a.sortOrder - b.sortOrder || (a.routineId ?? a.id).localeCompare(b.routineId ?? b.id) || a.stepIndex - b.stepIndex || a.id.localeCompare(b.id));

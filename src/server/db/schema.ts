@@ -125,19 +125,30 @@ export const dailyTasks = pgTable("daily_tasks", {
   check("task_points_range", sql`${table.points} between 0 and 1000`),
 ]);
 
-// Append-only earnings journal. One entry per task, enforced by PostgreSQL.
-// Redemptions/adjustments will get their own audited workflow in a later phase.
+// Shared append-only journal: task earnings, expenses and audited corrections.
 export const pointEntries = pgTable("point_entries", {
   id: uuid().primaryKey().defaultRandom(),
   familyId: uuid().notNull().references(() => families.id),
   childId: uuid().notNull(),
-  taskId: uuid().notNull().unique(),
+  taskId: uuid().unique(),
+  expenseKey: text().unique(),
+  correctionOf: uuid().unique(),
+  correctedBy: uuid(),
+  correctionReason: text(),
   amount: integer().notNull(),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   foreignKey({ columns: [table.taskId, table.childId, table.familyId], foreignColumns: [dailyTasks.id, dailyTasks.childId, dailyTasks.familyId] }),
   index("points_child_lookup").on(table.familyId, table.childId),
-  check("earned_points_range", sql`${table.amount} between 0 and 1000`),
+  unique("points_child_family_identity").on(table.id, table.childId, table.familyId),
+  foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
+  foreignKey({ columns: [table.correctionOf, table.childId, table.familyId], foreignColumns: [table.id, table.childId, table.familyId] }),
+  foreignKey({ columns: [table.correctedBy, table.familyId], foreignColumns: [parents.id, parents.familyId] }),
+  check("journal_entry_kind", sql`
+    (${table.taskId} is not null and ${table.expenseKey} is null and ${table.correctionOf} is null and ${table.correctedBy} is null and ${table.correctionReason} is null and ${table.amount} between 0 and 1000)
+    or (${table.taskId} is null and ${table.expenseKey} is not null and ${table.correctionOf} is null and ${table.correctedBy} is null and ${table.correctionReason} is null and ${table.amount} < 0)
+    or (${table.taskId} is null and ${table.expenseKey} is null and ${table.correctionOf} is not null and ${table.correctionOf} <> ${table.id} and ${table.correctedBy} is not null and ${table.correctionReason} is not null and length(trim(${table.correctionReason})) between 1 and 1000 and ${table.amount} between -1000 and 0)
+  `),
 ]);
 
 export const rewards = pgTable("rewards", {

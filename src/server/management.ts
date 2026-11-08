@@ -1,4 +1,5 @@
 import "server-only";
+import { alias } from "drizzle-orm/pg-core";
 import { editAppointment } from "./appointment-series";
 import { profileImageUrl } from "@/domain/profile-image";
 import { and, asc, desc, eq, gte, isNull, sql } from "drizzle-orm";
@@ -7,6 +8,7 @@ import { localDate } from "@/domain/plan";
 import { db } from "./db/client";
 import { buddyOwnership, buddyEquipment, allowedApps, appointments, childImages, children, dailyTasks, devices, families, parents, pointEntries, rewards, routinePauses, taskTemplates } from "./db/schema";
 import { ApiError } from "./errors";
+const corrections = alias(pointEntries, "management_corrections");
 import type { ParentActor } from "./auth/parent";
 import { isUniqueViolation } from "./auth/parent";
 
@@ -23,8 +25,9 @@ export async function getManagementData(parent: ParentActor, childId = "") {
   const today = localDate(new Date(), family.timezone);
   const [routines, tasks, dates, goals, apps, deviceRows, adults, images, equipment, ownership, pauses] = await Promise.all([
     db().select().from(taskTemplates).where(and(eq(taskTemplates.familyId, familyId), childScope(taskTemplates.childId))).orderBy(asc(taskTemplates.sortOrder)),
-    db().select({ task: dailyTasks, completed: sql<boolean>`${pointEntries.id} is not null` }).from(dailyTasks)
+    db().select({ task: dailyTasks, corrected: sql<boolean>`${corrections.id} is not null`, completed: sql<boolean>`${pointEntries.id} is not null` }).from(dailyTasks)
       .leftJoin(pointEntries, eq(pointEntries.taskId, dailyTasks.id))
+      .leftJoin(corrections, eq(corrections.correctionOf, pointEntries.id))
       .where(and(eq(dailyTasks.familyId, familyId), gte(dailyTasks.date, today), isNull(dailyTasks.cancelledAt), childScope(dailyTasks.childId)))
       .orderBy(asc(dailyTasks.date), asc(dailyTasks.sortOrder)).limit(1001),
     db().select().from(appointments).where(and(eq(appointments.familyId, familyId), childScope(appointments.childId))).orderBy(desc(appointments.startsAt)).limit(1001),
@@ -44,7 +47,7 @@ export async function getManagementData(parent: ParentActor, childId = "") {
     childFilter: { id: childId, invalid: invalidChild },
     limited: { tasks: tasks.length > 1000, appointments: dates.length > 1000 },
     family: { name: family.name, timezone: family.timezone }, today, pauses,
-    children: kids.map((child) => ({ ...child, equippedAccessories: equipment.filter((item) => item.childId === child.id).map((item) => item.accessoryId), ownedAccessories: ownership.filter((item) => item.childId === child.id).map((item) => item.accessoryId), imageUrl: imageUrls.get(child.id) ?? null })), routines: routines.map((routine) => ({ ...routine, steps: routine.steps ?? [{ title: routine.title, description: routine.description, icon: routine.icon, points: routine.points }] })), tasks: tasks.slice(0, 1000).map(({ task, completed }) => ({ ...task, completed })),
+    children: kids.map((child) => ({ ...child, equippedAccessories: equipment.filter((item) => item.childId === child.id).map((item) => item.accessoryId), ownedAccessories: ownership.filter((item) => item.childId === child.id).map((item) => item.accessoryId), imageUrl: imageUrls.get(child.id) ?? null })), routines: routines.map((routine) => ({ ...routine, steps: routine.steps ?? [{ title: routine.title, description: routine.description, icon: routine.icon, points: routine.points }] })), tasks: tasks.slice(0, 1000).map(({ task, completed, corrected }) => ({ ...task, completed, corrected })),
     appointments: dates.slice(0, 1000).map((item) => ({ ...item, startsAt: item.startsAt.toISOString(), endsAt: item.endsAt?.toISOString() ?? null })),
     rewards: goals, apps,
     devices: deviceRows.map((item) => ({ ...item, expiresAt: item.expiresAt.toISOString(), revokedAt: item.revokedAt?.toISOString() ?? null })),

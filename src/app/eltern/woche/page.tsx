@@ -43,7 +43,7 @@ export default async function WeekPage({ searchParams }: { searchParams: Promise
         {sections.map((section) => { const tasks = day.tasks.filter((task) => task.section === section.id); return tasks.length > 0 && <div className="week-section" key={section.id}><h4>{section.label.replace("Mein ", "")}</h4>{tasks.map((task, index) => <article className={`week-task ${(task.cancelled || task.paused) ? "week-cancelled" : ""}`} key={task.id}>
           {task.routineId && (index === 0 || tasks[index - 1].routineId !== task.routineId) && <p className="week-routine">{task.routineTitle}</p>}
           <strong>{task.time && `${task.time} · `}{task.title}</strong>{task.description && <p>{task.description}</p>}
-          <small>{task.source === "preview" ? "Vorschau" : "Gespeicherte Tageskopie"} · {task.completed ? "Erledigt" : task.cancelled ? "Aus dem Plan genommen" : task.paused ? "Pausiert · nicht fällig" : task.routineId ? "Routineschritt" : "Einzelaufgabe"}</small>
+          <small>{task.source === "preview" ? "Vorschau" : "Gespeicherte Tageskopie"} · {task.corrected ? "Abschluss korrigiert" : task.completed ? "Erledigt" : task.cancelled ? "Aus dem Plan genommen" : task.paused ? "Pausiert · nicht fällig" : task.routineId ? "Routineschritt" : "Einzelaufgabe"}</small>
         </article>)}</div>; })}
         {!day.tasks.length && !day.appointments.length && <p className="week-empty">{day.date < data.today ? "Keine gespeicherten Aufgaben oder Termine." : "Hier ist noch nichts geplant. Raum für freie Zeit."}</p>}
       </section>)}</div>
