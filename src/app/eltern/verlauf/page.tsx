@@ -30,7 +30,7 @@ export default async function History({ searchParams }: { searchParams: Promise<
       <div className="record-description"><h2>{task.title}</h2><p>{sections[task.section]}{task.scheduledTime ? ` · ${task.scheduledTime.slice(0, 5)} Uhr` : ""} · {task.routineTitle ?? "Einzelaufgabe"}</p>{task.description && <p>{task.description}</p>}
       <p>{task.completedAt ? `Abgeschlossen am ${time(task.completedAt)}: +${task.earned} Sterne` : task.cancelledAt ? `Entfernt / ausgesetzt am ${time(task.cancelledAt)}` : "Offen · kein Abschluss gespeichert"}</p>
       {task.correctedAt && <div className="history-correction"><strong>Durch Eltern korrigiert: {task.correctionAmount} Sterne</strong><p>{task.correctedBy} · {time(task.correctedAt)}</p><p className="correction-reason">{task.correctionReason}</p></div>}
-      {task.completionId && task.completedAt && !task.correctedAt && <TaskCorrection completionId={task.completionId} title={task.title} childName={data.profiles.find(child => child.id === data.childId)!.name} date={data.date.split("-").reverse().join(".")} completedAt={time(task.completedAt)} stars={task.earned ?? 0} />}
+      {task.completionId && task.completedAt && !task.correctedAt && <TaskCorrection completionId={task.completionId} />}
       </div>
       <strong className="history-stars">{(task.earned ?? 0) + (task.correctionAmount ?? 0)} ★<span>{task.correctedAt ? "nach Korrektur" : "verdient"}</span></strong>
     </article>)}</section>}
