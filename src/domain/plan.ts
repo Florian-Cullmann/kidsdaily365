@@ -7,7 +7,7 @@ export type ChildProfile = {
   id: string; name: string; avatar: string; reducedMotion: boolean;
   buddyKind: BuddyKind; buddyName: string;
 };
-export type Appointment = { id: string; title: string; startsAt: string; icon: "calendar" | "tooth" | "ball" | "heart" };
+export type Appointment = { id: string; title: string; startsAt: string; endsAt?: string | null; icon: "calendar" | "tooth" | "ball" | "heart" };
 export type RewardRequest = { id: string; childId: string; rewardId: string; title: string; cost: number; status: "pending" | "approved" | "rejected"; createdAt: string; decidedAt: string | null };
 export type Reward = { id: string; title: string; cost: number };
 export type Task = {
@@ -21,6 +21,7 @@ export type Task = {
   time: string | null;
   points: number;
   completed: boolean;
+  paused?: boolean;
 };
 export type DayPlan = {
   date: string;
@@ -40,6 +41,21 @@ export const sections: { id: DaySection; label: string; caption: string }[] = [
   { id: "evening", label: "Mein Abend", caption: "Den Tag entspannt beenden" },
 ];
 
+// Preserve the plan's order within each section and routine, including completed tasks.
+export function groupTasksBySection(tasks: Task[]) {
+  return sections.flatMap((section) => {
+    const groups = new Map<string, { id: string; tasks: Task[] }>();
+    for (const task of tasks) {
+      if (task.section !== section.id) continue;
+      const id = task.routineId ? `routine:${task.routineId}` : `task:${task.id}`;
+      const group = groups.get(id);
+      if (group) group.tasks.push(task);
+      else groups.set(id, { id, tasks: [task] });
+    }
+    return groups.size ? [{ ...section, groups: [...groups.values()] }] : [];
+  });
+}
+
 export function localDate(now: Date, timezone: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
@@ -51,11 +67,23 @@ export function localDate(now: Date, timezone: string): string {
 // Also used by demo mode. Completing the same task twice must be a no-op.
 export function completeDemoTask(plan: DayPlan, taskId: string): DayPlan {
   const task = plan.tasks.find((item) => item.id === taskId);
-  if (!task || task.completed) return plan;
+  if (!task || task.completed || task.paused) return plan;
   return {
     ...plan,
     balance: plan.balance + task.points,
     earnedTotal: (plan.earnedTotal ?? plan.balance) + task.points,
     tasks: plan.tasks.map((item) => item.id === taskId ? { ...item, completed: true } : item),
   };
+}
+
+/** Paused steps are visible, but never counted as completed or as outstanding work. */
+export function taskProgress(tasks: Task[]) {
+  const done = tasks.filter(task => task.completed).length;
+  const paused = tasks.filter(task => task.paused && !task.completed).length;
+  const total = tasks.length - paused;
+  const open = total - done;
+  const label = total === 0 && paused > 0 ? "Heute Pause" : paused > 0
+    ? `${done} geschafft${open ? ` · ${open} offen` : ""} · ${paused} mit Pause`
+    : `${done} von ${total} geschafft`;
+  return { done, paused, total, label };
 }
