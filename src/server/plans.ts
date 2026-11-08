@@ -1,4 +1,5 @@
 import "server-only";
+import { rewardHistory } from "./rewards";
 import { profileImageUrl } from "@/domain/profile-image";
 import { and, asc, eq, gt, gte, lte, isNull, or, sql } from "drizzle-orm";
 import { localDate, type DayPlan } from "@/domain/plan";
@@ -54,7 +55,7 @@ export async function getDayPlans(familyId: string, now = new Date()): Promise<D
       .from(dailyTasks).leftJoin(pointEntries, eq(dailyTasks.id, pointEntries.taskId))
       .where(and(eq(dailyTasks.familyId, familyId), eq(dailyTasks.date, date), isNull(dailyTasks.cancelledAt)))
       .orderBy(asc(dailyTasks.sortOrder), asc(dailyTasks.templateId), asc(dailyTasks.stepIndex), asc(dailyTasks.id)),
-    db().select({ childId: pointEntries.childId, balance: sql`sum(${pointEntries.amount})`.mapWith(Number) })
+    db().select({ childId: pointEntries.childId, balance: sql`sum(${pointEntries.amount})`.mapWith(Number), earnedTotal: sql`sum(greatest(${pointEntries.amount}, 0))`.mapWith(Number) })
       .from(pointEntries).where(eq(pointEntries.familyId, familyId)).groupBy(pointEntries.childId),
     db().select().from(appointments).where(and(eq(appointments.familyId, familyId), eq(appointments.active, true), or(
       gte(appointments.startsAt, now), gt(appointments.endsAt, now),
@@ -66,11 +67,14 @@ export async function getDayPlans(familyId: string, now = new Date()): Promise<D
     db().select().from(buddyEquipment).where(eq(buddyEquipment.familyId, familyId)),
   ]);
 
+  const history = await rewardHistory(familyId);
   const imageUrls = new Map(images.map((image) => [image.childId, profileImageUrl(image.childId, image.version)]));
   return profiles.map((child) => ({
     date, timezone,
     child: { id: child.id, name: child.name, avatar: child.avatar, equippedAccessories: equipment.filter((item) => item.childId === child.id).map((item) => item.accessoryId), imageUrl: imageUrls.get(child.id) ?? null, reducedMotion: child.reducedMotion, buddyKind: child.buddyKind, buddyName: child.buddyName },
     balance: balances.find((row) => row.childId === child.id)?.balance ?? 0,
+    earnedTotal: balances.find((row) => row.childId === child.id)?.earnedTotal ?? 0,
+    rewardRequests: history.filter((row) => row.childId === child.id),
     appointments: upcoming.filter((item) => item.childId === child.id).map((item) => ({ id: item.id, title: item.title, startsAt: item.startsAt.toISOString(), endsAt: item.endsAt?.toISOString() ?? null, icon: item.icon })),
     rewards: rewardOptions,
     tasks: tasks.filter(({ task }) => task.childId === child.id).map(({ task, completedAt }) => ({

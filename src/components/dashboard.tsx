@@ -1,4 +1,5 @@
 "use client";
+import { RewardHistory } from "./reward-history";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CalendarDays, Check, ChevronRight, Heart, House, Maximize, Pause, Star, Users } from "lucide-react";
@@ -33,6 +34,8 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
   const [notice, setNotice] = useState<{ text: string } | null>(null);
   const noticeContext = useRef(0);
   const [error, setError] = useState("");
+  const [confirmReward, setConfirmReward] = useState<string | null>(null);
+  const rewardKeys = useRef(new Map<string, string>());
   const [previousPlans, setPreviousPlans] = useState(plans);
   if (previousPlans !== plans) {
     setPreviousPlans(plans);
@@ -80,7 +83,7 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
 
   function chooseProfile(id: string) {
     noticeContext.current += 1;
-    setChildId(id); setView("day"); setNotice(null); setError("");
+    setConfirmReward(null); setChildId(id); setView("day"); setNotice(null); setError("");
   }
 
   function openView(nextView: View) {
@@ -104,6 +107,24 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
     if (!result || context !== noticeContext.current) return;
     if ("error" in result) setError(result.error);
     else if (!sync.getSnapshot().dayChanged) setNotice({ text: result.awarded ? `Geschafft! ${result.awarded} neue Sterne für dich.` : "Das hast du geschafft!" });
+  }
+
+  async function askReward(rewardId: string) {
+    if (busy || !plan || demo) return;
+    setError("");
+    const context = noticeContext.current;
+    const key = `${plan.child.id}:${rewardId}`;
+    try {
+      // Retain this ID across failures and reloads, including a lost response after a decision.
+      const storageKey = `reward-request:${key}`;
+      const requestId = rewardKeys.current.get(key) ?? sessionStorage.getItem(storageKey) ?? crypto.randomUUID();
+      rewardKeys.current.set(key, requestId); sessionStorage.setItem(storageKey, requestId);
+      const result = await sync.requestReward(plan.child.id, rewardId, requestId);
+      if (!result) return;
+      if ("error" in result) throw new Error(result.error);
+      sessionStorage.removeItem(storageKey); rewardKeys.current.delete(key);
+      if (context === noticeContext.current) { setConfirmReward(null); setNotice({ text: "Deine Anfrage ist gespeichert. Den Stand siehst du im Verlauf." }); }
+    } catch (cause) { if (context === noticeContext.current) setError(cause instanceof Error && !(cause instanceof TypeError) ? cause.message : "Der Server ist gerade nicht erreichbar. Bitte erneut versuchen; deine Anfrage wird nicht doppelt gespeichert."); }
   }
 
   async function fullscreen() {
@@ -174,7 +195,7 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
 
         {view === "appointments" && <div className="detail-scroll">{appointments.length ? appointments.map((item) => <article className="appointment-row" key={item.id}><span className="detail-picture" aria-hidden="true">{appointmentPictures[item.icon]}</span><div><span className="appointment-date">{appointmentLabel(item, plan.timezone, now)}</span><h3>{item.title}</h3></div><time dateTime={item.startsAt}>{appointmentTime(item.startsAt, plan.timezone)}</time></article>) : <div className="empty-state"><span aria-hidden="true">🌻</span><h3>Gerade ist nichts geplant.</h3></div>}</div>}
 
-        {view === "rewards" && <div className="detail-scroll"><p className="wishes-intro">Plant zusammen etwas, worauf du dich freust.</p>{plan.rewards.length ? plan.rewards.map((reward, index) => <article className="wish-card" key={reward.id}><span className="detail-picture" aria-hidden="true">{rewardPictures[index % rewardPictures.length]}</span><div><h3>{reward.title}</h3><p>{plan.balance >= reward.cost ? "Du hast genug Sterne!" : `Noch ${reward.cost - plan.balance} Sterne`}</p><progress value={Math.min(plan.balance, reward.cost)} max={reward.cost} aria-label={`Fortschritt für ${reward.title}`} /><span className="wish-count">{plan.balance} / {reward.cost} Sterne</span></div></article>) : <div className="empty-state"><span aria-hidden="true">🎁</span><h3>Was wünschst du dir?</h3><p>Hier ist Platz für eure gemeinsamen Ideen.</p></div>}<p className="wishes-note">Das Einlösen kommt später dazu.</p></div>}
+        {view === "rewards" && <div className="detail-scroll"><p className="wishes-intro">Plant zusammen etwas, worauf du dich freust.</p>{plan.rewards.length ? plan.rewards.map((reward, index) => <article className="wish-card" key={reward.id}><span className="detail-picture" aria-hidden="true">{rewardPictures[index % rewardPictures.length]}</span><div><h3>{reward.title}</h3><p>{plan.balance >= reward.cost ? "Du hast genug Sterne!" : `Noch ${reward.cost - plan.balance} Sterne`}</p><progress value={Math.min(plan.balance, reward.cost)} max={reward.cost} aria-label={`Fortschritt für ${reward.title}`} /><span className="wish-count">{plan.balance} / {reward.cost} Sterne</span>{plan.rewardRequests?.some((item) => item.rewardId === reward.id && item.status === "pending") ? <p>Bei deinen Eltern angefragt</p> : <button className="reward-action" disabled={!!busy || demo || live.phase !== "connected" || plan.balance < reward.cost} onClick={() => setConfirmReward(reward.id)}>Einlösen anfragen · {reward.cost} Sterne</button>}{confirmReward === reward.id && <div className="reward-confirm" role="group" aria-label="Anfrage bestätigen"><p>„{reward.title}“ für {reward.cost} Sterne anfragen? Erst wenn deine Eltern bestätigen, werden die Sterne abgezogen.</p><button className="reward-action" disabled={!!busy || live.phase !== "connected"} onClick={() => askReward(reward.id)}>Ja, bei meinen Eltern anfragen</button><button className="reward-action" disabled={!!busy} onClick={() => setConfirmReward(null)}>Zurück</button></div>}</div></article>) : <div className="empty-state"><span aria-hidden="true">🎁</span><h3>Was wünschst du dir?</h3><p>Hier ist Platz für eure gemeinsamen Ideen.</p></div>}<p className="wishes-note">{plan.balance} Sterne verfügbar · {plan.earnedTotal ?? plan.balance} insgesamt verdient{demo ? " · Anfragen sind nur am gekoppelten Wandbildschirm möglich." : ""}</p><RewardHistory items={plan.rewardRequests ?? []} timezone={plan.timezone} /></div>}
 
         <div className="paper-footer"><Heart size={19} /><span>Pausen gehören auch dazu.</span></div>
       </section>

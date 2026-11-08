@@ -13,7 +13,7 @@ const data = {
   family: { name: "Testfamilie", timezone: "Europe/Berlin" }, today: "2026-11-04",
   children: [{ id: "child", name: "Mika", avatar: "M", active: true, buddyInitialized: false, equippedAccessories: [], ownedAccessories: [] }],
   routines: ["Morgen", "Abend"].map((title, index) => ({ id: `routine-${index}`, title, childId: "child", active: true, weekdays: [1, 2, 3, 4, 5], section: "morning", sortOrder: 0, steps: [{ title: "Zähne putzen", description: "", icon: "toothbrush", points: 5 }, { title: "Rucksack packen", description: "", icon: "backpack", points: 3 }] })),
-  pauses: [], tasks: [], appointments: [], rewards: [], apps: [], devices: [], parents: [],
+  rewardRequests: [], wallets: [], pauses: [], tasks: [], appointments: [], rewards: [], apps: [], devices: [], parents: [],
 } as unknown as ManagementData;
 
 beforeAll(() => {

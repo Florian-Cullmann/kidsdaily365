@@ -116,28 +116,37 @@ export class WallSync {
       void this.refresh();
       return { error: "Ein neuer Tag hat begonnen. Dein Tagesplan wird geladen." };
     }
+    return this.mutate(plan.child.id, taskId, `/api/tasks/${taskId}/complete`);
+  }
+
+  async requestReward(childId: string, rewardId: string, requestId: string): Promise<Completion> {
+    return this.mutate(childId, rewardId, `/api/children/${childId}/reward-requests`, { rewardId, requestId });
+  }
+
+  private async mutate(childId: string, busyId: string, url: string, body?: unknown): Promise<Completion> {
+    if (!this.active || this.write || this.state.phase !== "connected") return null;
     this.generation++;
     this.read?.abort(); this.read = null;
     const controller = new AbortController();
     this.write = controller;
-    this.publish({ busyTaskId: taskId, refreshing: false });
+    this.publish({ busyTaskId: busyId, refreshing: false });
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await this.fetcher(`/api/tasks/${taskId}/complete`, { method: "POST", signal: controller.signal });
+      const response = await this.fetcher(url, { method: "POST", signal: controller.signal, ...(body === undefined ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }) });
       if (!this.active || this.write !== controller) return null;
       if (response.status === 401 || response.status === 403) { this.revoked(); return null; }
       const data = await response.json();
       if (!this.active || this.write !== controller) return null;
       if (controller.signal.aborted) throw new Error("completion timed out");
       if (!response.ok) return { error: typeof data.error === "string" ? data.error : "Das Speichern hat nicht geklappt. Bitte erneut versuchen." };
-      if (data.childId !== plan.child.id || data.plan?.child?.id !== plan.child.id) throw new Error("invalid completion");
-      this.publish({ plans: this.state.plans.map((item) => item.child.id === data.childId ? data.plan : item) });
+      if (data.plan?.child?.id !== childId || (body === undefined && data.childId !== childId)) throw new Error("invalid completion");
+      this.publish({ plans: this.state.plans.map((item) => item.child.id === childId ? data.plan : item) });
       this.checkDay();
-      return { childId: data.childId, awarded: data.awarded };
+      return { childId, awarded: data.awarded ?? 0 };
     } catch {
       if (!this.active || this.write !== controller) return null;
       this.publish({ phase: "offline" });
-      return { error: "Die Bestätigung fehlt. Sobald die Verbindung wieder da ist, prüfen wir, ob deine Aufgabe gespeichert wurde." };
+      return { error: "Die Bestätigung fehlt. Sobald die Verbindung wieder da ist, prüfen wir, ob deine Änderung gespeichert wurde." };
     } finally {
       clearTimeout(timeout);
       if (this.write === controller) {

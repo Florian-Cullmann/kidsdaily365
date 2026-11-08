@@ -120,6 +120,13 @@ Screenshots mit ausschließlich fiktiven Daten: [Elterneditor](proof/routine-edi
 Automatisierte Bildtests prüfen echte Dekodierung, Größenlimits, Ausschnitt, EXIF-Ausrichtung und entfernte Metadaten. Die Datenbanktests prüfen Ersetzen/Entfernen, Rechte, Profiltrennung und unabhängigen Punktestand. Keine echten Kinderfotos in Tests oder Nachweisen verwenden.
 
 
+## Belohnungen einlösen
+
+Mit fiktiven Profilen am gekoppelten Wandbildschirm einen erreichbaren Wunsch öffnen und „Einlösen anfragen“ bewusst bestätigen. Die Anfrage muss ohne Abbuchung beim Kind und im Elternbereich erscheinen. Eltern bestätigen einen Wunsch und lehnen einen zweiten ab: Nur die Bestätigung reduziert das verfügbare Guthaben, die insgesamt verdienten Sterne und abgeschlossenen Aufgaben bleiben erhalten. Nach Neuladen müssen beide Entscheidungen mit Angebotspreis und Zeitpunkten sichtbar sein.
+
+Zwischen Anfrage und Bestätigung den Preis ändern (der angefragte Preis bleibt bestehen) bzw. den Wunsch archivieren (Bestätigung muss scheitern; Ablehnung bleibt möglich). Offline darf keine Erfolgsmeldung erscheinen. Eine nach dem Speichern verlorene Antwort erneut versuchen: gleiche Anfrage-ID und nur eine persistierte Anfrage. Die Kinderansicht aktualisiert den Serverstand über den gemeinsamen Wandabgleich alle 10 Sekunden im Vordergrund.
+
+`tests/rewards.integration.test.ts` prüft auf einer migrierten disposable `*_test`-Datenbank parallele Anfragen, alternative Wiederholungs-IDs nach einer Entscheidung, konkurrierende Ausgaben bei knappem Guthaben, gegensätzliche Elternentscheidungen, archivierte Wünsche, Preisänderungen, manipulierte Eingaben und Haushalts-/Geschwistergrenzen. Die echten Route-Handler prüfen fehlende, native und widerrufene Gerätezugänge, getrennte Elternsitzungen und falsche Origins. Browserprüfungen ergänzen dies um bewusste Bestätigung, Offline-/Antwortverlust und den sichtbaren Verlauf.
 ## Ersteinrichtung in der Elternübersicht (#51)
 
 Die Checkliste wird aus den gespeicherten Haushaltsdaten abgeleitet. Es gibt keine

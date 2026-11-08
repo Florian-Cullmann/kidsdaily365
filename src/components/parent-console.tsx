@@ -1,4 +1,5 @@
 "use client";
+import { RewardHistory } from "./reward-history";
 
 import { EndAppointmentSeries, type EndSeriesPreview } from "./end-appointment-series";
 import Link from "next/link";
@@ -235,6 +236,7 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
         <div className="parent-callout">Auf dem Wandbildschirm können eure Kinder Aufgaben abhaken. Der Android-Launcher zeigt Buddy, Sterne und freigegebene Apps; er kann keine Aufgaben abhaken. Neue Kinderprofile starten mit Audible in der App-Liste.</div>
       </>}
 
+      {(tab === "overview" || tab === "rewards") && <section className="parent-panel"><h2>Belohnungsanfragen</h2><p>Bestätigen bedeutet eingelöst: Die angefragten Kosten werden einmalig abgezogen, auch wenn der Preis inzwischen geändert wurde.</p>{data.children.map((child) => { const wallet = data.wallets.find((w) => w.childId === child.id); return <p key={child.id}>{child.name}: {wallet?.balance ?? 0} Sterne verfügbar · {wallet?.earnedTotal ?? 0} insgesamt verdient</p>; })}<button className="parent-secondary" disabled={busy} onClick={() => action(refresh)}>Aktualisieren</button><RewardHistory items={data.rewardRequests} timezone={data.family.timezone} childName={childName} renderActions={(item) => item.status === "pending" && <div className="record-actions"><button className="parent-primary" disabled={busy} onClick={() => action(async () => { await request(`/api/parent/reward-requests/${item.id}`, "POST", { decision: "approved" }); await refresh(); setNotice("Wunsch eingelöst."); })}>Bestätigen · {item.cost} Sterne abbuchen</button><button className="parent-secondary" disabled={busy} onClick={() => action(async () => { await request(`/api/parent/reward-requests/${item.id}`, "POST", { decision: "rejected" }); await refresh(); setNotice("Anfrage abgelehnt. Keine Sterne abgezogen."); })}>Ablehnen</button></div>} /></section>}
       {isResource && <>
         {childFiltered && <section className="parent-child-filter" aria-label="Liste nach Kind filtern">
           <label htmlFor="child-filter">Kind auswählen<select id="child-filter" value={data.childFilter.id} disabled={busy} onChange={(event) => { const childId = event.target.value; leave(() => { void filterByChild(childId); }); }}>
@@ -248,7 +250,7 @@ export function ParentConsole({ parent, initialData, initialTab = "overview" }: 
         {(tab === "tasks" || tab === "appointments") && data.limited[tab] && <p className="parent-callout" role="status">Die Liste ist auf 1.000 Einträge begrenzt. {data.childFilter.id ? "Auch für dieses Kind gibt es weitere Einträge, die hier nicht angezeigt werden." : "Wähle ein Kind, um dessen Einträge gezielt zu laden."}</p>}
         {tab === "routines" && <div className="parent-callout">Änderungen gelten für neue Tagespläne. Pausen sind für einzelne Tage oder Ferien möglich. Bestehende Aufgaben bearbeitest du unter Einzelaufgaben.</div>}
         {tab === "apps" && <div className="parent-callout">Diese Liste legt die erlaubten Apps je Kind fest. Die echte Sperre auf dem Handy benötigt später den verwalteten Android-Launcher. Ein normaler Startbildschirm allein schützt das Gerät nicht.</div>}
-        {tab === "rewards" && <div className="parent-callout">Das Einlösen von Wünschen und der Kauf von Buddy-Accessoires sind noch nicht verfügbar. Hier werden keine Sterne abgezogen.</div>}
+        {tab === "rewards" && <div className="parent-callout">Kinder fragen Wünsche am Wandbildschirm an. Du entscheidest hier über die Einlösung. Archivierte Wünsche können nicht mehr bestätigt werden.</div>}
         {tab === "routines" && pauseRoutine && <RoutinePauses key={pauseRoutine.id} routine={pauseRoutine} childName={childName(pauseRoutine.childId)} today={data.today} timezone={data.family.timezone} pauses={data.pauses.filter(pause => pause.routineId === pauseRoutine.id)} busy={busy} onClose={() => setPauseRoutineId(null)} onCreate={input => action(async () => {
           await request(`/api/parent/routines/${pauseRoutine.id}/pauses`, "POST", input); await refresh(); setNotice("Pause gespeichert. Erledigte Schritte und Sterne bleiben erhalten.");
         })} onRevoke={id => action(async () => {

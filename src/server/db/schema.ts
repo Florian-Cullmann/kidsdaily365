@@ -1,6 +1,6 @@
 import type { RoutineStep } from "@/domain/management";
 import { sql } from "drizzle-orm";
-import { boolean, check, customType, date, foreignKey, index, integer, jsonb, pgEnum, pgTable, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, customType, date, foreignKey, index, integer, jsonb, pgEnum, pgTable, text, time, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 export const daySection = pgEnum("day_section", ["morning", "afternoon", "evening"]);
 export const taskIcon = pgEnum("task_icon", ["sun", "toothbrush", "backpack", "book", "moon", "heart"]);
@@ -125,19 +125,20 @@ export const dailyTasks = pgTable("daily_tasks", {
   check("task_points_range", sql`${table.points} between 0 and 1000`),
 ]);
 
-// Append-only earnings journal. One entry per task, enforced by PostgreSQL.
-// Redemptions/adjustments will get their own audited workflow in a later phase.
+// Shared append-only earnings/expenses journal. Task history remains immutable.
 export const pointEntries = pgTable("point_entries", {
   id: uuid().primaryKey().defaultRandom(),
   familyId: uuid().notNull().references(() => families.id),
   childId: uuid().notNull(),
-  taskId: uuid().notNull().unique(),
+  taskId: uuid().unique(),
+  expenseKey: text().unique(),
   amount: integer().notNull(),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   foreignKey({ columns: [table.taskId, table.childId, table.familyId], foreignColumns: [dailyTasks.id, dailyTasks.childId, dailyTasks.familyId] }),
   index("points_child_lookup").on(table.familyId, table.childId),
-  check("earned_points_range", sql`${table.amount} between 0 and 1000`),
+  foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
+  check("journal_entry_kind", sql`(${table.taskId} is not null and ${table.expenseKey} is null and ${table.amount} between 0 and 1000) or (${table.taskId} is null and ${table.expenseKey} is not null and ${table.amount} < 0)`),
 ]);
 
 export const rewards = pgTable("rewards", {
@@ -146,7 +147,7 @@ export const rewards = pgTable("rewards", {
   title: text().notNull(),
   cost: integer().notNull(),
   active: boolean().notNull().default(true),
-}, (table) => [check("reward_cost_positive", sql`${table.cost} > 0`)]);
+}, (table) => [unique("reward_family_identity").on(table.id, table.familyId), check("reward_cost_positive", sql`${table.cost} > 0`)]);
 
 // Concrete occurrences are created once; retries and cancellations never regenerate them.
 export const appointmentSeries = pgTable("appointment_series", {
@@ -293,3 +294,23 @@ export const childMessages = pgTable("child_messages", {
   index("messages_conversation").on(t.familyId, t.childId, t.createdAt),
   check("message_body_length", sql`length(${t.body}) between 1 and 2000`),
 ]);
+
+export const rewardRequests = pgTable("reward_requests", {
+  id: uuid().primaryKey(), familyId: uuid().notNull(), childId: uuid().notNull(), rewardId: uuid().notNull(),
+  title: text().notNull(), cost: integer().notNull(),
+  status: text().$type<"pending" | "approved" | "rejected">().notNull().default("pending"),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  decidedAt: timestamp({ withTimezone: true }), decidedBy: uuid(),
+}, (t) => [
+  foreignKey({ columns: [t.childId, t.familyId], foreignColumns: [children.id, children.familyId] }),
+  foreignKey({ columns: [t.rewardId, t.familyId], foreignColumns: [rewards.id, rewards.familyId] }),
+  foreignKey({ columns: [t.decidedBy, t.familyId], foreignColumns: [parents.id, parents.familyId] }),
+  uniqueIndex("one_open_reward_request").on(t.childId, t.rewardId).where(sql`${t.status} = 'pending'`),
+  check("request_cost_positive", sql`${t.cost} > 0`),
+  check("request_decision", sql`(${t.status} = 'pending' and ${t.decidedAt} is null and ${t.decidedBy} is null) or (${t.status} in ('approved', 'rejected') and ${t.decidedAt} is not null and ${t.decidedBy} is not null)`),
+]);
+
+// Every retry key is retained, even when multiple attempts resolved to one open request.
+export const rewardRequestKeys = pgTable("reward_request_keys", {
+  id: uuid().primaryKey(), requestId: uuid().notNull().references(() => rewardRequests.id),
+});
