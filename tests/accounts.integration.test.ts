@@ -1,5 +1,6 @@
 import { GET as getParentData } from "@/app/api/parent/data/route";
-import { buddySetup } from "@/server/buddy-setup";
+import { POST as postWallBuddy } from "@/app/api/children/[id]/buddy-setup/route";
+import { buddySetup, setupWallBuddy } from "@/server/buddy-setup";
 import { GET as getBuddySetup, POST as postBuddySetup } from "@/app/api/device/buddy-setup/route";
 import { changeBuddyEquipment } from "@/server/buddy";
 import { POST as postBuddy } from "@/app/api/parent/children/[id]/buddy/route";
@@ -674,5 +675,93 @@ describe("wall snapshot refresh", () => {
     expect(updated.appointments[0].title).toBe("Spielplatz");
     await archiveRecord(parent, "children", kid.id);
     expect(await read()).toEqual([]);
+  });
+});
+
+
+describe("wall buddy onboarding", () => {
+  const input = { kind: "bear", name: "Bruno" };
+  const send = (id: string, body: unknown = input, headers: Record<string, string> = {}) => postWallBuddy(new Request(`${origin}/api/children/${id}/buddy-setup`, {
+    method: "POST", headers: { origin: process.env.APP_ORIGIN!, "content-type": "application/json", ...headers }, body: JSON.stringify(body),
+  }), { params: Promise.resolve({ id }) });
+  async function pairWall(parent: ParentActor) {
+    const pair = await exchangePairingCode((await createPairingCode(parent, { kind: "wall", label: "Wand" })).code, origin, "wall");
+    cookieState.set("kidsdaily_device", pair.token);
+    return pair;
+  }
+
+  it("shares the first confirmed choice with Android, survives retries and re-pairing, and preserves tasks and stars", async () => {
+    const parent = await actor(); const kid = await child(parent); const sibling = await child(parent, "Ben");
+    await pairWall(parent);
+    const android = await exchangePairingCode((await createPairingCode(parent, { kind: "android", label: "Handy", childId: kid.id })).code, null, "android");
+    const [task] = await db().insert(dailyTasks).values({ familyId, childId: kid.id, title: "Geschafft", date: localDate(new Date(), "Europe/Berlin"), section: "morning", points: 7 }).returning();
+    await completeTask(familyId, task.id);
+    const before = (await getDayPlans(familyId)).find(p => p.child.id === kid.id)!;
+    expect(before.child.buddyInitialized).toBe(false);
+    const journal = await db().select().from(pointEntries).where(eq(pointEntries.childId, kid.id));
+    const [web] = await Promise.all([
+      send(kid.id), buddySetup(`Bearer ${android.buddySetupToken}`, { kind: "rabbit", name: "Lumi" }),
+    ]);
+    expect(web.status).toBe(200);
+    const saved = (await web.json()).plan;
+    expect(["Bruno", "Lumi"]).toContain(saved.child.buddyName);
+    expect(saved.child.buddyInitialized).toBe(true);
+    expect(saved.tasks).toEqual(before.tasks);
+    expect(saved.balance).toBe(before.balance);
+    expect(await db().select().from(pointEntries).where(eq(pointEntries.childId, kid.id))).toEqual(journal);
+    expect((await launcherSnapshot((await deviceFromToken(android.token))!)).buddy).toMatchObject({ kind: saved.child.buddyKind, name: saved.child.buddyName });
+    // Lost response: a repeat with different input must return the persisted winner.
+    expect((await (await send(kid.id, { kind: "fox", name: "Andere Wahl" })).json()).plan.child).toEqual(saved.child);
+    await buddySetup(`Bearer ${android.buddySetupToken}`, input);
+    await pairWall(parent);
+    expect((await getDayPlans(familyId)).find(p => p.child.id === kid.id)!.child).toEqual(saved.child);
+    expect((await getDayPlans(familyId)).find(p => p.child.id === sibling.id)!.child.buddyInitialized).toBe(false);
+    expect((await exchangePairingCode((await createPairingCode(parent, { kind: "android", label: "Neu", childId: kid.id })).code, null, "android")).buddySetupToken).toBeNull();
+  });
+
+  it("supports wall-only setup on LAN HTTP and requires explicit, valid input", async () => {
+    const parent = await actor(); const kid = await child(parent);
+    await pairWall(parent);
+    process.env.APP_ORIGIN = "http://192.168.1.50:3000";
+    try {
+      for (const data of [{ kind: "dragon", name: "X" }, { kind: "fox", name: " " }, { kind: "fox", name: "x".repeat(81) }, { kind: "fox", name: "x\u0000" }, { ...input, familyId }, { ...input, points: 100 }]) {
+        expect((await send(kid.id, data)).status).toBe(400);
+      }
+      expect((await getDayPlans(familyId))[0].child.buddyInitialized).toBe(false);
+      const result = await send(kid.id, { kind: "rabbit", name: "  Flocke  " });
+      expect(result.status).toBe(200);
+      expect((await result.json()).plan.child).toMatchObject({ buddyInitialized: true, buddyKind: "rabbit", buddyName: "Flocke" });
+    } finally { process.env.APP_ORIGIN = origin; }
+  });
+
+  it("rejects unpaired, foreign, archived, revoked, expired and native credentials, including revocation after authentication", async () => {
+    const parent = await actor(); const kid = await child(parent);
+    expect((await send(kid.id)).status).toBe(401);
+    const android = await exchangePairingCode((await createPairingCode(parent, { kind: "android", label: "Handy", childId: kid.id })).code, null, "android");
+    for (const token of [android.token, android.buddySetupToken!]) {
+      expect((await send(kid.id, input, { authorization: `Bearer ${token}` })).status).toBe(403);
+      cookieState.set("kidsdaily_device", token);
+      expect((await send(kid.id)).status).toBe(401);
+    }
+    const paired = await pairWall(parent);
+    const wall = (await deviceFromToken(paired.token))!;
+    expect((await send(kid.id, input, { origin: "http://foreign.test" })).status).toBe(403);
+    const foreign = await child(await actor(otherFamilyId));
+    expect((await send(foreign.id)).status).toBe(404);
+    expect((await send(randomUUID())).status).toBe(404);
+    process.env.FAMILY_ID = otherFamilyId;
+    expect((await send(kid.id)).status).toBe(401);
+    process.env.FAMILY_ID = familyId;
+    await db().update(children).set({ active: false }).where(eq(children.id, kid.id));
+    expect((await send(kid.id)).status).toBe(404);
+    await db().update(children).set({ active: true }).where(eq(children.id, kid.id));
+    await db().update(devices).set({ expiresAt: new Date(0) }).where(eq(devices.id, paired.id));
+    expect((await send(kid.id)).status).toBe(401);
+    await expect(setupWallBuddy(wall, kid.id, input)).rejects.toMatchObject({ status: 401 });
+    await db().update(devices).set({ expiresAt: new Date(Date.now() + 60_000) }).where(eq(devices.id, paired.id));
+    await revokeDevice(parent, paired.id);
+    expect((await send(kid.id)).status).toBe(401);
+    await expect(setupWallBuddy(wall, kid.id, input)).rejects.toMatchObject({ status: 401 });
+    expect((await getDayPlans(familyId))[0].child.buddyInitialized).toBe(false);
   });
 });

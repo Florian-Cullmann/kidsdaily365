@@ -186,3 +186,20 @@ it("saves and clears goals through the shared writer without changing the balanc
   expect(fetcher.mock.calls[3][1]).toMatchObject({ method: "PUT", body: JSON.stringify({ rewardId: null }) });
   expect(sync.getSnapshot().plans[0].savingsGoalId).toBeNull();
 });
+
+it("reconciles a lost buddy response from the persisted snapshot without optimistic success", async () => {
+  const pending = plans(); pending[0].child.buddyInitialized = false;
+  const stored = structuredClone(pending);
+  Object.assign(stored[0].child, { buddyInitialized: true, buddyKind: "bear", buddyName: "Bruno" });
+  const reconciliation = deferred<Response>();
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(snapshot(pending))
+    .mockRejectedValueOnce(new TypeError("lost response"))
+    .mockReturnValueOnce(reconciliation.promise);
+  const sync = create(fetcher); sync.start(); await flush();
+  const result = await sync.setupBuddy(pending[0].child.id, "rabbit", "Lumi");
+  expect(result).toMatchObject({ error: expect.stringContaining("Bestätigung fehlt") });
+  expect(sync.getSnapshot().plans[0].child.buddyInitialized).toBe(false);
+  reconciliation.resolve(snapshot(stored)); await flush();
+  expect(sync.getSnapshot().plans[0].child).toMatchObject({ buddyInitialized: true, buddyName: "Bruno" });
+  expect(sync.getSnapshot().plans[0].tasks).toEqual(pending[0].tasks);
+});
