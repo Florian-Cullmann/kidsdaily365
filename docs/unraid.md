@@ -29,6 +29,12 @@ Die IP-Adresse ersetzen. Jedes der drei Secrets separat mit `openssl rand -hex 3
 
 `APP_ORIGIN` ist exakt die Adresse, die der Browser aufruft, inklusive Schema und gegebenenfalls Port. Nicht `localhost`, wenn der Bildschirm über die Server-IP zugreift. Bei Reverse Proxy z. B. `https://kidsdaily.home.example` setzen. So stimmen Origin-Prüfung und Cookie-Einstellungen.
 
+### Optionaler lokaler Konfigurationscheck
+
+Mit Node.js 24 LTS und nach `npm ci` lässt sich vor dem Start `npm run config:check` ausführen. Der Befehl lädt `.env`, wobei bereits gesetzte Umgebungsvariablen Vorrang haben. Für den Live-Check muss `APP_MODE=live` gesetzt sein. Fehler nennen nur die betroffenen Variablen und liefern Exitcode 1; Erfolg liefert 0. Es werden keine Daten verändert und weder Netzwerk noch Datenbank kontaktiert.
+
+Der Check verwendet die App-Validierung und prüft die lokale `DATABASE_URL`, nicht die von Compose ersetzte Containeradresse. Er ersetzt weder `docker compose config --quiet` noch die Prüfung von `POSTGRES_PASSWORD`, laufender Datenbank oder Migrationen. Die beiden folgenden Compose-Befehle bleiben erforderlich.
+
 ## 2. Bauen und einrichten
 
 ```sh
@@ -79,28 +85,70 @@ Das Manifest bereitet einen späteren App-Rahmen vor. Offline-Funktion, Hintergr
 
 ## 4. Sichern und wiederherstellen
 
-Eine laufende PostgreSQL-Datenablage nicht einfach kopieren. Ein logischer Dump funktioniert unabhängig vom Containerpfad:
+Eine laufende PostgreSQL-Datenablage nicht einfach kopieren. Das mitgelieferte `scripts/backup.py` erstellt vollständige PostgreSQL-Custom-Archive, einschließlich `child_images` (WebP-Inhalte), Tageskopien, Punktejournal, Elternkonten, Gerätefreigaben und Drizzle-Migrationshistorie. Es gibt kein zusätzliches Upload-Volume. Profilbilder enthalten nur den gespeicherten Ausschnitt, keine Originaldatei oder EXIF-/GPS-Metadaten. Alte Sicherungen behalten auch später gelöschte Daten.
+
+### Automatisierte Sicherung
+
+Voraussetzungen auf dem **Host**: Python 3.9+ mit `fcntl` (Linux/Unraid/macOS), Docker Compose, Git sowie der konfigurierte Checkout mit `.env`. Auf Unraid Python gegebenenfalls über die dortige Paketverwaltung bereitstellen. Der Job muss unter einem Benutzer laufen, der Docker und das Zielverzeichnis verwenden darf. Das Skript nutzt den Compose-Service `db` dieses Checkouts. Bei mehreren Installationen immer denselben `COMPOSE_PROJECT_NAME`/dieselben Compose-Overrides wie beim Start verwenden. Aus dem tatsächlich bereitgestellten, unveränderten Release-Checkout ausführen; währenddessen kein Update/Migrationslauf.
 
 ```sh
-mkdir -p backups
-docker compose exec -T db pg_dump -U kidsdaily -d kidsdaily -Fc > backups/kidsdaily.dump
+python3 scripts/backup.py create --target /mnt/user/backups/kidsdaily365 --keep 14
 ```
 
-Profilbilder liegen als fertig zugeschnittene WebP-Dateiinhalte in der PostgreSQL-Tabelle `child_images`, zusammen mit der Familien-/Kindzuordnung und einer Bildversion. Sie verwenden damit dieselbe persistente Unraid-Ablage `${APPDATA_PATH}/postgres`. Es gibt kein zusätzliches Upload-Verzeichnis oder Volume. Der vollständige `pg_dump` oben enthält sowohl die Bildreferenzen als auch die Bilddaten; beim Wiederherstellen keine Tabellen ausschließen. Ein App- oder Containerneustart verändert die Bilder nicht.
+`--target` legt den privaten Speicherort fest, `--keep` die Anzahl erfolgreicher Sicherungen (mindestens 1, Standard 14). Neue Verzeichnisse erhalten Modus 700, Dateien 600; vorhandene Zielverzeichnisse vorher selbst auf restriktive Rechte prüfen. Kein freigegebenes SMB-Verzeichnis verwenden. Das Ziel darf nicht in Git, `public/` oder einem CI-Artefaktverzeichnis liegen. Ein eigener Datenträger schützt zusätzlich gegen Ausfall des App-Datenträgers; dasselbe Unraid-Array ist kein Schutz gegen dessen vollständigen Verlust. Kein externer Dienst ist erforderlich.
 
-Beim Ersetzen wird der bisherige Bildinhalt in derselben Transaktion überschrieben; beim Entfernen wird der Datensatz gelöscht. Es entstehen keine verwaisten Dateien auf dem Dateisystem. Bereits erstellte Backups behalten ihren damaligen Stand. Die Originaldatei wird nicht gespeichert: nur der gewählte Ausschnitt mit 512 × 512 Pixeln, ohne EXIF-/GPS-Metadaten. Zulässig sind unbewegte JPEG-, PNG- und WebP-Dateien bis 8 MB und 20 Megapixel. Die App liefert Bilder ausschließlich über einen berechtigungsgeprüften Endpunkt aus, nicht aus `public/`.
+Beispiel für Cron auf einem Linux-Host, täglich um 03:15 Uhr in der Host-Zeitzone (Pfade anpassen):
 
-Backups enthalten persönliche Kinderdaten: außerhalb von Git und mit beschränktem Zugriff aufbewahren. Für den produktiven Betrieb einen rotierenden, extern gesicherten Backup-Job einrichten und die Wiederherstellung zuerst mit einer separaten Testinstanz prüfen.
+```cron
+15 3 * * * cd /mnt/user/appdata/kidsdaily365/source && /usr/bin/python3 scripts/backup.py create --target /mnt/user/backups/kidsdaily365 --keep 14 >> /mnt/user/backups/kidsdaily365-backup.log 2>&1
+```
 
-Wiederherstellung **in eine leere Ersatzdatenbank** (App vorher stoppen):
+Logdatei vorher mit Modus 600 anlegen und über die lokale Logrotation begrenzen. Auf Unraid kann derselbe Befehl als geplanter Job, etwa in der vorhandenen User-Scripts-Verwaltung, ausgeführt werden; eine direkt bearbeitete Root-Crontab kann beim Neustart verloren gehen. Zeitplan und Fehlerbenachrichtigung der vorhandenen Jobverwaltung einrichten und den letzten erfolgreichen Lauf regelmäßig kontrollieren. Ein Scheduler-Neustart muss den Job erhalten.
+
+Jeder Lauf schreibt zunächst in `.kidsdaily365-incomplete-*`, prüft den Exitstatus von `pg_dump` und das Archivverzeichnis mit `pg_restore --list` und veröffentlicht erst dann atomar einen Ordner `kidsdaily365-<UTC-Zeit>-<UUID>`. Darin liegen `database.dump` und `manifest.json` mit SHA-256, PostgreSQL-Hauptversion, Git-Revision und Fingerprint der Migrationen. Das ist eine Integritätsprüfung, keine Signatur und noch kein vollständiger Restore-Nachweis. Die Quellcode-Version im Manifest stammt aus dem Checkout, nicht aus dem laufenden App-Image; deren Übereinstimmung ist Betreiberverantwortung.
+
+Eine exklusive Sperre verhindert parallele Läufe im selben Ziel. Erst nach Veröffentlichung rotiert das Skript eigene abgeschlossene Ordner mit passendem Namen und Manifest. Fremde Dateien, unvollständige Ordner und Verzeichnis-Symlinks bleiben erhalten. Fehlgeschlagene/abgebrochene Dumps löschen keine vorhandene Sicherung. Exit 0 bedeutet Erfolg; Fehler liefern Exit 1, Ctrl-C 130, SIGTERM 143. Die Logs enthalten keine SQL-Daten, Zugangsdaten oder ungefilterten Docker-/PostgreSQL-Fehler. Nach hartem Abbruch oder Stromausfall können unvollständige Ordner zurückbleiben: erst ohne aktiven Job prüfen und gezielt entfernen. Nach einem Rotationsfehler bleibt die neue Sicherung erhalten, der Lauf meldet dennoch einen Fehler. Platten-/Dateisystemausfälle erfordern zusätzlich die übliche Betriebsvorsorge.
+
+### Konfiguration separat sichern
+
+Die Datenbanksicherung enthält **nicht** `.env`, Compose-Overrides, Reverse-Proxy-/TLS-Konfiguration und den eingesetzten Quellcode. `.env` und eigene Betriebsdateien separat mit restriktiven Rechten auf einem verschlüsselten Datenträger oder in einem bereits vorhandenen verschlüsselten lokalen Archiv sichern; Schlüssel/Passphrase getrennt verwahren. Keine Secrets in Befehlsargumente, Shell-History, Git, PR-Anhänge oder CI-Artefakte kopieren. Auch `.env` niemals in einen öffentlichen Backup-Download legen. Release-Commit (siehe Manifest), PostgreSQL-Version und verwendete Overrides mit dokumentieren. Ein unverändertes `.env.example` reicht zur Wiederherstellung nicht aus.
+
+Beim Wiederaufbau die private Konfiguration vor dem Start nach `.env` zurückspielen (`chmod 600 .env`), Pfade und `APP_ORIGIN` an die Ersatzinstanz anpassen und dieselbe `FAMILY_ID` beibehalten. Der bisherige `SESSION_SECRET` ist der Pepper für Tokenhashes: mit ihm können noch gültige Sitzungen und Gerätefreigaben aus dem Sicherungszeitpunkt wieder gültig werden, einschließlich seitdem widerrufener Freigaben. Nach Restore Geräte/Sitzungen prüfen. Bei Rotation dieses Secrets werden Elternsitzungen, Geräte, Einladungen und offene Gerätecodes ungültig; Eltern können sich mit ihrem Passwort neu anmelden und Geräte neu freigeben. Die Konfiguration des Android-Geräts selbst ist nicht im DB-Dump enthalten. Das Datenbankpasswort eines bestehenden PostgreSQL-Volumes ändert sich nicht durch Bearbeiten der Umgebungsvariable; ein Passwortwechsel benötigt zusätzlich `ALTER ROLE` auf der DB.
+
+### Isolierte Restore-Prüfung
+
+Regelmäßig sowie vor Updates ausführen, mit einem Backup und dem zugehörigen Release-Checkout (gleiche Migrationen):
 
 ```sh
-docker compose stop app
-docker compose exec -T db pg_restore -U kidsdaily -d kidsdaily --no-owner --exit-on-error < backups/kidsdaily.dump
-docker compose up -d app
+python3 scripts/backup.py verify /mnt/user/backups/kidsdaily365/kidsdaily365-<UTC-Zeit>-<UUID>
 ```
 
-Die `.env` separat sichern. Für die Wiederherstellung dieselbe `FAMILY_ID` verwenden. Eine Rotation von `SESSION_SECRET` widerruft Elternsitzungen, Geräte, Einladungen und noch offene Gerätecodes; danach können Eltern sich mit ihrem Passwort neu anmelden und Geräte neu freigeben. Das Datenbankpasswort eines bestehenden PostgreSQL-Volumes ändert sich nicht durch Bearbeiten der Umgebungsvariable; ein Passwortwechsel benötigt zusätzlich `ALTER ROLE` auf der DB.
+Das Skript prüft Manifest, Schema-Fingerprint und Prüfsumme. Danach startet es einen zufällig benannten **neuen** `postgres:18-alpine`-Container mit `--network none`, ohne Portfreigabe, ohne Bind-Mount produktiver Daten und mit flüchtigem `tmpfs`. Darin liegt ausschließlich `kidsdaily_restore_test`. Es gibt absichtlich keinen Parameter für eine Ziel-DB-URL oder einen vorhandenen Container. Das Image muss lokal vorhanden sein oder vorher mit `docker pull postgres:18-alpine` geladen werden. Für Dump plus restaurierte DB ausreichend RAM/Swap bereithalten; der Test kann mehrere Datenbankgrößen benötigen. Auch Host-Swap muss für vertrauliche Daten angemessen geschützt sein.
+
+Der komplette Restore läuft transaktional mit `--exit-on-error --no-owner --no-privileges`, anschließend werden Kinderprofile, Bildbytes, Tageskopien und Punktejournal gelesen, ohne Inhalte auszugeben. Der Container wird auch bei Fehlern wieder entfernt. Bei SIGKILL/Host-Absturz verbliebene Container mit Präfix `kidsdaily365-restore-` nach Prüfung gezielt über `docker rm -f -v <Name>` entfernen. Der Test verändert niemals die produktive DB. Ein erfolgreiches Ergebnis belegt die Wiederherstellbarkeit des Archivs und lesbare Kerntabellen, nicht die fachliche Vollständigkeit jeder historischen Eingabe oder die Bedienbarkeit aller App-Funktionen.
+
+Der reproduzierbare Entwicklungstest verwendet ausschließlich fiktive Daten, migriert eine neue `*_test`-DB mit dem echten Migrator, führt die App-Integrationstests aus und vergleicht nach Restore **alle Zeilen sämtlicher App- und Migrationstabellen**, einschließlich WebP-Bytes, Tageskopie und Punktehistorie. Zusätzlich prüft er einen beschädigten Restore. Keine Dumps oder Datenausgaben werden als CI-Artefakte gespeichert:
+
+```sh
+npm ci
+python3 -m unittest discover -s tests -p backup_test.py
+BACKUP_INTEGRATION=1 python3 -m unittest discover -s tests -p backup_test.py
+```
+
+Der Docker-Test öffnet nur für die Migration/App-Tests einen zufälligen Loopback-Port mit einem fiktiven Testpasswort; die eigentliche Restore-Instanz bleibt ohne Netzwerk. Fehler-/Abbruchtests prüfen, dass keine Teilsicherung veröffentlicht und keine letzte funktionierende Sicherung rotiert wird.
+
+### Tatsächliche Wiederherstellung
+
+Erst die isolierte Prüfung bestehen lassen. Dann eine **separate Ersatzinstallation** mit leerem PostgreSQL-Volume, eigener Compose-Projektkennung und passenden Release-Dateien aufbauen. Die alte Installation stoppen bzw. vom Zugriff der Geräte trennen. Den `db`-Service der Ersatzinstallation starten, aber noch keine Migration und keine App starten. Bei Verwendung desselben Hosts eigene `APPDATA_PATH`- und Portwerte setzen. Im Checkout der Ersatzinstallation:
+
+```sh
+docker compose up -d db
+# Ausschließlich in der geprüften LEEREN Ersatzdatenbank ausführen:
+docker compose exec -T db pg_restore -U kidsdaily -d kidsdaily --no-owner --no-privileges --exit-on-error --single-transaction < /privater/pfad/zur/sicherung/database.dump
+docker compose up -d
+```
+
+Die DB muss vor `pg_restore` bereit sein (`docker compose ps`). Das Skript bietet bewusst keine automatische produktive Wiederherstellung. Vor Freigabe der Ersatzinstanz Profilbilder, abgeschlossene Aufgaben, Punktestand und Geräteberechtigungen im Browser prüfen. Nach dem Restore zunächst dieselbe App-/Schemaversion verwenden. Für einen späteren Versionswechsel neue Sicherung erstellen und die versionierten Migrationen kontrolliert anwenden; ein altes App-Image gegen ein neueres Schema ist kein sicherer Rollback. Ein Wechsel der PostgreSQL-Hauptversion braucht einen eigenen getesteten Upgrade-Ablauf.
 
 ## 5. Updates
 

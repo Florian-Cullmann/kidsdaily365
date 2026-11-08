@@ -118,3 +118,149 @@ Screenshots mit ausschließlich fiktiven Daten: [Elterneditor](proof/routine-edi
 5. Vollständigen PostgreSQL-Dump der separaten Testdatenbank in eine leere `*_test`-Datenbank zurückspielen. Bildversionen und SHA-256-Prüfsummen der `child_images.data`-Spalte müssen übereinstimmen. Die Unraid-Anleitung enthält den produktiven Backup-Weg.
 
 Automatisierte Bildtests prüfen echte Dekodierung, Größenlimits, Ausschnitt, EXIF-Ausrichtung und entfernte Metadaten. Die Datenbanktests prüfen Ersetzen/Entfernen, Rechte, Profiltrennung und unabhängigen Punktestand. Keine echten Kinderfotos in Tests oder Nachweisen verwenden.
+
+
+## Belohnungen einlösen
+
+Mit fiktiven Profilen am gekoppelten Wandbildschirm einen erreichbaren Wunsch öffnen und „Einlösen anfragen“ bewusst bestätigen. Die Anfrage muss ohne Abbuchung beim Kind und im Elternbereich erscheinen. Eltern bestätigen einen Wunsch und lehnen einen zweiten ab: Nur die Bestätigung reduziert das verfügbare Guthaben, die insgesamt verdienten Sterne und abgeschlossenen Aufgaben bleiben erhalten. Nach Neuladen müssen beide Entscheidungen mit Angebotspreis und Zeitpunkten sichtbar sein.
+
+Zwischen Anfrage und Bestätigung den Preis ändern (der angefragte Preis bleibt bestehen) bzw. den Wunsch archivieren (Bestätigung muss scheitern; Ablehnung bleibt möglich). Offline darf keine Erfolgsmeldung erscheinen. Eine nach dem Speichern verlorene Antwort erneut versuchen: gleiche Anfrage-ID und nur eine persistierte Anfrage. Die Kinderansicht aktualisiert den Serverstand über den gemeinsamen Wandabgleich alle 10 Sekunden im Vordergrund.
+
+`tests/rewards.integration.test.ts` prüft auf einer migrierten disposable `*_test`-Datenbank parallele Anfragen, alternative Wiederholungs-IDs nach einer Entscheidung, konkurrierende Ausgaben bei knappem Guthaben, gegensätzliche Elternentscheidungen, archivierte Wünsche, Preisänderungen, manipulierte Eingaben und Haushalts-/Geschwistergrenzen. Die echten Route-Handler prüfen fehlende, native und widerrufene Gerätezugänge, getrennte Elternsitzungen und falsche Origins. Browserprüfungen ergänzen dies um bewusste Bestätigung, Offline-/Antwortverlust und den sichtbaren Verlauf.
+
+## Persönliches Sparziel
+
+Am gekoppelten Wandbildschirm unter „Sterne“ einen Wunsch als Sparziel wählen, zur Tagesansicht zurückkehren und neu laden: Ziel, verfügbares Guthaben und fehlende Sterne bleiben sichtbar. Ein anderes Kind behält seine eigene Auswahl. Ziel wechseln und entfernen: Guthaben und Einlösungsverlauf bleiben unverändert. Einen gewählten Wunsch im Elternbereich archivieren: Das Kind erhält einen verständlichen Hinweis und kann einen anderen Wunsch wählen oder die Auswahl entfernen. Ohne Auswahl wird kein Wunsch automatisch zum Ziel. Im Demo-Modus ist die Auswahl nur lokal zum Ausprobieren.
+
+`tests/savings-goals.integration.test.ts` prüft Persistenz, Profiltrennung, Archivierung, unveränderte Sterne und den bestehenden Einlöseweg sowie Haushaltsbindung, manipulierte Eingaben, Origins, fehlende/widerrufene Wandkopplung und ausgeschlossene Android-/Setup-Tokens.
+## Ersteinrichtung in der Elternübersicht (#51)
+
+Die Checkliste wird aus den gespeicherten Haushaltsdaten abgeleitet. Es gibt keine
+manuell abhakbaren Schritte und keine lokale Erledigt-Ablage. „Status aktualisieren“
+lädt den Stand neu, etwa nach dem Einlösen eines Gerätecodes auf einem anderen
+Bildschirm. Neuladen setzt den Einstieg ebenfalls anhand der aktuellen Daten fort.
+Geräteablauf wird bei sichtbarer Übersicht alle 30 Sekunden und bei Fensterfokus
+neu bewertet; ein erzeugter, noch nicht eingelöster Code zählt nicht als Gerät.
+
+Mit fiktiven Daten prüfen:
+
+1. Neuer Haushalt: alle drei Schritte offen; „Kind hinzufügen“ öffnet das bestehende
+   Profilformular. Ohne aktives Kind ist „Routine anlegen“ noch nicht verfügbar.
+2. Aktives Kind speichern: Übersicht zeigt den ersten Schritt erfüllt. „Routine
+   anlegen“ öffnet das vorhandene Routineformular mit aktivem Kind als Vorauswahl.
+3. Aktive Routine mit Schritten speichern: zweiter Schritt erfüllt. „Wandbildschirm
+   verbinden“ öffnet die Geräteverwaltung mit Gerätetyp Wandbildschirm, auch wenn
+   vorher Android ausgewählt war. Code erstellen allein erfüllt den Schritt nicht.
+4. Code am Wandbildschirm einlösen, Status aktualisieren: fertiger Zustand.
+   Seite neu laden: Zustand bleibt korrekt. Android und Buddy-Ausstattung sind optional.
+5. Kind archivieren: Kind und zugehörige Routine zählen nicht mehr. Routine
+   deaktivieren: Routine wieder offen. Wandgerät widerrufen oder ablaufen lassen:
+   Geräteschritt wieder offen. Ein Android-Gerät ersetzt kein Wandgerät.
+6. Gekoppelten Wandbildschirm ohne aktive Kinder öffnen: verständlicher Hinweis auf
+   Kinderprofile im Elternbereich, keine Verwaltungsaktionen und keine Gerätecodes.
+
+`tests/setup.test.ts` deckt Ableitung, Teilzustände, Archivierung, leere/deaktivierte
+Routinen, falsche Kindzuordnung, Widerruf und Ablauf einschließlich Grenzzeitpunkt ab.
+
+### Kinderfilter in der Elternverwaltung
+
+Unter Routinen, Einzelaufgaben, Terminen und Android-Apps begrenzt „Kind auswählen“
+die Liste auf ein Kind. Liste (`tab`) und Auswahl (`child`) stehen in der URL und
+bleiben beim Listenwechsel, Speichern, Archivieren und Neuladen erhalten.
+„Alle Kinder anzeigen“ setzt den Filter zurück. Kinderprofile und gemeinsame Wünsche
+bleiben ungefiltert. Neue Einträge verwenden das ausgewählte aktive Kind; archivierte
+Kinder stehen nur zur Rückschau zur Verfügung, nicht als Ziel neuer Einträge.
+
+Mit zwei fiktiven Kindern und gleichnamigen Routinen prüfen: filtern, Liste wechseln,
+Neuanlage mit Vorbelegung, tatsächliche Zuordnung beim Bearbeiten, speichern,
+archivieren und neu laden. Ein leeres sowie ein archiviertes Profil auswählen.
+Eine ungültige oder fremde `child`-ID muss einen erklärten Leerzustand mit Rücksetzknopf
+zeigen. Auswahl und Rücksetzen auch per Tastatur prüfen.
+
+Der Server filtert vor dem Lade-Limit. Aufgaben und Termine zeigen höchstens 1.000
+Einträge; bei weiteren Treffern erscheint ein ausdrücklicher Hinweis. Es gibt noch
+keine Pagination. Integrationstests erzeugen mehr als 1.000 Einträge eines anderen
+Kindes und prüfen, dass das ausgewählte Kind trotzdem gefunden wird. Die Eltern-API
+bleibt mit Wandcookie oder Android-Token ohne Elternsitzung gesperrt.
+
+## Ungespeicherte Elternformulare (#41)
+
+Kinderprofile, Routinen, Einzelaufgaben, Termine, Wünsche und App-Freigaben vergleichen
+alle Eingaben mit dem geöffneten Ausgangszustand. Schritte umsortieren, hinzufügen und
+entfernen zählt ebenfalls; vollständiges Zurücksetzen macht den Entwurf wieder unverändert.
+Tab-Wechsel, anderer Datensatz, Neuanlage, Abbrechen, Ausstattung/Profilbild und die
+Links zum Kinderbildschirm fragen vor dem Verwerfen nach. „Weiter bearbeiten“ und
+Escape erhalten die Eingaben und führen zum zuletzt bearbeiteten Feld zurück.
+
+- Unberührtes Formular verlassen: keine Rückfrage. Geänderte Routine mit mehreren
+  Schritten über jede der genannten Aktionen verlassen: beide Entscheidungen testen.
+- Im Dialog mit Tab/Shift+Tab navigieren; Fokus bleibt im Dialog. Enter aktiviert
+  den fokussierten Knopf. Touch-Ziele sind mindestens 48 Pixel hoch.
+- Während des Speicherns sind weitere Speicher-/Verwerfaktionen gesperrt.
+  Validierungs-/Netzwerkfehler erhalten den Entwurf. Nach bestätigtem Schreiben ist
+  er gespeichert, auch wenn das anschließende Aktualisieren der Liste fehlschlägt.
+- Reload/Tab schließen: bei Änderungen nativer Browserhinweis, sofern unterstützt.
+  Browser bestimmen Text und Anzeige und benötigen meist vorherige Interaktion.
+  Insbesondere mobile App-Wechsel, erzwungenes Schließen und Browserabstürze können
+  ohne Hinweis erfolgen. Es gibt keine automatische Speicherung oder Wiederherstellung.
+- Abmeldung und erkannter Sitzungsablauf haben Vorrang und löschen den Entwurf ohne
+  Rückfrage. Ein anderer Elternteil/Haushalt erhält eine neue Konsoleninstanz.
+
+`tests/parent-drafts.test.tsx` prüft diese Abläufe mit fiktiven Daten und simuliertem
+Transport; die native Dialog-Fokusfalle und der Browserhinweis brauchen zusätzlich
+Browserprüfung. Das ist kein Nachweis serverseitiger Berechtigungen.
+
+Kopierentwürfe (#34) öffnen über `leave` mit eigenem Formularschlüssel und vorbelegten
+Startwerten als Vergleichsbasis. Auch „Routine kopieren“ und „Pausen verwalten“
+fragen vor dem Verwerfen geänderter Eingaben nach.
+
+## Lesende Wochenvorschau (#33)
+
+- Unter Elternbereich → Wochenvorschau Kind und Datum wählen. Vorherige/nächste Woche und Rückkehr zur aktuellen Woche prüfen; eine Woche läuft von Montag bis Sonntag in Familienzeit.
+- Eine Routine heute am Wandbildschirm materialisieren, danach ihre Vorlage ändern. Die Wochenvorschau zeigt die gespeicherten Schritte unverändert und für zukünftige, noch nicht angelegte Routinen die neue Vorlage mit „Vorschau“. Auch entfernte Schritte bleiben nachvollziehbar; fehlende historische Tage werden nicht aus heutigen Vorlagen rekonstruiert.
+- Einzelaufgaben und Termine einschließlich mehrtägiger Zeiträume prüfen. Terminenden sind exklusiv: Ein Ende um Mitternacht belegt nicht den Folgetag. Alle angezeigten Terminzeiten folgen der Familienzeitzone, auch am DST-Wechsel.
+- Archivierte Kinder bleiben auswählbar, erhalten aber keine berechneten Routinen. Leere Tage bleiben neutral. Auf 390 px und großem Bildschirm sowie mit Tastatur prüfen.
+- Ohne Elternsitzung (auch mit Launcher-Bearer) führt die Seite zur Anmeldung. Ein Kind eines anderen Haushalts liefert keine Daten.
+- `tests/week-preview.integration.test.ts` prüft unveränderte Tageskopien und leeres Punktejournal nach Vorschauabrufen gegen PostgreSQL. Die Lesetransaktion selbst ist `READ ONLY`, mit konsistentem Snapshot.
+- Kompatibilität mit #28: Bis dessen additive Migration auf `main` liegt, erkennt ein lesender Adapter die vorhandene Tabelle `routine_pauses`; er verwendet ausschließlich deren inklusive Datumsbereiche, `revokedAt` und den gespeicherten `daily_tasks.pausedBy`-Verweis. Kein eigenes Pausenmodell und keine Migration in #33. Pausierte Schritte heißen „Pausiert · nicht fällig“, erledigte Schritte bleiben erledigt. Nach Integration von #28 kann der Adapter auf die gemeinsamen Drizzle-Typen umgestellt werden.
+- Der zusätzliche Pausen-Integrationstest läuft, sobald die #28-Migration in der disposable Testdatenbank vorhanden ist; ohne diese Tabelle wird ausschließlich dieser Test übersprungen. Beide Datenbankstände prüfen. Die Migration aus #28 ausschließlich in einer disposable `*_test`-Datenbank separat anwenden, niemals außerhalb des normalen Migrationsablaufs auf deployed Daten.
+
+## Tagesplan drucken (#50)
+
+- In der Wochenvorschau bei einem Tag „Tagesplan drucken“ öffnen. Datum und Kind bleiben erhalten; der Druckknopf öffnet den Browserdruckdialog. A4 und ausgeschaltete Browser-Kopf-/Fußzeilen wählen (sonst kann der Browser die URL ergänzen).
+- Kurzen und mehrseitigen Plan prüfen: Schritte mit Erklärungen, Uhrzeiten, Einzelaufgaben und mehrtägige Termine; freie Kästchen für Papier, digitale Abschlüsse ausdrücklich „Erledigt“, Pausen/entfernte Aufgaben nicht fällig. Keine Navigation, Fotos, Geräteinformationen oder Codes im Druckinhalt.
+- Vorschau, archiviertes Profil, leeren zukünftigen und fehlenden vergangenen Tag prüfen. Handschriftliche Haken werden nicht synchronisiert und vergeben keine Sterne.
+- Druckansicht verwendet ausschließlich `getWeekPreview` mit dessen lesender Transaktion. Bestehende Integrationstests prüfen Schreibfreiheit und Haushaltsgrenzen; `print-day.test.ts` prüft die Elternsperre der Druckroute. Ohne Elterncookie muss auch ein Launcher-Bearer zur Anmeldung führen.
+
+## Routinen für Geschwister kopieren
+
+Unter **Routinen → Routine kopieren** erscheint ein unabhängiger Entwurf mit Quellkind und aktivem Zielkind. Titel, Schritte (einschließlich Erklärung, Symbol und Sternen), Schrittfolge, Tagesabschnitt, Uhrzeit, Sortierung und Wochentage sind vor dem Speichern änderbar. Die Kopie startet aktiv; bei Bedarf im Entwurf deaktivieren. Abbrechen schreibt nichts.
+
+Der angezeigte erste Wirksamkeitstag richtet sich nach dem heutigen Familientag und den gewählten Wochentagen. Neue Routinen werden beim nächsten Tagesplanabruf für einen passenden Tag übernommen, gegebenenfalls bereits heute. Speichern selbst erzeugt keine Tagesaufgaben. Bestehende Tageskopien der Quelle bleiben unverändert; Verlauf, Abschlüsse, verdiente Sterne und Pausen werden nicht kopiert. Die Pausenfunktion aus #28 ist noch separat in Arbeit.
+
+Mit fiktiven Geschwisterprofilen eine Routine mit drei unterschiedlichen Schritten kopieren, im Entwurf Reihenfolge und Titel ändern, anschließend Quelle und Kopie getrennt bearbeiten. Auch Abbrechen und einen erneuten Speicherversuch nach verlorener Antwort prüfen: Pro Entwurf entsteht höchstens eine Kopie. Bei geändertem Inhalt nach bereits erfolgreichem Speichern wird ein Konflikt gemeldet; dann die gespeicherte Kopie bearbeiten. Automatische Integrationstests prüfen parallele Wiederholungen, unveränderte Historie, fremde Haushalte, archivierte Ziele und den Ausschluss von Gerätezugängen.
+
+## Automatischer Abgleich am Wandbildschirm (#26)
+
+Mit zwei getrennten Browser-Sitzungen und zwei gültigen Wandfreigaben testen; Elternverwaltung in einer dritten Sitzung öffnen. Ausschließlich fiktive Profile verwenden.
+
+1. Dasselbe Kind auf beiden Wandbildschirmen auswählen. Auf A eine Aufgabe abschließen; B übernimmt innerhalb des nächsten Zehn-Sekunden-Abrufs Abschluss und Sterne, ohne eine eigene Erfolgsmeldung zu erzeugen.
+2. Über die Elternverwaltung Profil/Buddy, Profilbild oder Termin ändern. Auswahl, geöffnete Termine-/Sterneansicht und Scrollposition des Wandbildschirms bleiben bei der Aktualisierung erhalten. Routinenänderungen schreiben bestehende Tageskopien weiterhin nicht um.
+3. Verbindung auf B unterbrechen. Der letzte Stand bleibt sichtbar; Aufgaben sind gesperrt. Unten rechts steht „Sync fehlgeschlagen“. Ein Klick zeigt während des erneuten Abrufs „Versuche Sync...“, bei Erfolg „Letzter Sync: dd.mm.YYYY HH:ii“ in Familienzeit. Wieder verbinden: Abgleich ohne Neuladen, keine automatisch nachgesendeten Abschlüsse. Bei verloren gegangener Abschlussantwort entscheidet der nächste Serverabgleich über den tatsächlich gespeicherten Zustand.
+4. Ausgewähltes Profil archivieren: B kehrt zur aktuellen Profilauswahl zurück. Wandfreigabe widerrufen: B entfernt die geschützten Inhalte und zeigt die Kopplung. Ein Widerruf kann erst bei erreichbarem Server erkannt werden.
+5. Tageswechsel in der Familienzeitzone sowohl mit ausgewähltem Kind als auch mit offener Profilauswahl prüfen. Offline werden alte Aufgaben nicht als heutige Aufgaben angeboten; nach erfolgreichem Abruf erscheint der neue Plan. Die Geräteuhr muss richtig eingestellt sein; der Server prüft das gültige Aufgabendatum zusätzlich bei jedem Abschluss.
+6. Versteckte Seite wieder öffnen oder Browser fokussieren: unmittelbarer Abgleich. Bei leerem Haushalt führt ein neu angelegtes Profil ohne Seitenreload zur Profilauswahl. Demo-Modus erzeugt keine Wand-API-Aufrufe.
+
+`tests/wall-sync.test.ts` prüft kontrolliert verspätete/abgebrochene Antworten, parallele Abrufe, Abschlussabgleich, Timeout, Familien-Mitternacht und Widerruf. Die Integrationstests für `/api/wall/snapshot` prüfen echte Wand-/Android-/Elternberechtigungen, Haushaltsgrenzen, Ablauf, Widerruf und unveränderte Tageskopien. Die Antworten sind ausdrücklich `private, no-store`.
+
+### Terminanzeige am Wandbildschirm
+
+Laufende Termine bleiben bis zur exklusiven Endzeit sichtbar und tragen „Jetzt“.
+Ohne Endzeit bleibt ein Termin bis zum Ende seines Starttags in der Familienzeitzone
+sichtbar (nach Beginn „Heute“, keine behauptete laufende Dauer). Die Terminliste
+enthält alle relevanten aktiven Termine des Kindes und lässt sich bei Bedarf scrollen.
+Die Ansicht prüft Zeitgrenzen alle 15 Sekunden und bei Rückkehr zum Browser;
+Änderungen durch andere Geräte übernimmt der automatische Abgleich (siehe #26 oben).
+Prüfe mehr als drei Termine, einen laufenden Termin über Mitternacht, einen Termin
+ohne Ende sowie das automatische Verschwinden nach Ablauf. Sommerzeit und
+Profil-/Haushaltsgrenzen werden zusätzlich durch die automatischen Tests abgedeckt.
