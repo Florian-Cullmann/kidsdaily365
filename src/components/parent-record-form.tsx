@@ -135,7 +135,7 @@ export function ParentRecordForm({ resource, data, record, defaultChildId, copyS
         {record?.buddyInitialized === true ? <>
         <label>Buddy<select name="buddyKind" defaultValue={text("buddyKind", "fox")}><option value="fox">Fuchs</option><option value="rabbit">Hase</option><option value="bear">Bär</option></select></label>
         <label>Name des Buddys<input name="buddyName" defaultValue={text("buddyName", "Fino")} required maxLength={80} /></label>
-        </> : <p>Dein Kind wählt und benennt seinen Buddy nach dem Verbinden selbst auf seinem Android-Gerät.</p>}
+        </> : <p>Dein Kind wählt und benennt seinen Buddy beim ersten Öffnen am gekoppelten Wandbildschirm oder nach dem Verbinden seines Android-Geräts. Ein Android-Gerät ist dafür nicht nötig.</p>}
         <label className="check-field"><input name="reducedMotion" type="checkbox" defaultChecked={record?.reducedMotion !== false} /><span>Bewegungsarme Darstellung</span></label>
       </>}
       {(isTask || resource === "rewards") && <label className="wide-field">{resource === "rewards" ? "Wunsch oder Belohnung" : "Bezeichnung"}<input name="title" defaultValue={text("title")} required maxLength={80} /></label>}

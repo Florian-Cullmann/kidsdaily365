@@ -123,6 +123,10 @@ export class WallSync {
     return this.mutate(childId, rewardId, `/api/children/${childId}/reward-requests`, { rewardId, requestId });
   }
 
+  async setupBuddy(childId: string, kind: DayPlan["child"]["buddyKind"], name: string): Promise<Completion> {
+    return this.mutate(childId, "buddy-setup", `/api/children/${childId}/buddy-setup`, { kind, name });
+  }
+
   async saveGoal(childId: string, rewardId: string | null): Promise<Completion> {
     return this.mutate(childId, "savings-goal", `/api/children/${childId}/savings-goal`, { rewardId }, "PUT");
   }

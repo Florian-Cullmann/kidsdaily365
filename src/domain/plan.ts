@@ -5,7 +5,7 @@ export type ChildProfile = {
   equippedAccessories?: string[];
   imageUrl?: string | null;
   id: string; name: string; avatar: string; reducedMotion: boolean;
-  buddyKind: BuddyKind; buddyName: string;
+  buddyKind: BuddyKind; buddyName: string; buddyInitialized?: boolean;
 };
 export type Appointment = { id: string; title: string; startsAt: string; endsAt?: string | null; icon: "calendar" | "tooth" | "ball" | "heart" };
 export type RewardRequest = { id: string; childId: string; rewardId: string; title: string; cost: number; status: "pending" | "approved" | "rejected"; createdAt: string; decidedAt: string | null };

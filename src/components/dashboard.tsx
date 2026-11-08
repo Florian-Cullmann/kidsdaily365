@@ -7,6 +7,7 @@ import { completeDemoTask, groupTasksBySection, taskProgress, type DayPlan, type
 import { appointmentLabel, relevantAppointments } from "@/domain/appointments";
 import { ProfilePicture } from "./profile-picture";
 import { Buddy } from "./buddy";
+import { BuddySetup } from "./buddy-setup";
 import Link from "next/link";
 import { WallSync } from "@/client/wall-sync";
 import { PairDevice } from "./pair-device";
@@ -172,11 +173,17 @@ export function Dashboard({ initialPlans, demo, initialSyncedAt = null }: { init
     <div className="profile-welcome"><span className="welcome-tag">Dein kleiner Alltagsbegleiter</span><h1>Wer ist heute dabei?</h1><p>Tippe auf dein Bild. Dein Buddy freut sich auf dich!</p></div>
     <div className="profile-grid">{plans.map((item, index) => <button key={item.child.id} className={`profile-tile tile-${index % 3}`} onClick={() => chooseProfile(item.child.id)}>
       <span className="profile-art"><ProfilePicture imageUrl={item.child.imageUrl} buddyKind={item.child.buddyKind} equipped={item.child.equippedAccessories} /><span className="profile-initial">{item.child.avatar}</span></span>
-      <strong>{item.child.name}</strong><span>mit {item.child.buddyName}</span>
+      <strong>{item.child.name}</strong><span>{item.child.buddyInitialized === false ? "Wähle deinen Buddy" : `mit ${item.child.buddyName}`}</span>
     </button>)}</div>
     <div className="profile-footer"><p>{demo ? "Zum Ausprobieren · Dein Fortschritt wird nicht gespeichert" : "Jeder hat seinen eigenen Tag. Und seinen eigenen Buddy."}</p><Link className="parent-entry-link" href="/eltern">Elternbereich</Link></div>
     {syncStatus}
   </main>;
+
+  if (!demo && plan.child.buddyInitialized === false) return <BuddySetup
+    key={plan.child.id} child={plan.child} busy={!!busy} connected={live.phase === "connected"}
+    onSave={(kind, name) => sync.setupBuddy(plan.child.id, kind, name)}
+    onBack={() => chooseProfile("")} onRetry={() => void sync.refresh()}
+  />;
 
   const progress = taskProgress(plan.tasks);
   const daySections = groupTasksBySection(plan.tasks);
