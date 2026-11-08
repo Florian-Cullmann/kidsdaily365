@@ -1,5 +1,5 @@
 {
-  "id": "9e6f2952-7cda-4053-bb25-9d13ae908582",
+  "id": "7d65ade1-6166-46ec-af21-d88d6f7630d1",
   "prevId": "3a1f941b-ba1c-4e48-a308-54588c1eda9f",
   "version": "7",
   "dialect": "postgresql",
@@ -1717,13 +1717,7 @@
           "name": "taskId",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": false
-        },
-        "expenseKey": {
-          "name": "expenseKey",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "amount": {
           "name": "amount",
@@ -1792,21 +1786,6 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
-        },
-        "point_entries_childId_familyId_children_id_familyId_fk": {
-          "name": "point_entries_childId_familyId_children_id_familyId_fk",
-          "tableFrom": "point_entries",
-          "tableTo": "children",
-          "columnsFrom": [
-            "childId",
-            "familyId"
-          ],
-          "columnsTo": [
-            "id",
-            "familyId"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1817,173 +1796,13 @@
           "columns": [
             "taskId"
           ]
-        },
-        "point_entries_expenseKey_unique": {
-          "name": "point_entries_expenseKey_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "expenseKey"
-          ]
         }
       },
       "policies": {},
       "checkConstraints": {
-        "journal_entry_kind": {
-          "name": "journal_entry_kind",
-          "value": "(\"point_entries\".\"taskId\" is not null and \"point_entries\".\"expenseKey\" is null and \"point_entries\".\"amount\" between 0 and 1000) or (\"point_entries\".\"taskId\" is null and \"point_entries\".\"expenseKey\" is not null and \"point_entries\".\"amount\" < 0)"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.reward_requests": {
-      "name": "reward_requests",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "familyId": {
-          "name": "familyId",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "childId": {
-          "name": "childId",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "rewardId": {
-          "name": "rewardId",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "cost": {
-          "name": "cost",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "decidedAt": {
-          "name": "decidedAt",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "decidedBy": {
-          "name": "decidedBy",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "one_open_reward_request": {
-          "name": "one_open_reward_request",
-          "columns": [
-            {
-              "expression": "childId",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "rewardId",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"reward_requests\".\"status\" = 'pending'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "reward_requests_childId_familyId_children_id_familyId_fk": {
-          "name": "reward_requests_childId_familyId_children_id_familyId_fk",
-          "tableFrom": "reward_requests",
-          "tableTo": "children",
-          "columnsFrom": [
-            "childId",
-            "familyId"
-          ],
-          "columnsTo": [
-            "id",
-            "familyId"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "reward_requests_rewardId_familyId_rewards_id_familyId_fk": {
-          "name": "reward_requests_rewardId_familyId_rewards_id_familyId_fk",
-          "tableFrom": "reward_requests",
-          "tableTo": "rewards",
-          "columnsFrom": [
-            "rewardId",
-            "familyId"
-          ],
-          "columnsTo": [
-            "id",
-            "familyId"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "reward_requests_decidedBy_familyId_parents_id_familyId_fk": {
-          "name": "reward_requests_decidedBy_familyId_parents_id_familyId_fk",
-          "tableFrom": "reward_requests",
-          "tableTo": "parents",
-          "columnsFrom": [
-            "decidedBy",
-            "familyId"
-          ],
-          "columnsTo": [
-            "id",
-            "familyId"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "request_cost_positive": {
-          "name": "request_cost_positive",
-          "value": "\"reward_requests\".\"cost\" > 0"
-        },
-        "request_decision": {
-          "name": "request_decision",
-          "value": "(\"reward_requests\".\"status\" = 'pending' and \"reward_requests\".\"decidedAt\" is null and \"reward_requests\".\"decidedBy\" is null) or (\"reward_requests\".\"status\" in ('approved', 'rejected') and \"reward_requests\".\"decidedAt\" is not null and \"reward_requests\".\"decidedBy\" is not null)"
+        "earned_points_range": {
+          "name": "earned_points_range",
+          "value": "\"point_entries\".\"amount\" between 0 and 1000"
         }
       },
       "isRLSEnabled": false
@@ -2042,16 +1861,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "reward_family_identity": {
-          "name": "reward_family_identity",
-          "nullsNotDistinct": false,
-          "columns": [
-            "id",
-            "familyId"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
         "reward_cost_positive": {
@@ -2068,6 +1878,18 @@
         "steps": {
           "name": "steps",
           "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "copyRequestId": {
+          "name": "copyRequestId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "copyFingerprint": {
+          "name": "copyFingerprint",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -2186,6 +2008,14 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
+        "templates_copy_request": {
+          "name": "templates_copy_request",
+          "nullsNotDistinct": false,
+          "columns": [
+            "familyId",
+            "copyRequestId"
+          ]
+        },
         "templates_child_family_identity": {
           "name": "templates_child_family_identity",
           "nullsNotDistinct": false,
