@@ -301,7 +301,7 @@ progress::-moz-progress-bar { background: #efb832; border-radius: 20px; }
 .reward-history-item h4, .reward-history-item p { margin: 6px 0; }
 
 .savings-action[aria-pressed="true"] { background: #dcebd5; border-width: 2px; }
-.savings-fallback { padding: 16px; border-radius: 16px; background: #f3f8ef; }
+.savings-fallback { margin-bottom: 16px; padding: 16px; border-radius: 16px; background: #f3f8ef; }
 .setup-checklist-heading { display: flex; align-items: start; justify-content: space-between; gap: 24px; }
 .setup-checklist-heading p { max-width: 680px; }
 .setup-checklist button { min-height: 48px; flex-shrink: 0; }
