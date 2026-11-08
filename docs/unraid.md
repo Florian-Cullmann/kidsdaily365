@@ -144,20 +144,44 @@ docker compose up -d
 
 Die DB muss vor `pg_restore` bereit sein (`docker compose ps`). Das Skript bietet bewusst keine automatische produktive Wiederherstellung. Vor Freigabe der Ersatzinstanz Profilbilder, abgeschlossene Aufgaben, Punktestand und Geräteberechtigungen im Browser prüfen. Nach dem Restore zunächst dieselbe App-/Schemaversion verwenden. Für einen späteren Versionswechsel neue Sicherung erstellen und die versionierten Migrationen kontrolliert anwenden; ein altes App-Image gegen ein neueres Schema ist kein sicherer Rollback. Ein Wechsel der PostgreSQL-Hauptversion braucht einen eigenen getesteten Upgrade-Ablauf.
 
-## 5. Updates
+## 5. Wiederholbare Installation und Updates per SSH
 
-Vorher Backup erstellen und Änderungen/Migrationen prüfen. Dann:
+`scripts/deploy-unraid.sh` läuft auf dem Entwicklungsrechner mit Git-Zugang zum Repository. Der Server braucht keinen GitHub-Schlüssel: übertragen wird ausschließlich ein `git archive` eines festen Commits, ohne lokale Änderungen oder `.env`. Standardmäßig wird `origin/main` frisch geladen. Ein zweites Argument erlaubt einen bewusst gewählten Git-Stand.
+
+Voraussetzungen auf Unraid: Bash, Docker, Compose mit `--wait`, Buildx, `flock`, GNU Coreutils und ein bestätigter SSH-Hostschlüssel. Wenn ein Container bereits Host-Port 22 verwendet, muss Unraid-SSH einen anderen freien Port benutzen. Auch der App-Port darf nicht von einem anderen Container belegt sein.
+
+Einmalig einen privaten Installationsordner auf einer **XFS- oder Btrfs-Ablage** anlegen (Modus `700`). PostgreSQL nicht auf NTFS ablegen. Bei Cache-only-Shares das tatsächliche Dateisystem prüfen. Die Konfiguration aus Abschnitt 1 als `<Installationsordner>/.env` mit Modus `600` speichern; `APPDATA_PATH` muss auf denselben persistenten Ordner zeigen. `APP_PORT` darf auch `LAN-IP:Port` enthalten, um ausschließlich diese Host-Adresse zu verwenden. Bestehende manuelle Installationen vor einer Umstellung separat migrieren; dieses Skript ist für einen eigenen Stack `kidsdaily365` vorgesehen.
+
+Das Skript verwendet `DOCKER_CONFIG=<Installationsordner>/docker-config`. Falls Compose auf Unraid fehlt, das zur Architektur passende offizielle [Compose-Release](https://github.com/docker/compose/releases) samt veröffentlichter SHA256-Prüfsumme herunterladen, prüfen und als `docker-config/cli-plugins/docker-compose` ausführbar ablegen. So bleibt das Plugin über Neustarts erhalten. Keine Secrets in die Skripte eintragen.
+
+Auf dem Entwicklungsrechner, mit den eigenen Werten:
 
 ```sh
-git pull --ff-only
-docker compose build
-docker compose stop app
-docker compose run --rm migrate
-docker compose up -d
-docker compose ps
+export KIDSDAILY_SSH_PORT=2222
+export KIDSDAILY_SSH_KEY="$HOME/.ssh/mein-unraid-schluessel"
+export KIDSDAILY_REMOTE_PATH=/mnt/disk1/appdata/kidsdaily365
+./scripts/deploy-unraid.sh root@unraid-host
 ```
 
-PostgreSQL bleibt auf Hauptversion 18. Ein späterer Major-Upgrade braucht einen geplanten Dump/Restore oder `pg_upgrade`; nie nur den Image-Tag über einem bestehenden Datenverzeichnis wechseln. App-Rollback nach Datenbankänderungen benötigt eine zur Schema-Version passende App bzw. eine Backup-Wiederherstellung.
+Derselbe Befehl installiert auch spätere Updates. Er führt diese Schritte aus:
+
+1. Einen festen Commit übertragen und die Images bauen, während die bisherige App weiterläuft.
+2. Bei einem Update die App stoppen und einen vollständigen PostgreSQL-Dump erstellen. Das Archiv wird mit `pg_restore --list` geprüft; Konfiguration und vorherige Commit-ID werden separat dazu gesichert.
+3. Die versionierten Migrationen ausführen und die neue App starten.
+4. Auf den Container-Healthcheck warten und `/api/health` zusätzlich prüfen. Erst dann `current` und `installed-revision` umstellen.
+
+Daten bleiben unter `<Installationsordner>/postgres`, Releases unter `releases/<Commit>`, Sicherungen unter `backups/`. App und Datenbank erhalten `unless-stopped` und werden bei vorhandener Unraid-Autostartliste dort eingetragen; der Migrationstask wird bei Updates explizit ausgeführt. Die erneute Installation derselben Version prüft deren Gesundheit und baut nicht erneut.
+
+Fehlt das Backup, läuft keine Migration und die bisherige App wird wieder gestartet. Vor der Migration wird die App aus der Unraid-Autostartliste genommen und erst nach Erfolg wieder eingetragen. Sobald eine Migration begonnen wurde, bleibt die App bei Fehlern gestoppt: kein automatischer Rollback gegen ein möglicherweise neueres Schema. Vor einer manuellen Wiederherstellung App-Version, Schema und Sicherung gemeinsam prüfen. Erfolgreiche Backups und alte Release-Images werden nicht automatisch gelöscht; Speicherbedarf überwachen und Sicherungen zusätzlich extern aufbewahren. Die Archivprüfung ersetzt keinen vollständigen Restore-Test. Diese Deployment-Sicherungen sind einfache Dumps mit Konfiguration/Revision, **keine** Manifest-Bundles des Python-Backupskripts aus Abschnitt 4.
+
+PostgreSQL bleibt auf Hauptversion 18. Ein Major-Upgrade benötigt einen separat getesteten Dump/Restore oder `pg_upgrade`. Das Deployment aktualisiert die PostgreSQL-Hauptversion nicht automatisch. Es richtet weder Internetfreigaben noch automatische unbeaufsichtigte Updates ein.
+
+Prüfen der Fehlergrenzen (ohne Docker/Produktivdaten):
+
+```sh
+bash -n scripts/deploy-unraid.sh scripts/unraid-release.sh
+python3 -m unittest discover -s tests -p unraid_deploy_test.py
+```
 
 ## Betriebsgrenzen
 
