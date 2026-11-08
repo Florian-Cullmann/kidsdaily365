@@ -1,6 +1,6 @@
 # Buddy-Accessoires · Vorbereitungsstufe für #3
 
-Eltern können unter **Kinderprofile → Ausstattung** einen kostenlosen Stern-Anstecker freigeben und anschließend anlegen oder ablegen. Freigeben und Anlegen sind getrennte Schritte. Ablegen entfernt den Besitz nicht. Es gibt noch keinen Shop, keine Käufe, keine Einlösung und keine Sterne-Abbuchungen. Android und Wandgeräte dürfen die Ausstattung nicht verändern.
+Eltern können unter **Kinderprofile → Ausstattung** einen kostenlosen Stern-Anstecker freigeben und anschließend anlegen oder ablegen. Freigeben und Anlegen sind getrennte Schritte. Ablegen entfernt den Besitz nicht. Für Buddy-Accessoires gibt es noch keinen Shop, keine Käufe und keine Sterne-Abbuchungen. Familienbelohnungen haben einen getrennten Freigabeablauf im Elternbereich. Android und Wandgeräte dürfen die Ausstattung nicht verändern.
 
 ## Daten und Grenzen
 

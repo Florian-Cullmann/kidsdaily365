@@ -9,14 +9,16 @@ Eine selbst gehostete Familien-App für neurodivergente Kinder: eigener Buddy, �
 - Eigene Profilbilder im Elternbereich hochladen, zuschneiden, ersetzen und entfernen. Ohne Bild bleibt der Buddy in der Profilauswahl sichtbar. Bilder werden geschützt in PostgreSQL gespeichert und sind im Datenbank-Backup enthalten.
 - Kinderprofile mit eigenem Buddy, Aufgaben, Terminen und Sternestand; Archivierung erhält den bisherigen Verlauf.
 - Routinen mit sortierbaren, einzeln abhakbaren Schritten nach Wochentagen; einmalige Tagesaufgaben, Termine und gemeinsame Belohnungsziele verwalten. Die Kinderansicht zeigt den Gruppenfortschritt (z. B. 2 von 3).
+- [Wöchentliche Terminserien](docs/appointment-series.md) mit vollständiger Vorschau, Familienzeitzone und höchstens 53 Vorkommen; einzelne Termine verschieben/absagen oder die verbleibende Serie nach Vorschau beenden.
 - Routinenänderungen gelten für noch nicht angelegte Tagespläne. Bestehende Tageskopien und verdiente Sterne bleiben erhalten; die Migration übernimmt bisherige Routinen als Gruppen mit einem Schritt.
 - Kindliche Waldwelt, große Aufgabenkarten zum Abhaken und untere Navigation für Wand-Tablets. Profile und Punkte bleiben getrennt; paralleles Abhaken vergibt keine doppelten Sterne.
+- Wandbildschirme gleichen sichtbare Pläne und die Profilauswahl alle zehn Sekunden ab. Auswahl, Ansicht und Scrollposition bleiben erhalten; Verbindungsprobleme zeigen den letzten Abgleich, ein Widerruf führt zurück zur Kopplung. Nach dem Tageswechsel werden alte Aufgaben bis zum Laden des neuen Plans nicht mehr angeboten.
 - Wandbildschirme und Android-Geräte einzeln freigeben und sperren. Android-Geräte gehören genau einem Kind und haben keine Schreibrechte.
 - Lokaler Android-Elternzugang mit Offline-Wartung, einmaliger Eltern-Bestätigung zur Einrichtung und begrenzten Fehlversuchen.
 - App-Freigaben je Kind im Elternbereich; Audible als erste Freigabe bei neuen Profilen.
 - Launcher-API für Buddy, Sternestand und App-Liste. Das native Projekt unter `apps/android/` bleibt ohne Provisionierung ungeschützt. Auf ausdrücklich eingerichteten Device-Owner-Geräten stehen Lock Task, Kamera-/Systemleisten-Sperren und Offline-Wartung bereit; die physische Geräteabnahme aus [Issue #2](https://github.com/Florian-Cullmann/kidsdaily365/issues/2) steht noch aus. [Provisionierung und Recovery](apps/android/README.md#device-owner-bewusst-provisionieren).
 
-Belohnungseinlösung und [Buddy-Kosmetik](https://github.com/Florian-Cullmann/kidsdaily365/issues/3) sind noch nicht umgesetzt. Es gibt keine Werbung, zufälligen Belohnungen, Streak-Strafen, externen Fonts oder automatisch gestarteten Sounds. [Illustrationen und Prompts](docs/illustrations.md) liegen im Projekt.
+Belohnungen können am gekoppelten Wandbildschirm angefragt und im Elternbereich bestätigt oder abgelehnt werden. Erst die Bestätigung zieht die angebotenen Sternkosten ab; Anfragen und Entscheidungen bleiben im Verlauf. [Buddy-Kosmetik](https://github.com/Florian-Cullmann/kidsdaily365/issues/3) ist noch nicht umgesetzt. Es gibt keine Werbung, zufälligen Belohnungen, Streak-Strafen, externen Fonts oder automatisch gestarteten Sounds. [Illustrationen und Prompts](docs/illustrations.md) liegen im Projekt.
 
 ## Lokal als Demo starten
 
@@ -56,6 +58,12 @@ tests/                    Unit-, API-Grenz- und Datenbanktests
 ```
 
 Next.js/TypeScript und PostgreSQL/Drizzle bilden einen modularen Monolithen. Der Wandbildschirm verwendet ein eigenes Gerätecookie; Eltern erhalten ein getrenntes Sitzungscookie; Android verwendet einen kindgebundenen Bearer-Token. [Architektur](docs/architecture.md) und [Android-Konzept](docs/android.md) erklären die Sicherheitsgrenzen und den aktuellen Umsetzungsstand.
+
+## Konfiguration vor dem Start prüfen
+
+Nach `npm ci` prüft `npm run config:check` die lokale `.env`. Bereits gesetzte Umgebungsvariablen haben Vorrang. Im Demo-Modus sind keine Live-Zugangsdaten nötig; im Live-Modus gelten dieselben Regeln wie im Server. Ohne `APP_MODE` gilt bei `NODE_ENV=production` Live, sonst Demo. Der Befehl meldet nur Variablennamen, keine Werte oder Geheimnisse, und endet bei Fehlern mit Exitcode 1.
+
+Ein Erfolg bestätigt ausschließlich die App-Konfiguration: keine Datenbankverbindung, Migration oder Netzwerkprüfung. Docker-/Postgres-Parameter wie `POSTGRES_PASSWORD` werden nicht geprüft. Im Compose-Betrieb wird `DATABASE_URL` gesondert gesetzt; ein lokaler Check prüft die lokale Umgebung, nicht die spätere Containerkonfiguration.
 
 ## Prüfen
 

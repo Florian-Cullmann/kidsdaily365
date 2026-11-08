@@ -1,5 +1,5 @@
 {
-  "id": "adfe61fb-4920-4973-b133-391f5c8fe551",
+  "id": "7d65ade1-6166-46ec-af21-d88d6f7630d1",
   "prevId": "3a1f941b-ba1c-4e48-a308-54588c1eda9f",
   "version": "7",
   "dialect": "postgresql",
@@ -1033,13 +1033,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "appStatuses": {
-          "name": "appStatuses",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
         }
       },
       "indexes": {},
@@ -1888,6 +1881,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "copyRequestId": {
+          "name": "copyRequestId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "copyFingerprint": {
+          "name": "copyFingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "id": {
           "name": "id",
           "type": "uuid",
@@ -2003,6 +2008,14 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
+        "templates_copy_request": {
+          "name": "templates_copy_request",
+          "nullsNotDistinct": false,
+          "columns": [
+            "familyId",
+            "copyRequestId"
+          ]
+        },
         "templates_child_family_identity": {
           "name": "templates_child_family_identity",
           "nullsNotDistinct": false,

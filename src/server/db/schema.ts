@@ -1,7 +1,7 @@
 import type { AppStatus } from "@/domain/device-management";
 import type { RoutineStep } from "@/domain/management";
 import { sql } from "drizzle-orm";
-import { boolean, check, customType, date, foreignKey, index, integer, jsonb, pgEnum, pgTable, text, time, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, customType, date, foreignKey, index, integer, jsonb, pgEnum, pgTable, text, time, timestamp, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 export const daySection = pgEnum("day_section", ["morning", "afternoon", "evening"]);
 export const taskIcon = pgEnum("task_icon", ["sun", "toothbrush", "backpack", "book", "moon", "heart"]);
@@ -62,6 +62,8 @@ export const childImages = pgTable("child_images", {
 // Templates describe routines; occurrences are immutable daily snapshots.
 export const taskTemplates = pgTable("task_templates", {
   steps: jsonb().$type<RoutineStep[]>(),
+  copyRequestId: uuid(),
+  copyFingerprint: text(),
   id: uuid().primaryKey().defaultRandom(),
   familyId: uuid().notNull().references(() => families.id),
   childId: uuid().notNull(),
@@ -76,9 +78,24 @@ export const taskTemplates = pgTable("task_templates", {
   weekdays: integer().array().notNull().default(sql`ARRAY[1,2,3,4,5,6,7]::integer[]`),
 }, (table) => [
   foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
+  unique("templates_copy_request").on(table.familyId, table.copyRequestId),
   unique("templates_child_family_identity").on(table.id, table.childId, table.familyId),
   check("template_points_range", sql`${table.points} between 0 and 1000`),
   check("template_valid_weekdays", sql`cardinality(${table.weekdays}) between 1 and 7 and ${table.weekdays} <@ ARRAY[1,2,3,4,5,6,7]::integer[]`),
+]);
+
+// Exceptions are retained after revocation so historical paused snapshots keep their provenance.
+export const routinePauses = pgTable("routine_pauses", {
+  id: uuid().primaryKey().defaultRandom(),
+  familyId: uuid().notNull(), childId: uuid().notNull(), routineId: uuid().notNull(),
+  startsOn: date().notNull(), endsOn: date().notNull(), reason: text().notNull().default(""),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  revokedAt: timestamp({ withTimezone: true }),
+}, (table) => [
+  foreignKey({ columns: [table.routineId, table.childId, table.familyId], foreignColumns: [taskTemplates.id, taskTemplates.childId, taskTemplates.familyId] }).onDelete("cascade"),
+  unique("pause_routine_child_family_identity").on(table.id, table.routineId, table.childId, table.familyId),
+  index("routine_pause_dates").on(table.familyId, table.routineId, table.startsOn, table.endsOn),
+  check("pause_dates_ordered", sql`${table.endsOn} >= ${table.startsOn}`),
 ]);
 
 export const dailyTasks = pgTable("daily_tasks", {
@@ -97,28 +114,32 @@ export const dailyTasks = pgTable("daily_tasks", {
   points: integer().notNull(),
   sortOrder: integer().notNull().default(0),
   cancelledAt: timestamp({ withTimezone: true }),
+  pausedBy: uuid(),
 }, (table) => [
   foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
   foreignKey({ columns: [table.templateId, table.childId, table.familyId], foreignColumns: [taskTemplates.id, taskTemplates.childId, taskTemplates.familyId] }),
+  foreignKey({ columns: [table.pausedBy, table.templateId, table.childId, table.familyId], foreignColumns: [routinePauses.id, routinePauses.routineId, routinePauses.childId, routinePauses.familyId] }),
+  check("paused_task_has_routine", sql`${table.pausedBy} is null or ${table.templateId} is not null`),
   unique("tasks_child_family_identity").on(table.id, table.childId, table.familyId),
   unique("one_template_per_day").on(table.templateId, table.date, table.stepIndex),
   index("tasks_day_lookup").on(table.familyId, table.childId, table.date),
   check("task_points_range", sql`${table.points} between 0 and 1000`),
 ]);
 
-// Append-only earnings journal. One entry per task, enforced by PostgreSQL.
-// Redemptions/adjustments will get their own audited workflow in a later phase.
+// Shared append-only earnings/expenses journal. Task history remains immutable.
 export const pointEntries = pgTable("point_entries", {
   id: uuid().primaryKey().defaultRandom(),
   familyId: uuid().notNull().references(() => families.id),
   childId: uuid().notNull(),
-  taskId: uuid().notNull().unique(),
+  taskId: uuid().unique(),
+  expenseKey: text().unique(),
   amount: integer().notNull(),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   foreignKey({ columns: [table.taskId, table.childId, table.familyId], foreignColumns: [dailyTasks.id, dailyTasks.childId, dailyTasks.familyId] }),
   index("points_child_lookup").on(table.familyId, table.childId),
-  check("earned_points_range", sql`${table.amount} between 0 and 1000`),
+  foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
+  check("journal_entry_kind", sql`(${table.taskId} is not null and ${table.expenseKey} is null and ${table.amount} between 0 and 1000) or (${table.taskId} is null and ${table.expenseKey} is not null and ${table.amount} < 0)`),
 ]);
 
 export const rewards = pgTable("rewards", {
@@ -127,9 +148,26 @@ export const rewards = pgTable("rewards", {
   title: text().notNull(),
   cost: integer().notNull(),
   active: boolean().notNull().default(true),
-}, (table) => [check("reward_cost_positive", sql`${table.cost} > 0`)]);
+}, (table) => [unique("reward_family_identity").on(table.id, table.familyId), check("reward_cost_positive", sql`${table.cost} > 0`)]);
+
+// Concrete occurrences are created once; retries and cancellations never regenerate them.
+export const appointmentSeries = pgTable("appointment_series", {
+  id: uuid().primaryKey().defaultRandom(),
+  familyId: uuid().notNull().references(() => families.id),
+  childId: uuid().notNull(),
+  requestId: uuid().notNull(),
+  inputHash: text().notNull(),
+  timezone: text().notNull(),
+  endedAt: timestamp({ withTimezone: true }),
+}, (table) => [
+  foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
+  unique("appointment_series_request").on(table.familyId, table.requestId),
+  unique("appointment_series_child_family").on(table.id, table.childId, table.familyId),
+]);
 
 export const appointments = pgTable("appointments", {
+  seriesId: uuid(),
+  occurrenceIndex: integer(),
   id: uuid().primaryKey().defaultRandom(),
   familyId: uuid().notNull().references(() => families.id),
   childId: uuid().notNull(),
@@ -140,6 +178,9 @@ export const appointments = pgTable("appointments", {
   active: boolean().notNull().default(true),
 }, (table) => [
   foreignKey({ columns: [table.childId, table.familyId], foreignColumns: [children.id, children.familyId] }),
+  foreignKey({ columns: [table.seriesId, table.childId, table.familyId], foreignColumns: [appointmentSeries.id, appointmentSeries.childId, appointmentSeries.familyId] }),
+  unique("appointment_series_occurrence").on(table.seriesId, table.occurrenceIndex),
+  check("appointment_series_position", sql`(${table.seriesId} is null and ${table.occurrenceIndex} is null) or (${table.seriesId} is not null and ${table.occurrenceIndex} is not null and ${table.occurrenceIndex} between 0 and 52)`),
   index("appointments_child_time").on(table.familyId, table.childId, table.startsAt),
   check("appointment_end_after_start", sql`${table.endsAt} is null or ${table.endsAt} > ${table.startsAt}`),
 ]);
@@ -254,4 +295,34 @@ export const childMessages = pgTable("child_messages", {
   unique("message_request_identity").on(t.familyId, t.childId, t.senderId, t.requestId),
   index("messages_conversation").on(t.familyId, t.childId, t.createdAt),
   check("message_body_length", sql`length(${t.body}) between 1 and 2000`),
+]);
+
+export const rewardRequests = pgTable("reward_requests", {
+  id: uuid().primaryKey(), familyId: uuid().notNull(), childId: uuid().notNull(), rewardId: uuid().notNull(),
+  title: text().notNull(), cost: integer().notNull(),
+  status: text().$type<"pending" | "approved" | "rejected">().notNull().default("pending"),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  decidedAt: timestamp({ withTimezone: true }), decidedBy: uuid(),
+}, (t) => [
+  foreignKey({ columns: [t.childId, t.familyId], foreignColumns: [children.id, children.familyId] }),
+  foreignKey({ columns: [t.rewardId, t.familyId], foreignColumns: [rewards.id, rewards.familyId] }),
+  foreignKey({ columns: [t.decidedBy, t.familyId], foreignColumns: [parents.id, parents.familyId] }),
+  uniqueIndex("one_open_reward_request").on(t.childId, t.rewardId).where(sql`${t.status} = 'pending'`),
+  check("request_cost_positive", sql`${t.cost} > 0`),
+  check("request_decision", sql`(${t.status} = 'pending' and ${t.decidedAt} is null and ${t.decidedBy} is null) or (${t.status} in ('approved', 'rejected') and ${t.decidedAt} is not null and ${t.decidedBy} is not null)`),
+]);
+
+// Every retry key is retained, even when multiple attempts resolved to one open request.
+export const rewardRequestKeys = pgTable("reward_request_keys", {
+  id: uuid().primaryKey(), requestId: uuid().notNull().references(() => rewardRequests.id),
+});
+
+// A preference only: no reservation or journal entry is created.
+export const childSavingsGoals = pgTable("child_savings_goals", {
+  childId: uuid().primaryKey(),
+  familyId: uuid().notNull(),
+  rewardId: uuid().notNull(),
+}, (t) => [
+  foreignKey({ columns: [t.childId, t.familyId], foreignColumns: [children.id, children.familyId] }).onDelete("cascade"),
+  foreignKey({ columns: [t.rewardId, t.familyId], foreignColumns: [rewards.id, rewards.familyId] }),
 ]);
