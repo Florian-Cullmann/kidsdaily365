@@ -167,3 +167,22 @@ it("serializes reward requests with completions and ignores older polls", async 
   expect(sync.getSnapshot().plans[0].balance).toBe(42);
   fresh.resolve(snapshot([updated])); await flush();
 });
+
+
+it("saves and clears goals through the shared writer without changing the balance", async () => {
+  const post = deferred<Response>(); const fresh = deferred<Response>();
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(snapshot()).mockReturnValueOnce(post.promise).mockReturnValueOnce(fresh.promise);
+  const sync = create(fetcher); sync.start(); await flush();
+  const plan = plans()[0];
+  const saving = sync.saveGoal(plan.child.id, "goal");
+  expect(await sync.requestReward(plan.child.id, "reward", "retry-id")).toBeNull();
+  expect(fetcher.mock.calls[1][1]).toMatchObject({ method: "PUT", body: JSON.stringify({ rewardId: "goal" }) });
+  const updated = { ...plan, savingsGoalId: "goal" };
+  post.resolve(Response.json({ plan: updated })); await saving;
+  expect(sync.getSnapshot().plans[0]).toMatchObject({ savingsGoalId: "goal", balance: plan.balance });
+  fresh.resolve(snapshot([updated])); await flush();
+  fetcher.mockResolvedValueOnce(Response.json({ plan: { ...plan, savingsGoalId: null } })).mockResolvedValueOnce(snapshot());
+  await sync.saveGoal(plan.child.id, null);
+  expect(fetcher.mock.calls[3][1]).toMatchObject({ method: "PUT", body: JSON.stringify({ rewardId: null }) });
+  expect(sync.getSnapshot().plans[0].savingsGoalId).toBeNull();
+});

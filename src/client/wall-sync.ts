@@ -123,7 +123,11 @@ export class WallSync {
     return this.mutate(childId, rewardId, `/api/children/${childId}/reward-requests`, { rewardId, requestId });
   }
 
-  private async mutate(childId: string, busyId: string, url: string, body?: unknown): Promise<Completion> {
+  async saveGoal(childId: string, rewardId: string | null): Promise<Completion> {
+    return this.mutate(childId, "savings-goal", `/api/children/${childId}/savings-goal`, { rewardId }, "PUT");
+  }
+
+  private async mutate(childId: string, busyId: string, url: string, body?: unknown, method = "POST"): Promise<Completion> {
     if (!this.active || this.write || this.state.phase !== "connected") return null;
     this.generation++;
     this.read?.abort(); this.read = null;
@@ -132,7 +136,7 @@ export class WallSync {
     this.publish({ busyTaskId: busyId, refreshing: false });
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await this.fetcher(url, { method: "POST", signal: controller.signal, ...(body === undefined ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }) });
+      const response = await this.fetcher(url, { method, signal: controller.signal, ...(body === undefined ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }) });
       if (!this.active || this.write !== controller) return null;
       if (response.status === 401 || response.status === 403) { this.revoked(); return null; }
       const data = await response.json();

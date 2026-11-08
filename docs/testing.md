@@ -127,6 +127,12 @@ Mit fiktiven Profilen am gekoppelten Wandbildschirm einen erreichbaren Wunsch ö
 Zwischen Anfrage und Bestätigung den Preis ändern (der angefragte Preis bleibt bestehen) bzw. den Wunsch archivieren (Bestätigung muss scheitern; Ablehnung bleibt möglich). Offline darf keine Erfolgsmeldung erscheinen. Eine nach dem Speichern verlorene Antwort erneut versuchen: gleiche Anfrage-ID und nur eine persistierte Anfrage. Die Kinderansicht aktualisiert den Serverstand über den gemeinsamen Wandabgleich alle 10 Sekunden im Vordergrund.
 
 `tests/rewards.integration.test.ts` prüft auf einer migrierten disposable `*_test`-Datenbank parallele Anfragen, alternative Wiederholungs-IDs nach einer Entscheidung, konkurrierende Ausgaben bei knappem Guthaben, gegensätzliche Elternentscheidungen, archivierte Wünsche, Preisänderungen, manipulierte Eingaben und Haushalts-/Geschwistergrenzen. Die echten Route-Handler prüfen fehlende, native und widerrufene Gerätezugänge, getrennte Elternsitzungen und falsche Origins. Browserprüfungen ergänzen dies um bewusste Bestätigung, Offline-/Antwortverlust und den sichtbaren Verlauf.
+
+## Persönliches Sparziel
+
+Am gekoppelten Wandbildschirm unter „Sterne“ einen Wunsch als Sparziel wählen, zur Tagesansicht zurückkehren und neu laden: Ziel, verfügbares Guthaben und fehlende Sterne bleiben sichtbar. Ein anderes Kind behält seine eigene Auswahl. Ziel wechseln und entfernen: Guthaben und Einlösungsverlauf bleiben unverändert. Einen gewählten Wunsch im Elternbereich archivieren: Das Kind erhält einen verständlichen Hinweis und kann einen anderen Wunsch wählen oder die Auswahl entfernen. Ohne Auswahl wird kein Wunsch automatisch zum Ziel. Im Demo-Modus ist die Auswahl nur lokal zum Ausprobieren.
+
+`tests/savings-goals.integration.test.ts` prüft Persistenz, Profiltrennung, Archivierung, unveränderte Sterne und den bestehenden Einlöseweg sowie Haushaltsbindung, manipulierte Eingaben, Origins, fehlende/widerrufene Wandkopplung und ausgeschlossene Android-/Setup-Tokens.
 ## Ersteinrichtung in der Elternübersicht (#51)
 
 Die Checkliste wird aus den gespeicherten Haushaltsdaten abgeleitet. Es gibt keine

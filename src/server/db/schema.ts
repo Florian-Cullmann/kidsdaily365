@@ -314,3 +314,13 @@ export const rewardRequests = pgTable("reward_requests", {
 export const rewardRequestKeys = pgTable("reward_request_keys", {
   id: uuid().primaryKey(), requestId: uuid().notNull().references(() => rewardRequests.id),
 });
+
+// A preference only: no reservation or journal entry is created.
+export const childSavingsGoals = pgTable("child_savings_goals", {
+  childId: uuid().primaryKey(),
+  familyId: uuid().notNull(),
+  rewardId: uuid().notNull(),
+}, (t) => [
+  foreignKey({ columns: [t.childId, t.familyId], foreignColumns: [children.id, children.familyId] }).onDelete("cascade"),
+  foreignKey({ columns: [t.rewardId, t.familyId], foreignColumns: [rewards.id, rewards.familyId] }),
+]);
