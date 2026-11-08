@@ -1,26 +1,31 @@
 // @vitest-environment jsdom
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { TaskCorrection } from "@/components/task-correction";
 import { demoPlans } from "@/domain/demo";
 import { completeDemoTask, taskProgress } from "@/domain/plan";
 const refresh = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+  HTMLDialogElement.prototype.close = function () { this.open = false; };
+});
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 it("only withdraws after OK and permits safe retry after a lost response", async () => {
   const fetch = vi.fn().mockRejectedValueOnce(new Error("Verbindung unterbrochen")).mockResolvedValueOnce(Response.json({ id: "stored" }));
-  const confirm = vi.fn().mockReturnValueOnce(false).mockReturnValue(true);
   vi.stubGlobal("fetch", fetch);
-  vi.stubGlobal("confirm", confirm);
   render(<TaskCorrection completionId="entry" />);
   const button = screen.getByRole("button", { name: "Bestätigung zurückziehen" });
   fireEvent.click(button);
-  expect(confirm).toHaveBeenCalledWith("Bestätigung wirklich zurückziehen?");
+  expect(screen.getByRole("dialog", { name: "Bestätigung wirklich zurückziehen?" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Abbrechen" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
   expect(fetch).not.toHaveBeenCalled();
   fireEvent.click(button);
+  fireEvent.click(screen.getByRole("button", { name: "OK" }));
   await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Verbindung unterbrochen"));
   expect(refresh).not.toHaveBeenCalled();
-  fireEvent.click(button);
+  fireEvent.click(screen.getByRole("button", { name: "OK" }));
   await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
   expect(fetch).toHaveBeenCalledTimes(2);
   expect(fetch.mock.calls[0]).toEqual(fetch.mock.calls[1]);
@@ -30,16 +35,20 @@ it("shows server errors and prevents another request while saving", async () => 
   let finish!: (response: Response) => void;
   const fetch = vi.fn(() => new Promise<Response>(resolve => { finish = resolve; }));
   vi.stubGlobal("fetch", fetch);
-  vi.stubGlobal("confirm", vi.fn(() => true));
   render(<TaskCorrection completionId="entry" />);
-  fireEvent.click(screen.getByRole("button"));
-  expect((screen.getByRole("button") as HTMLButtonElement).disabled).toBe(true);
-  fireEvent.click(screen.getByRole("button"));
+  fireEvent.click(screen.getByRole("button", { name: "Bestätigung zurückziehen" }));
+  const ok = screen.getByRole("button", { name: "OK" });
+  fireEvent.click(ok);
+  expect((ok as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(ok);
+  const cancelEvent = new Event("cancel", { cancelable: true });
+  fireEvent(screen.getByRole("dialog"), cancelEvent);
+  expect(cancelEvent.defaultPrevented).toBe(true);
   expect(fetch).toHaveBeenCalledTimes(1);
   finish(Response.json({ error: "Nicht genügend Sterne." }, { status: 409 }));
   await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("Nicht genügend Sterne."));
   expect(refresh).not.toHaveBeenCalled();
-  expect((screen.getByRole("button") as HTMLButtonElement).disabled).toBe(false);
+  expect((screen.getByRole("button", { name: "OK" }) as HTMLButtonElement).disabled).toBe(false);
 });
 it("never counts or completes a corrected task as ordinary work", () => {
   const plan = demoPlans()[0];
