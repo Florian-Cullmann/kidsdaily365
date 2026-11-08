@@ -765,3 +765,42 @@ describe("wall buddy onboarding", () => {
     expect((await getDayPlans(familyId))[0].child.buddyInitialized).toBe(false);
   });
 });
+
+describe("explicit child reactivation", () => {
+  it("preserves history, buddy and settings without backfill or reviving device tokens", async () => {
+    const parent = await actor(); const kid = await child(parent, "Mika");
+    const input = { name: "Mika", avatar: "M", reducedMotion: true, active: true };
+    const routine = await saveRecord(parent, "routines", { childId: kid.id, title: "Morgen", section: "morning", weekdays: [1, 2, 3, 4, 5, 6, 7], steps: [{ title: "Zähne", icon: "toothbrush", points: 3 }] });
+    const first = (await getDayPlans(familyId, new Date("2026-01-01T12:00:00Z")))[0];
+    await completeTask(familyId, first.tasks[0].id, new Date("2026-01-01T12:00:00Z"));
+    const phoneCode = await createPairingCode(parent, { kind: "android", childId: kid.id, label: "Phone" });
+    const phone = await exchangePairingCode(phoneCode.code, null);
+    const wallCode = await createPairingCode(parent, { kind: "wall", childId: null, label: "Wall" });
+    const wall = await exchangePairingCode(wallCode.code, origin);
+    const appsBefore = await db().select().from(allowedApps).where(eq(allowedApps.childId, kid.id));
+    const profileBefore = (await db().select().from(children).where(eq(children.id, kid.id)))[0];
+    await archiveRecord(parent, "children", kid.id);
+    expect(await getDayPlans(familyId, new Date("2026-01-02T12:00:00Z"))).toHaveLength(0);
+    const revokedBefore = (await db().select().from(devices).where(eq(devices.id, phone.id)))[0].revokedAt;
+    await expect(saveRecord(await actor(otherFamilyId), "children", input, kid.id)).rejects.toMatchObject({ status: 404 });
+    const { PUT } = await import("@/app/api/parent/records/[resource]/[id]/route");
+    for (const token of [phone.token, wall.token]) {
+      cookieState.set("kidsdaily_parent", token); cookieState.set("kidsdaily_device", token);
+      const response = await PUT(new Request(`${origin}/api/parent/records/children/${kid.id}`, { method: "PUT", headers: { Origin: origin, Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(input) }), { params: Promise.resolve({ resource: "children", id: kid.id }) });
+      expect(response.status).toBe(401);
+    }
+    for (let retry = 0; retry < 2; retry++) await saveRecord(parent, "children", input, kid.id);
+    expect((await db().select().from(children).where(eq(children.id, kid.id)))[0]).toEqual(profileBefore);
+    expect(await db().select().from(allowedApps).where(eq(allowedApps.childId, kid.id))).toEqual(appsBefore);
+    expect(await deviceFromToken(phone.token)).toBeNull();
+    expect((await db().select().from(devices).where(eq(devices.id, phone.id)))[0].revokedAt).toEqual(revokedBefore);
+    expect(await deviceFromToken(wall.token)).not.toBeNull();
+    await getDayPlans(familyId, new Date("2026-01-03T12:00:00Z"));
+    await getDayPlans(familyId, new Date("2026-01-03T12:00:00Z"));
+    const tasks = await db().select().from(dailyTasks).where(eq(dailyTasks.templateId, routine.id));
+    expect(tasks.map(task => task.date).sort()).toEqual(["2026-01-01", "2026-01-03"]);
+    expect(await db().select().from(pointEntries).where(eq(pointEntries.childId, kid.id))).toHaveLength(1);
+    const freshCode = await createPairingCode(parent, { kind: "android", childId: kid.id, label: "Neu gekoppelt" });
+    expect(await deviceFromToken((await exchangePairingCode(freshCode.code, null)).token)).not.toBeNull();
+  });
+});

@@ -95,7 +95,7 @@ export function ParentRecordForm({ resource, data, record, defaultChildId, copyS
     setTimeError("");
     const form = new FormData(event.currentTarget);
     const field = (key: string) => String(form.get(key) ?? "").trim();
-    const active = form.get("active") === "on";
+    const active = resource === "children" ? record?.active !== false : form.get("active") === "on";
     let input: unknown;
     if (resource === "children") input = { name: field("name"), avatar: field("avatar") || Array.from(field("name"))[0], ...(record?.buddyInitialized === true ? { buddyName: field("buddyName"), buddyKind: field("buddyKind") } : {}), reducedMotion: form.get("reducedMotion") === "on", active };
     else if (isTask) {
@@ -193,7 +193,7 @@ export function ParentRecordForm({ resource, data, record, defaultChildId, copyS
         <label>Anzeigename<input name="label" defaultValue={text("label")} required maxLength={80} placeholder="Audible" /></label>
         <label className="wide-field">Android-Paketname<input name="packageName" defaultValue={text("packageName")} required maxLength={255} placeholder="com.audible.application" autoCapitalize="none" autoCorrect="off" spellCheck={false} /><span className="field-help">Exakter Paketname der installierten App, keine Website oder Suchbegriffe.</span></label>
       </>}
-      {resource !== "tasks" && !weekly && <label className="check-field wide-field"><input name="active" type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} /><span>{resource === "apps" ? "App freigegeben" : "Aktiv"}</span></label>}
+      {resource !== "tasks" && resource !== "children" && !weekly && <label className="check-field wide-field"><input name="active" type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} /><span>{resource === "apps" ? "App freigegeben" : "Aktiv"}</span></label>}
     </fieldset>
     <div className="record-form-actions"><button type="button" className="parent-secondary" onClick={onCancel} disabled={busy}>Abbrechen</button><button className="parent-primary" disabled={busy}>{busy ? "Wird gespeichert …" : resource === "appointments" && !record ? (weekly ? "Terminserie anlegen" : "Termin anlegen") : "Speichern"}</button></div>
   </form>;
